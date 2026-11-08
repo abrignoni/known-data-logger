@@ -30,6 +30,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val repo = Repo(applicationContext)
+        windowStart = repo.loadWindowStart()?.let { Pending(it) }
         setContent {
             MaterialTheme(colorScheme = if (androidx.compose.foundation.isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
                 App(repo)
@@ -248,12 +249,13 @@ fun LogScreen(repo: Repo, bump: () -> Unit, onExportNeeded: () -> Unit) {
         val start = windowStart
         OutlinedButton(enabled = ready, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), onClick = {
             if (start == null) {
-                windowStart = Pending(repo.stamp()); toast(ctx, "Start stamped. Tap Done when it ends.")
+                val s = repo.stamp()
+                repo.saveWindowStart(s); windowStart = Pending(s); toast(ctx, "Start stamped. Tap Done when it ends.")
             } else {
                 val end = repo.stamp()
                 val d = draft()
                 report(repo.log(d, start.stamp, windowS = (end.elapsedMs - start.stamp.elapsedMs) / 1000.0))
-                windowStart = null; lastDraft = d; bump()
+                repo.saveWindowStart(null); windowStart = null; lastDraft = d; bump()
             }
         }) { Text(if (start == null) "Start (call, recording)" else "Done: started ${hhmmss(start.stamp)}") }
         Spacer(Modifier.height(24.dp))

@@ -42,6 +42,26 @@ class Repo(private val context: Context) {
 
     fun stamp(): Stamp = Clocks.stamp(resolver)
 
+    /** Start stamp of an open Start/Done window, kept in the database so a killed app keeps it. */
+    fun saveWindowStart(s: Stamp?) {
+        if (s == null) { db.writableDatabase.delete("settings", "key=?", arrayOf("window_start")); return }
+        db.putSetting("window_start", JSONObject().apply {
+            put("utc_ms", s.utcMs); put("tz_id", s.tzId); put("tz_offset_min", s.tzOffsetMin)
+            put("elapsed_ms", s.elapsedMs); put("boot_count", s.bootCount)
+            put("network_time_ms", s.networkTimeMs ?: JSONObject.NULL); put("gnss_time_ms", s.gnssTimeMs ?: JSONObject.NULL)
+        }.toString())
+    }
+
+    fun loadWindowStart(): Stamp? = db.setting("window_start")?.let {
+        val o = JSONObject(it)
+        Stamp(
+            utcMs = o.getLong("utc_ms"), tzId = o.getString("tz_id"), tzOffsetMin = o.getInt("tz_offset_min"),
+            elapsedMs = o.getLong("elapsed_ms"), bootCount = o.getInt("boot_count"),
+            networkTimeMs = if (o.isNull("network_time_ms")) null else o.getLong("network_time_ms"),
+            gnssTimeMs = if (o.isNull("gnss_time_ms")) null else o.getLong("gnss_time_ms"),
+        )
+    }
+
     private fun latestProfileId(): Long? = db.profiles().lastOrNull()?.id
 
     fun appVersion(pkg: String?): String? = pkg?.let {
@@ -179,11 +199,12 @@ class Repo(private val context: Context) {
     }
 
     private fun profileJson(p: Profile): JSONObject = JSONObject().apply {
-        put("id", p.id); put("utc_ms", p.utcMs); put("boot_count", p.bootCount)
-        put("manufacturer", p.manufacturer); put("model", p.model); put("device", p.device)
-        put("fingerprint", p.fingerprint); put("release", p.release); put("incremental", p.incremental)
-        put("sdk_int", p.sdkInt); put("security_patch", p.securityPatch); put("kernel", p.kernel)
-        put("baseband", p.baseband); put("carrier", p.carrier ?: JSONObject.NULL); put("notes", p.notes ?: JSONObject.NULL)
+        fun n(v: Any?): Any = v ?: JSONObject.NULL
+        put("id", n(p.id)); put("utc_ms", p.utcMs); put("boot_count", p.bootCount)
+        put("manufacturer", n(p.manufacturer)); put("model", n(p.model)); put("device", n(p.device))
+        put("fingerprint", n(p.fingerprint)); put("release", n(p.release)); put("incremental", n(p.incremental))
+        put("sdk_int", n(p.sdkInt)); put("security_patch", n(p.securityPatch)); put("kernel", n(p.kernel))
+        put("baseband", n(p.baseband)); put("carrier", n(p.carrier)); put("notes", n(p.notes))
     }
 
     fun manifest(rows: List<Entry>, jsonlBytes: ByteArray, exportStamp: Stamp): JSONObject {
@@ -193,7 +214,7 @@ class Repo(private val context: Context) {
             put("schema_version", SCHEMA_VERSION)
             put("logger", JSONObject().apply {
                 put("package", context.packageName)
-                put("version_name", self.versionName)
+                put("version_name", self.versionName ?: JSONObject.NULL)
                 put("first_install_ms", self.firstInstallTime)
                 put("last_update_ms", self.lastUpdateTime)
             })

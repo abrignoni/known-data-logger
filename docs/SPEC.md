@@ -50,8 +50,10 @@ Each entry stores:
 - `tz_id`, `tz_offset_min`: read fresh at each tap (ZoneId.systemDefault() on every call).
 - `elapsed_ms`: `SystemClock.elapsedRealtime()`, includes deep sleep, monotonic within a boot.
 - `boot_count`: `Settings.Global.BOOT_COUNT` (stubs: constant "boot_count"; API 24; read without a
-  permission per the Settings.Global page). Matches the value an extraction carries in
-  settings_global. Ordering key is (boot_count, elapsed_ms, seq).
+  permission per the Settings.Global page). A `boot_count` setting is present in
+  `settings_global.xml` on the Pixel3_A11 corpus image (read with an XML parser). Android 12+
+  images store that file as binary XML and were not checked. Ordering key is (boot_count,
+  elapsed_ms, seq).
 - `boot_wall_ms` = utc_ms minus elapsed_ms. Within one boot_count it is constant unless the clock
   was set; a jump between two entries is a clock change between them, detected with no receiver.
 - `network_time_ms`: `SystemClock.currentNetworkTimeClock()` (stubs; API 33): last network time
@@ -61,8 +63,8 @@ Each entry stores:
 
 There is no network time check and no INTERNET permission.
 
-Clock and time zone changes done as test steps are logged as actions; the app also flags a
-detected boot_wall_ms jump and asks for a note.
+Clock and time zone changes done as test steps are logged as actions by the researcher. The app
+also logs a detected change as its own row and shows a short message; it does not ask for a note.
 
 Checker tolerance defaults, written into every manifest so a checker does not have to guess:
 120 s for `exact`, 300 s for `before` and `after`, 900 s for `approximate`, and the window for
@@ -85,7 +87,7 @@ a time zone change (`clock_change`, action `clock_change_detected`).
 - Every entry is also appended to a JSONL file in the app-specific external files directory
   (no permission, no MediaStore rows, reachable with `adb pull`). This survives an app crash; it
   does not survive a factory reset.
-- A factory-reset action forces a manual export first. A manual export to Downloads creates
+- Logging a factory-reset action shows a reminder, logs the entry, then opens the Export tab. A manual export to Downloads creates
   MediaStore rows; each export is logged as its own entry.
 - The app's own database is evidence too: schema versioned from day one and documented, so a
   later ALEAPP module can parse it.

@@ -12,7 +12,8 @@ It is meant for test devices only. Never install it on an evidence device.
 Each entry gets the device clock (UTC ms), the time zone, the time since boot, the boot count from
 `Settings.Global.BOOT_COUNT`, and the system's last network and GNSS time when the phone has them.
 The time since boot and the boot count keep the order right when you change the clock or reboot as
-a test step. The app also notices those changes on its own and logs them.
+a test step. The app also notices those changes on its own and logs them. Clock and reboot
+detection were tried on an Android 15 emulator; time zone detection is covered by unit tests only.
 
 Edits never overwrite. Each edit is a new revision with the original action time, and removing an
 entry writes a tombstone.
@@ -46,7 +47,8 @@ Field definitions are in [docs/SPEC.md](docs/SPEC.md).
 
 ## Build
 
-Builds locally, no CI. Needs JDK 17 and the Android SDK with platform 37.2.
+Builds locally, no CI. Needs JDK 17 and the Android SDK with platform 37.2. Gradle finds the SDK
+through `sdk.dir` in `local.properties` (not committed) or the `ANDROID_HOME` variable.
 
 ```bash
 JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew testDebugUnitTest assembleDebug
