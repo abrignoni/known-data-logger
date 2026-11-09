@@ -203,7 +203,9 @@ label in two tables, a world clock city that the app stores with an accent the t
 a deleted alarm reported as not found with the database's freelist count, a running timer listed
 on the Time only sheet by its wall clock and its since-boot time, and the two text messages with
 their time column. The
-hits named here were checked by opening the stores by hand.
+hits named here were checked by opening the stores by hand. On the same image the LevelDB reader
+read the Google app's and Play services' LevelDB folders; the MMKV reader has run on test fixtures
+only, and the IndexedDB reader has not run on any store yet. Gzip files are listed as not read.
 
 ## Checking a LEAPP artifact (kdl_check.py)
 
