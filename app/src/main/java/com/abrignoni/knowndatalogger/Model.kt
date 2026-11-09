@@ -507,3 +507,71 @@ object Chain {
         return null
     }
 }
+
+
+/** Counts on the Check tab and the stop sheet, by kind. */
+data class PendingCounts(val inferred: Int, val marks: Int, val locked: Int, val stamped: Int) {
+    val total get() = inferred + marks + locked + stamped
+
+    companion object {
+        fun of(pending: List<Entry>) = PendingCounts(
+            inferred = pending.count { it.kind == Kind.ACTION && it.source == Source.AUTO_RULE && !it.reviewed },
+            marks = pending.count { it.isMark },
+            locked = pending.count { it.isWithheldNotification },
+            stamped = pending.count { it.needsDetail },
+        )
+    }
+}
+
+/** One capture session: from its start row to its stop row (or now, if still running). */
+data class SessionSummary(
+    val start: Stamp,
+    val end: Stamp?,
+    val durationMs: Long?,
+    val events: Int,
+    val screenshots: Int,
+)
+
+/**
+ * Summarizes the newest session. Events are the action and captured-event rows between start and
+ * stop (system rows excluded, original rows only). Duration uses the monotonic clock when start and
+ * stop are in the same boot, otherwise the wall clock.
+ */
+fun summarize(rows: List<Entry>, shots: Map<String, Shot>): SessionSummary? {
+    val ordered = rows.filter { it.revisionN == 0 }.sortedBy { it.seq }
+    val start = ordered.lastOrNull { it.action == "capture_session_start" } ?: return null
+    val stop = ordered.firstOrNull { it.seq > start.seq && it.action == "capture_session_stop" }
+    val inside = ordered.filter { it.seq > start.seq && (stop == null || it.seq < stop.seq) &&
+        (it.kind == Kind.ACTION || it.kind == Kind.AUTO_EVENT) }
+    val duration = stop?.let {
+        if (it.stamp.bootCount == start.stamp.bootCount) it.stamp.elapsedMs - start.stamp.elapsedMs
+        else it.stamp.utcMs - start.stamp.utcMs
+    }
+    val ids = inside.map { it.entryId }.toSet()
+    return SessionSummary(start.stamp, stop?.stamp, duration, inside.size,
+        shots.values.count { it.entryId in ids && it.file != null })
+}
+
+
+private val SYSTEM_LABELS = mapOf(
+    "capture_session_start" to "Session started", "capture_session_stop" to "Session stopped",
+    "capture_service_connected" to "Capture resumed", "capture_service_disconnected" to "Capture paused",
+    "boot_detected" to "Phone restarted", "clock_change_detected" to "Clock changed", "export" to "Exported",
+    "export_failed" to "Export failed", "profile_snapshot" to "Device snapshot", "app_installed" to "App installed",
+    "app_updated" to "App updated", "app_removed" to "App removed", "app_data_cleared" to "App data cleared",
+    "app_version_changed_since_last_seen" to "App version changed", "rule_taught" to "Rule taught",
+    "rule_removed" to "Rule removed", "hash_chain_backfilled" to "Hash chain started",
+)
+
+/** The words shown for an entry in the interface (the log keeps the action key). */
+fun displayLabel(e: Entry): String = when {
+    e.isMark -> "Mark"
+    e.isWithheldNotification -> "Notification"
+    e.needsDetail -> "Stamped, no action"
+    else -> SYSTEM_LABELS[e.action] ?: templateLabel(e.action).replaceFirstChar { it.uppercase() }
+}
+
+/** True for the pause and resume rows the capture service writes. */
+val Entry.isCapturePause: Boolean get() = action == "capture_service_connected" || action == "capture_service_disconnected"
+
+fun plural(n: Int, one: String, many: String = one + "s") = "$n ${if (n == 1) one else many}"

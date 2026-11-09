@@ -26,12 +26,18 @@ There is no field for passwords or passcodes. Keep those in your private notes.
 
 ## Automatic capture (0.2)
 
-1. Add the apps under test on the Scenario tab.
-2. Turn on "Known-data logger" in Settings, Accessibility. On Android 13 and later a sideloaded app
-   may first need App info, menu, Allow restricted settings (not yet confirmed on a phone).
-3. On the Capture tab, tap Start session. A red MARK button floats over every app.
-4. Use the phone. Tap MARK at any moment you want recorded with a screenshot.
-5. Stop the session, then go through Timeline, To review: accept or fix auto labels and label marks.
+1. On first launch KDL walks you through four steps: the test-phone notice with a scenario name and
+   device label, the apps to capture, turning on "Known-data logger" in Settings, Accessibility,
+   and done. If the switch is greyed out on Android 13 and later: App info, the three-dot menu,
+   Allow restricted settings (an `adb` install on a Pixel 7a with Android 17 did not need it).
+2. On the **Session** tab, tap Start session. A red MARK button floats over every app except KDL.
+3. Use the phone. Tap MARK at any moment you want recorded with a screenshot. Chips on the Session
+   tab log an action by hand, stamped at the tap.
+4. Stop the session. A sheet shows how many items need checking, with Check now, Export and Later.
+5. On the **Check** tab, label marks and locked notifications and accept or change inferred actions
+   ("Accept all" has Undo). The Timeline view shows every entry to the second; tap one to edit it.
+   **Setup** holds the scenario, apps, capture options, rules, device snapshots and the latest
+   row hash.
 
 What is captured, only in the apps under test plus System UI and Settings unless you choose all apps:
 

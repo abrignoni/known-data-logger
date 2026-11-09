@@ -67,6 +67,44 @@ class Repo private constructor(private val context: Context) {
     fun knownVersion(pkg: String): String? = db.setting("known_version:$pkg")
     fun setKnownVersion(pkg: String, v: String?) = db.putSetting("known_version:$pkg", v ?: "")
 
+    /** First-run setup finished. Installs from before it existed count as set up once they have a scenario. */
+    var onboarded: Boolean
+        get() = db.setting("onboarded") == "1" || scenarioId.isNotBlank()
+        set(v) = db.putSetting("onboarded", if (v) "1" else "0")
+
+    // ---- Sessions ----
+
+    val sessionActive: Boolean get() = flag(KEY_SESSION, false)
+
+    /** Stamp of the running session's start, for the timer. */
+    fun sessionStart(): Stamp? = loadStamp("session_start")
+
+    fun startSession() {
+        val s = stamp()
+        setFlag(KEY_SESSION, true)
+        saveStamp("session_start", s)
+        val allApps = flag(KEY_ALL_APPS, false)
+        log(Draft(action = "capture_session_start", source = Source.SYSTEM,
+            detail = "apps: " + (if (allApps) "all" else capturePackages().sorted().joinToString(" ")) +
+                "; screenshots: auto=${flag(KEY_SHOT_AUTO, true)} every_tap=${flag(KEY_SHOT_TAP, false)}"),
+            s, kind = Kind.SYSTEM_EVENT)
+    }
+
+    fun stopSession() {
+        setFlag(KEY_SESSION, false)
+        log(Draft(action = "capture_session_stop", source = Source.SYSTEM), kind = Kind.SYSTEM_EVENT)
+    }
+
+    /** The newest session (running or finished) and what it produced. */
+    fun lastSession(): SessionSummary? = summarize(db.entries(), db.shots())
+
+    fun pendingCounts(): PendingCounts = PendingCounts.of(Review.pending(db.entries()))
+
+    /** How many of the items to check happened at or after this session's start. */
+    fun pendingInSession(start: Stamp): Int = Review.pending(db.entries()).count {
+        it.stamp.bootCount > start.bootCount || (it.stamp.bootCount == start.bootCount && it.stamp.elapsedMs >= start.elapsedMs)
+    }
+
     fun flag(key: String, default: Boolean): Boolean = db.setting(key)?.let { it == "1" } ?: default
     fun setFlag(key: String, v: Boolean) = db.putSetting(key, if (v) "1" else "0")
 
@@ -123,16 +161,20 @@ class Repo private constructor(private val context: Context) {
     fun recordShot(shot: Shot) = db.putShot(shot)
 
     /** Start stamp of an open Start/Done window, kept in the database so a killed app keeps it. */
-    fun saveWindowStart(s: Stamp?) {
-        if (s == null) { db.writableDatabase.delete("settings", "key=?", arrayOf("window_start")); return }
-        db.putSetting("window_start", JSONObject().apply {
+    fun saveWindowStart(s: Stamp?) = saveStamp("window_start", s)
+
+    fun loadWindowStart(): Stamp? = loadStamp("window_start")
+
+    private fun saveStamp(key: String, s: Stamp?) {
+        if (s == null) { db.writableDatabase.delete("settings", "key=?", arrayOf(key)); return }
+        db.putSetting(key, JSONObject().apply {
             put("utc_ms", s.utcMs); put("tz_id", s.tzId); put("tz_offset_min", s.tzOffsetMin)
             put("elapsed_ms", s.elapsedMs); put("boot_count", s.bootCount)
             put("network_time_ms", s.networkTimeMs ?: JSONObject.NULL); put("gnss_time_ms", s.gnssTimeMs ?: JSONObject.NULL)
         }.toString())
     }
 
-    fun loadWindowStart(): Stamp? = db.setting("window_start")?.let {
+    private fun loadStamp(key: String): Stamp? = db.setting(key)?.let {
         val o = JSONObject(it)
         Stamp(
             utcMs = o.getLong("utc_ms"), tzId = o.getString("tz_id"), tzOffsetMin = o.getInt("tz_offset_min"),
@@ -291,6 +333,10 @@ class Repo private constructor(private val context: Context) {
             )
         )
     }
+
+    /** Undo of an accept: a new revision marked not reviewed again. */
+    fun unaccept(current: Entry): Entry =
+        write(current.copy(seq = 0, revisionN = current.revisionN + 1, editedUtcMs = stamp().utcMs, reviewed = false))
 
     fun tombstone(current: Entry): Entry =
         write(current.copy(seq = 0, revisionN = current.revisionN + 1, kind = Kind.TOMBSTONE, editedUtcMs = stamp().utcMs))

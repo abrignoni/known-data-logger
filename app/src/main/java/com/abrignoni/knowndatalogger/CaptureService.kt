@@ -32,6 +32,18 @@ class CaptureService : AccessibilityService() {
     private var rules: List<Rule> = emptyList()
     private var mark: View? = null
     private var lastScreen: Pair<String, String>? = null
+    private var kdlInFront: Boolean
+        get() = com.abrignoni.knowndatalogger.kdlInFront
+        set(v) { com.abrignoni.knowndatalogger.kdlInFront = v }
+
+    /**
+     * Called by KDL's own screen on resume and pause (same process), so MARK never covers KDL's
+     * buttons. Window events were not reliable for this on a Pixel 7a.
+     */
+    fun kdlVisibilityChanged(front: Boolean) {
+        kdlInFront = front
+        mark?.visibility = if (front) View.INVISIBLE else View.VISIBLE
+    }
     /** Last app seen in the foreground, ignoring System UI (status bar and shade events come between app and mark). */
     private var lastApp: String? = null
 
@@ -357,7 +369,7 @@ class CaptureService : AccessibilityService() {
         if (Build.VERSION.SDK_INT < 30) return
         takeScreenshot(Display.DEFAULT_DISPLAY, io, object : TakeScreenshotCallback {
             override fun onSuccess(result: ScreenshotResult) {
-                main.post { mark?.visibility = View.VISIBLE }
+                main.post { if (!kdlInFront) mark?.visibility = View.VISIBLE }
                 val shot = try {
                     val hw = Bitmap.wrapHardwareBuffer(result.hardwareBuffer, result.colorSpace)
                     val bmp = hw!!.copy(Bitmap.Config.ARGB_8888, false)
@@ -376,7 +388,7 @@ class CaptureService : AccessibilityService() {
 
             override fun onFailure(errorCode: Int) {
                 main.post {
-                    mark?.visibility = View.VISIBLE
+                    if (!kdlInFront) mark?.visibility = View.VISIBLE
                     repo.recordShot(Shot(entryId, null, null, "failed:code_$errorCode", System.currentTimeMillis()))
                 }
             }
@@ -413,7 +425,12 @@ class CaptureService : AccessibilityService() {
         val lp = WindowManager.LayoutParams(
             size, size, WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT,
-        ).apply { gravity = Gravity.TOP or Gravity.END; x = 0; y = (220 * resources.displayMetrics.density).toInt() }
+        ).apply {
+            gravity = Gravity.TOP or Gravity.END
+            x = (8 * resources.displayMetrics.density).toInt()
+            // Starts low on the right, clear of most controls; a dragged position is remembered.
+            y = repo.db.setting("mark_y")?.toIntOrNull() ?: (resources.displayMetrics.heightPixels * 0.7).toInt()
+        }
         // Drag to move; a short touch without movement is a mark.
         var downY = 0f; var startY = 0; var moved = false
         v.setOnTouchListener { _, e ->
@@ -423,10 +440,11 @@ class CaptureService : AccessibilityService() {
                     val dy = (e.rawY - downY).toInt()
                     if (kotlin.math.abs(dy) > 12) { moved = true; lp.y = startY + dy; wm.updateViewLayout(v, lp) }
                 }
-                MotionEvent.ACTION_UP -> if (!moved) onMark()
+                MotionEvent.ACTION_UP -> if (!moved) onMark() else repo.db.putSetting("mark_y", lp.y.toString())
             }
             true
         }
+        v.visibility = if (kdlInFront) View.INVISIBLE else View.VISIBLE
         wm.addView(v, lp)
         mark = v
     }
