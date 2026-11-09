@@ -161,6 +161,9 @@ class CheckTest(unittest.TestCase):
         e2 = {"utc_ms": T0, "content": "Hola"}
         rows2 = [(1, {"timestamp": T0 // 1000, "message": "hola", "direction": "Outgoing"})]
         self.assertEqual(kk.grade(e2, art, rows2, types, tol)[0], "found, weak match")
+        e4 = {"utc_ms": T0, "content": "Hola", "counterpart": "Sam Example"}
+        rows4 = [(1, {"timestamp": T0 // 1000, "message": "hola", "peer": "Sam Example", "direction": "Incoming"})]
+        self.assertEqual(kk.grade(e4, art, rows4, types, tol)[0], "found, weak match")
         e3 = {"utc_ms": T0}
         self.assertEqual(kk.grade(e3, art, [(1, {"message": "x"})], {}, tol)[0], "not gradable")
         self.assertEqual(kk.bucket("found, weak match"), "found with a caveat")

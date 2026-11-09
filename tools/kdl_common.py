@@ -232,7 +232,9 @@ def entry_time_hits(value, entry, start_ms, end_ms):
     out = time_hits(value, start_ms, end_ms, entry["utc_ms"])
     el = entry.get("elapsed_ms")
     v = as_number(value)
-    if el is not None and isinstance(v, int) and v >= MIN_SINCE_BOOT_MS:
+    if v is None and isinstance(value, str) and value.strip().isdigit() and len(value.strip()) >= 5:
+        v = int(value.strip())  # a since-boot count is shorter than the 9 digits as_number asks of a clock
+    if el is not None and isinstance(v, int) and not isinstance(v, bool) and v >= MIN_SINCE_BOOT_MS:
         lo, hi = el + (start_ms - entry["utc_ms"]), el + (end_ms - entry["utc_ms"])
         if lo <= v <= hi:
             out.append((SINCE_BOOT, round((v - el) / 1000, 3)))

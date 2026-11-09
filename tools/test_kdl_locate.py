@@ -128,6 +128,12 @@ def build_app(root):
     con.commit()
     con.execute("DELETE FROM tags WHERE name = 'Tag beta two'")
     con.commit()
+    con.execute("CREATE TABLE raw (id INTEGER PRIMARY KEY, body TEXT)")
+    con.execute("INSERT INTO raw (body) VALUES (CAST(x'ff41' AS TEXT))")
+    con.execute("INSERT INTO raw (body) VALUES ('Gone from the raw table')")
+    con.commit()
+    con.execute("DELETE FROM raw WHERE body = 'Gone from the raw table'")
+    con.commit()
     for s in ("", "-wal", "-shm"):
         shutil.copyfile(src + s, db + s)
     con.close()
@@ -194,6 +200,8 @@ def entries():
         row(21, "e21", "received_message", content="Never stored text", counterpart="+1 555 010 2030",
             direction="in", **x),
         row(22, "d22", "deleted_item", content="Tag beta two", **x),
+        row(23, "d23", "deleted_item", content="Gone from the raw table", **x),
+        row(24, "e24", "received_message", content="ok", counterpart="+1 555 010 2030", direction="in", **x),
     ]
 
 
@@ -299,6 +307,22 @@ class LocateTest(unittest.TestCase):
         self.assertIn("present in the current state", outcomes)
         self.assertTrue(any(o.startswith("only in an earlier state: Not in current state") for o in outcomes), outcomes)
 
+    def test_invalid_utf8_does_not_hide_a_table_from_the_wal(self):
+        outcomes = [r["Outcome"] for r in sheet(self.out, "Deletions") if r["Searched"] == "content: Gone from the raw table"]
+        self.assertEqual(len(outcomes), 1)
+        self.assertTrue(outcomes[0].startswith("only in an earlier state: Not in current state"), outcomes)
+
+    def test_short_content_with_counterpart_is_not_found(self):
+        self.assertTrue(self.entries["e24"]["Status"].startswith("content too short to search"))
+
+    def test_datastore_read_as_json_is_not_listed_as_not_read(self):
+        self.assertFalse(any(r["Store"].endswith("greeting.preferences_pb") for r in sheet(self.out, "Not read")))
+
+    def test_files_staged_counts_files_only(self):
+        summary = {r["Item"]: r["Value"] for r in sheet(self.out, "Summary")}
+        inv = sheet(self.out, "Inventory")
+        self.assertEqual(int(summary["Files staged"]), sum(1 for r in inv if r["SHA-256"] != "(folder)"))
+
     def test_time_only(self):
         rows = [r for r in sheet(self.out, "Time only") if r["Entry id"] == "e14"]
         self.assertTrue(any(r["Field"] == "taken_ms" and r["Epoch"] == "Unix milliseconds" for r in rows))
@@ -361,6 +385,7 @@ class UnitTest(unittest.TestCase):
         got = kc.entry_time_hits(1_711_204, e, T0 - 120_000, T0 + 120_000)
         self.assertEqual(got, [(kc.SINCE_BOOT, -2.075)])
         self.assertEqual(kc.entry_time_hits(5_000, dict(e, elapsed_ms=6_000), T0 - 120_000, T0 + 120_000), [])
+        self.assertEqual(kc.entry_time_hits("1711204", e, T0 - 120_000, T0 + 120_000), [(kc.SINCE_BOOT, -2.075)])
 
     def test_window(self):
         e = {"utc_ms": 1000_000, "time_quality": "approximate"}

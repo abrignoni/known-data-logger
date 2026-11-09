@@ -300,11 +300,14 @@ def _earlier_rows(st, queries):
     table inside one pass over the states, so the database and its log are copied once per state
     rather than once per table and state."""
     include = (sqlite_wal.KIND_COMMITTED, sqlite_wal.KIND_EARLIER, sqlite_wal.KIND_UNCOMMITTED)
-    current, keys, found, broken = {}, {}, {t: {} for t, _, _, _ in queries}, set()
+    current, keys, found, broken = {}, {}, {t: {} for t, _, _, _ in queries}, {}
     try:
         with sqlite_wal.WalStates(st.path, include=include) as w:
             first = True
             for state in w.states():
+                # Decode text as the current-state reader does, so a value that is not valid UTF-8
+                # cannot stop a table from being compared.
+                state.connection.text_factory = lambda b: b.decode("utf-8", "replace")
                 for table, _, _, rowid in queries:
                     if table in broken:
                         continue
@@ -312,9 +315,9 @@ def _earlier_rows(st, queries):
                     try:
                         rows = state.connection.execute(
                             f"SELECT rowid AS kdl_rowid, * FROM {q}" if rowid else f"SELECT * FROM {q}").fetchall()
-                    except sqlite3.Error:
+                    except sqlite3.Error as ex:
                         if first:
-                            broken.add(table)
+                            broken[table] = f"{type(ex).__name__}: {ex}"
                         continue  # a state where the table or a column does not exist yet
                     if first:
                         current[table] = set(rows)
@@ -339,7 +342,8 @@ def _earlier_rows(st, queries):
         return
     for table, label, cols, rowid in queries:
         if table in broken:
-            st.notes.append(f"earlier write-ahead log states of {table} not read: the table did not read in the current state")
+            st.notes.append(f"earlier write-ahead log states of {table} not read: the current state of the log "
+                            f"gave {broken[table]}")
         for r, seen in found[table].items():
             committed, earlier = seen["committed"], seen["earlier"]
             if committed is None and earlier is None:
@@ -593,7 +597,7 @@ def classify_and_read(name, path, st):
         if st.status == "read":
             return
         # A store under datastore/ can be JSON or text (a serializer other than protobuf).
-        st.notes.append(f"not read as protobuf: {st.reason}")
+        st.notes.append(f"read as JSON or text instead of protobuf ({st.reason})")
         st.status, st.reason, st.kind = "read", "", ""
     if size <= MAX_TEXT_BYTES:
         with open(path, "rb") as f:
@@ -781,7 +785,8 @@ def field_pattern(name):
 
 
 def is_primary(h):
-    has_content = any(n.searchable and n.field == "content" for n in kc.needles(h["entry"]))
+    # Content logged but too short to search still means a counterpart hit is not this entry's row.
+    has_content = any(n.field == "content" for n in kc.needles(h["entry"]))
     return h["needle"].field == "content" or not has_content
 
 
@@ -1025,10 +1030,13 @@ def main(argv=None):
         elif hs:
             # With content logged, only a content hit counts: a counterpart turns up in contact
             # and participant tables whether or not the message itself was stored.
-            has_content = any(n.searchable and n.field == "content" for n in nds)
+            has_content = any(n.field == "content" for n in nds)
             main = [h for h in hs if h["needle"].field == "content"] if has_content else hs
             strong = [h for h in main if not h["guess"] and "weak" not in h["kind"]]
-            if not main:
+            if has_content and not any(n.searchable for n in nds if n.field == "content"):
+                status = (f"content too short to search; only the counterpart or thread label matched "
+                          f"({n_unread} store(s) not read)")
+            elif not main:
                 status = (f"content not found; only the counterpart or thread label matched "
                           f"({n_unread} store(s) not read)")
             elif any(h["rec"].state == "current" for h in strong):
@@ -1074,7 +1082,7 @@ def main(argv=None):
         ("Entries found", sum(1 for r in entry_rows if r[7] == "found")),
         ("Deletions", len(deletions)),
         ("Current rows not searched", f"{len(skipped)} (other apps, no app, or events a label refers to)"),
-        ("Files staged", len(inventory)),
+        ("Files staged", sum(1 for r in inventory if r[2] != "(folder)")),
         ("Stores read", sum(1 for s in stores if s.status == "read")),
         ("Stores not read", f"{n_unread} (Not read sheet, which also lists {n_partial} note(s) on stores read only in "
                             f"part and {len(ex.rejected)} rejected member name(s))"),

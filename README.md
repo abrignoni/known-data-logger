@@ -201,11 +201,11 @@ evidence for a person writing one.
 Tried on an Android 15 emulator (9 November 2026) with Google Clock and Google Messages: an alarm
 label in two tables, a world clock city that the app stores with an accent the tester did not type,
 a deleted alarm reported as not found with the database's freelist count, a running timer listed
-on the Time only sheet by its wall clock and its since-boot time, and the two text messages with
-their time column. The
-hits named here were checked by opening the stores by hand. On the same image the LevelDB reader
-read the Google app's and Play services' LevelDB folders; the MMKV reader has run on test fixtures
-only, and the IndexedDB reader has not run on any store yet. Gzip files are listed as not read.
+on the Time only sheet by its wall clock and its since-boot time, and the two text messages with a
+candidate time column (`parts.timestamp`, Unix milliseconds). The hits named here were checked by
+opening the stores by hand. On the same image the LevelDB reader read the Google app's and Play
+services' LevelDB folders; the MMKV reader has run on test fixtures only, and the IndexedDB reader
+has not run on any store yet. Gzip files are listed as not read.
 
 ## Checking a LEAPP artifact (kdl_check.py)
 
@@ -216,13 +216,15 @@ python3 tools/kdl_check.py --export kdl_scenario_phoneA_... --leapp-output phone
 
 It reads the LEAPP output the way LEAPP writes it (`_lava_data.lava` and `_lava_artifacts.db`) and
 grades each labelled action against the artifacts named in its `expected_artifacts`, or against the
-artifacts given with `--artifact`: found, ambiguous, mismatched (text there, time outside the
-tolerance or the direction column contradicting the log) or missing. It adds coverage per artifact,
+artifacts given with `--artifact`: found, found with a caveat (time only, time not checked,
+direction not stored, weak match), ambiguous, mismatched (text there, time outside the tolerance or
+the direction column contradicting the log), missing, or not gradable (no text and no datetime
+column, or an output from another core). It adds coverage per artifact,
 the artifact rows inside a capture session that no entry accounts for, and, with two phones, each
 sent message paired with its received copy. Captured raw events are not graded. On the emulator run
 above, ALEAPP's Google Messages artifact was graded found for both messages.
 
-Tests: `python3 -m unittest discover -s tools` (fictional fixtures for every reader).
+Tests: `python3 -m unittest discover -s tools` (fictional fixtures for every reader except IndexedDB).
 
 The step-by-step user manual, with screenshots, is [docs/USER_MANUAL.md](docs/USER_MANUAL.md).
 

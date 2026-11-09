@@ -188,7 +188,9 @@ def grade(entry, art, rows, types, tol):
         if is_sent != (entry["direction"] == "out"):
             return "mismatched", [rid], detail + f"; {dcol} = {row[dcol]!r} contradicts the logged direction " \
                                                  f"{entry['direction']!r}", rid, delta
-    if any("weak" in k for _, k in best.values()) and not any("weak" not in k for _, k in best.values()):
+    # The content decides when it was logged; a strong counterpart beside it does not lift a weak content match.
+    lead = best.get("content") or next(iter(best.values()))
+    if "weak" in lead[1]:
         return "found, weak match", [rid], detail, rid, delta
     return "found", [rid], detail, rid, delta
 
@@ -337,9 +339,12 @@ def main(argv=None):
                     (f"{dev}: export checks", "; ".join(f"{k}: {v}" for k, v in e["checks"])),
                     (f"{dev}: LEAPP output", f"{out.folder} ({out.core} {out.version})")]
     summary += [
-        ("Statuses", "found: one row holds the text with a datetime inside the tolerance; ambiguous: several rows "
-                     "equally good; mismatched: the text is there but the time is outside the tolerance or the "
-                     "direction column contradicts the log; missing: no row holds the text."),
+        ("Statuses", "found: one row holds the text with a datetime inside the tolerance. Found with a caveat: "
+                     "found (time only), found, time not checked (no datetime column), found, direction not stored, "
+                     "found, weak match (a short value matched whole). ambiguous: several rows equally good; "
+                     "mismatched: the text is there but the time is outside the tolerance or the direction column "
+                     "contradicts the log; missing: no row holds the text; not gradable: no text and no datetime "
+                     "column, or an output from another core."),
         ("Rows not matched", "Rows with a datetime inside a capture session that no graded entry accounts for. "
                              "Some are expected (data the app made on its own); each needs a look, not a verdict."),
         ("Time", "LAVA datetime cells are read as UTC epoch seconds. Whole-second storage can move a time by up to 1 s."),
