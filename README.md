@@ -28,8 +28,10 @@ There is no field for passwords or passcodes. Keep those in your private notes.
 
 1. On first launch KDL walks you through four steps: the test-phone notice with a scenario name and
    device label, the apps to capture, turning on "Known-data logger" in Settings, Accessibility,
-   and done. If the switch is greyed out on Android 13 and later: App info, the three-dot menu,
-   Allow restricted settings (an `adb` install on a Pixel 7a with Android 17 did not need it).
+   and done. An APK installed from a file is blocked at that step: on a Pixel 7a with Android 17,
+   an install through the Files app made Android answer "App was denied access" when capture was
+   switched on. Fix: Settings, Apps, KDL, the three-dot menu, Allow restricted settings (asks for
+   the phone's PIN), then switch it on again. An `adb install` did not trigger the block.
 2. On the **Session** tab, tap Start session. A red MARK button floats over every app except KDL.
 3. Use the phone. Tap MARK at any moment you want recorded with a screenshot. Chips on the Session
    tab log an action by hand, stamped at the tap.
@@ -183,7 +185,8 @@ The APK is in `app/build/outputs/apk/debug/`. Install with `adb install`.
 Version 0.3.0, Android only. Tested on an Android 15 emulator and on a Pixel 7a with Android 17
 (8 November 2026), installed with `adb` into a separate user profile on that phone. On the Pixel:
 - installing with `adb install --user` and turning the service on did not ask for "Allow
-  restricted settings" (an APK installed from a file was not tried)
+  restricted settings"; installing the same APK from the Files app did (Android recorded it as a
+  local-file install), and Allow restricted settings in App info cleared it
 - sends in Google Messages (October 2026 build), an incoming call, a missed call, a MARK with its
   screenshot, an export, the hash chain (41 rows) and the spreadsheet all worked
 - incoming texts showed only "New message" on the phone itself in that profile, and the log

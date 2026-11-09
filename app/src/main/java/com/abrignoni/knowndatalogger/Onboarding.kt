@@ -101,7 +101,7 @@ fun Onboarding(repo: Repo, onDone: () -> Unit) {
                             Icon(if (enabled) Icons.Outlined.CheckCircle else Icons.Outlined.Schedule, null, tint = if (enabled) Kdl.Green else Kdl.Amber)
                             Text(if (enabled) "  Capture is on" else "  Waiting for capture to turn on", color = Kdl.Muted)
                         }
-                        Text("On Android 13 and later, if the switch is greyed out: App info, the three-dot menu, Allow restricted settings.",
+                        Text("If Android says the app was denied access (an APK installed from a file): Settings, Apps, KDL, the three-dot menu, Allow restricted settings, then switch it on again.",
                             color = Kdl.Muted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 20.dp))
                     }
                     else -> {
