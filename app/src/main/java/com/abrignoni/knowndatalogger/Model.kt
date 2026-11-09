@@ -430,6 +430,17 @@ const val FACTORY_RESET = "factory_reset"
 
 fun templateLabel(key: String): String = key.replace('_', ' ')
 
+/**
+ * Direction written with an action: "in" for the received templates, "out" for any other action,
+ * none while the action is blank. Hand logging, labels and rule matches all use it, so an action
+ * gets the same direction however it was recorded.
+ */
+fun directionFor(action: String): String? = when (action.trim()) {
+    "received_message", "incoming_call", "missed_call", "received_media" -> "in"
+    "" -> null
+    else -> "out"
+}
+
 
 /**
  * Tamper evidence for the log. Each row's hash covers its own fields plus the previous row's

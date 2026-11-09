@@ -268,7 +268,7 @@ class CaptureService : AccessibilityService() {
     /** Writes an auto-labelled action for a matching rule (unreviewed) and screenshots it. */
     private fun applyRule(pkg: String, event: String, viewId: String?, label: String?, raw: Entry, typed: String?): Boolean {
         val rule = Rules.match(rules, pkg, event, viewId, label) ?: return false
-        val labelled = repo.log(Draft(appPackage = pkg, action = rule.action,
+        val labelled = repo.log(Draft(appPackage = pkg, action = rule.action, direction = directionFor(rule.action),
             content = if (rule.content == "last_typed") typed else null,
             refersTo = raw.entryId, detail = "auto rule ${rule.id}", source = Source.AUTO_RULE, reviewed = false),
             stamp = raw.stamp, detect = false).last()
