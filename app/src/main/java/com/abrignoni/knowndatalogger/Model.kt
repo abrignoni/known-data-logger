@@ -6,7 +6,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
-const val SCHEMA_VERSION = 1
+const val SCHEMA_VERSION = 2
 
 /** Allowed values for Entry.kind. */
 object Kind {
@@ -16,6 +16,33 @@ object Kind {
     const val EXPORT = "export"
     const val NOTE = "note"
     const val TOMBSTONE = "tombstone"
+    /** Raw event seen by the capture service (a tap, typed text, a screen change, a mark). */
+    const val AUTO_EVENT = "auto_event"
+}
+
+/** Where a row came from. */
+object Source {
+    const val MANUAL = "manual"
+    const val AUTO_EVENT = "auto_event"
+    const val AUTO_RULE = "auto_rule"
+    const val MARK = "mark"
+    const val SYSTEM = "system"
+}
+
+/** Actions written for raw capture events. */
+object AutoAction {
+    const val TAP = "tap"
+    const val TYPED_TEXT = "typed_text"
+    const val SCREEN = "screen"
+    const val MARK = "mark"
+    /** A text field emptied in one step (all text removed by a single change), the usual sign of a send. */
+    const val FIELD_CLEARED = "field_cleared"
+}
+
+/** Events a rule can match. Compose apps report no tap events, so their sends match FIELD_CLEARED. */
+object RuleEvent {
+    const val TAP = "tap"
+    const val FIELD_CLEARED = "field_cleared"
 }
 
 /** Allowed values for Entry.timeQuality. */
@@ -71,7 +98,12 @@ data class Entry(
     val refersTo: String? = null,
     val expectedArtifacts: List<String> = emptyList(),
     val detail: String? = null,
+    val source: String = Source.MANUAL,
+    /** False only for auto-labelled actions nobody has accepted yet. */
+    val reviewed: Boolean = true,
 ) {
+    val isMark: Boolean get() = kind == Kind.AUTO_EVENT && action == AutoAction.MARK
+
     /** A stamped entry that still has no action written. */
     val needsDetail: Boolean get() = kind == Kind.ACTION && action.isBlank()
 }
@@ -98,25 +130,123 @@ object Timeline {
      * Returns system rows to insert before the new entry: a boot count change,
      * or a jump in boot_wall_ms within the same boot (the wall clock was set).
      */
-    fun detectChanges(rows: List<Entry>, next: Stamp, thresholdMs: Long = 2000): List<Pair<String, String>> {
-        val last = originals(rows).lastOrNull() ?: return emptyList()
+    fun detectChanges(rows: List<Entry>, next: Stamp, thresholdMs: Long = 2000): List<Pair<String, String>> =
+        detectChangesFrom(originals(rows).lastOrNull()?.stamp, next, thresholdMs)
+
+    /** Same check against a known last stamp, so a busy capture session does not re-read the table. */
+    fun detectChangesFrom(last: Stamp?, next: Stamp, thresholdMs: Long = 2000): List<Pair<String, String>> {
+        if (last == null) return emptyList()
         val out = mutableListOf<Pair<String, String>>()
-        if (next.bootCount >= 0 && last.stamp.bootCount >= 0 && next.bootCount != last.stamp.bootCount) {
+        if (next.bootCount >= 0 && last.bootCount >= 0 && next.bootCount != last.bootCount) {
             out += Kind.SYSTEM_EVENT to
-                "boot_count changed from ${last.stamp.bootCount} to ${next.bootCount}"
+                "boot_count changed from ${last.bootCount} to ${next.bootCount}"
         } else {
-            val delta = next.bootWallMs - last.stamp.bootWallMs
+            val delta = next.bootWallMs - last.bootWallMs
             if (kotlin.math.abs(delta) > thresholdMs) {
                 out += Kind.CLOCK_CHANGE to
                     "wall clock moved ${delta} ms relative to the monotonic clock since the previous entry"
             }
         }
-        if (next.tzId != last.stamp.tzId || next.tzOffsetMin != last.stamp.tzOffsetMin) {
+        if (next.tzId != last.tzId || next.tzOffsetMin != last.tzOffsetMin) {
             out += Kind.CLOCK_CHANGE to
-                "time zone changed from ${last.stamp.tzId} (${last.stamp.tzOffsetMin} min) to ${next.tzId} (${next.tzOffsetMin} min)"
+                "time zone changed from ${last.tzId} (${last.tzOffsetMin} min) to ${next.tzId} (${next.tzOffsetMin} min)"
         }
         return out
     }
+}
+
+/** What still needs a person: unaccepted auto labels, unlabelled marks, stamped-only entries. */
+object Review {
+    fun pending(rows: List<Entry>): List<Entry> {
+        val current = Timeline.current(rows)
+        val resolvedMarks = current.mapNotNull { it.refersTo }.toSet()
+        return current.filter {
+            (it.kind == Kind.ACTION && it.source == Source.AUTO_RULE && !it.reviewed) ||
+                (it.isMark && it.entryId !in resolvedMarks) ||
+                it.needsDetail
+        }
+    }
+}
+
+/** A screenshot tied to one entry. Status is ok, blank, failed:<reason> or unsupported. */
+data class Shot(
+    val entryId: String,
+    val file: String?,
+    val sha256: String?,
+    val status: String,
+    val utcMs: Long,
+)
+
+/**
+ * One auto-label rule. Matches one event type (tap or field_cleared) in one package by view id
+ * and/or label (regex, case insensitive). content = "last_typed" copies the text typed just
+ * before the tap, or the text that was cleared.
+ */
+data class Rule(
+    val id: String,
+    val pkg: String,
+    val viewId: String?,
+    val labelRegex: String?,
+    val action: String,
+    val content: String?,
+    val verifiedWith: String?,
+    val event: String = RuleEvent.TAP,
+) {
+    fun matches(pkg: String, event: String, viewId: String?, label: String?): Boolean {
+        if (pkg != this.pkg || event != this.event) return false
+        if (this.viewId == null && labelRegex == null) return false
+        if (this.viewId != null && this.viewId != viewId) return false
+        if (labelRegex != null && (label == null || !Regex(labelRegex, RegexOption.IGNORE_CASE).containsMatchIn(label))) return false
+        return true
+    }
+}
+
+object Rules {
+    fun match(rules: List<Rule>, pkg: String, event: String, viewId: String?, label: String?): Rule? =
+        rules.firstOrNull { it.matches(pkg, event, viewId, label) }
+
+    /** True when one text change removed all of the previous text (at least 2 characters). */
+    fun isBulkClear(before: String?, added: Int, removed: Int): Boolean =
+        before != null && before.length >= 2 && added == 0 && removed == before.length
+
+    /** Later lists override earlier ones rule by rule (same id). */
+    fun merge(vararg lists: List<Rule>): List<Rule> {
+        val byId = LinkedHashMap<String, Rule>()
+        lists.forEach { l -> l.forEach { byId[it.id] = it } }
+        return byId.values.toList()
+    }
+}
+
+/**
+ * Holds typed text until the field is done: the next tap, screen change, focus change or session
+ * stop flushes it as one typed_text event. Password fields never enter the buffer.
+ */
+class TextBuffer {
+    private var key: String? = null
+    private var text: String? = null
+    private var pkg: String? = null
+    private var viewId: String? = null
+    var lastFlushed: String? = null
+        private set
+
+    fun update(pkg: String, viewId: String?, fieldKey: String, value: String?, isPassword: Boolean): Triple<String, String?, String>? {
+        if (isPassword) return null
+        val flushed = if (key != null && key != fieldKey) flush() else null
+        key = fieldKey; this.pkg = pkg; this.viewId = viewId; text = value
+        return flushed
+    }
+
+    /** Returns (package, view id, text) for a non-empty pending value, then clears it. */
+    fun flush(): Triple<String, String?, String>? {
+        val t = text; val p = pkg; val v = viewId
+        key = null; text = null; pkg = null; viewId = null
+        if (t.isNullOrEmpty() || p == null) return null
+        lastFlushed = t
+        return Triple(p, v, t)
+    }
+
+    /** Text currently in the buffer, else the last flushed value. Used for rule content. */
+    fun currentOrLast(): String? = text?.takeIf { it.isNotEmpty() } ?: lastFlushed
 }
 
 object Csv {
@@ -125,7 +255,8 @@ object Csv {
         "local_time", "utc_time", "tz_id", "tz_offset_min", "utc_ms", "elapsed_ms", "boot_count",
         "boot_wall_ms", "network_time_ms", "gnss_time_ms", "time_quality", "window_s", "edited_utc_ms",
         "app_package", "app_version", "account", "action", "content", "counterpart", "direction",
-        "conversation_id", "refers_to", "expected_artifacts", "detail",
+        "conversation_id", "refers_to", "expected_artifacts", "detail", "source", "reviewed",
+        "screenshot_file", "screenshot_sha256", "screenshot_status",
     )
 
     fun field(v: Any?): String {
@@ -141,20 +272,21 @@ object Csv {
 
     fun utcIso(utcMs: Long): String = DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochMilli(utcMs))
 
-    fun row(e: Entry, isCurrent: Boolean): String = listOf(
+    fun row(e: Entry, isCurrent: Boolean, shot: Shot? = null): String = listOf(
         e.seq, e.entryId, e.revisionN, isCurrent, e.kind, e.scenarioId, e.deviceLabel, e.profileId,
         localIso(e.stamp.utcMs, e.stamp.tzOffsetMin), utcIso(e.stamp.utcMs), e.stamp.tzId,
         e.stamp.tzOffsetMin, e.stamp.utcMs, e.stamp.elapsedMs, e.stamp.bootCount, e.stamp.bootWallMs,
         e.stamp.networkTimeMs, e.stamp.gnssTimeMs, e.timeQuality, e.windowS, e.editedUtcMs,
         e.appPackage, e.appVersion, e.account, e.action, e.content, e.counterpart, e.direction,
-        e.conversationId, e.refersTo, e.expectedArtifacts.joinToString(";"), e.detail,
+        e.conversationId, e.refersTo, e.expectedArtifacts.joinToString(";"), e.detail, e.source, e.reviewed,
+        shot?.file, shot?.sha256, shot?.status,
     ).joinToString(",") { field(it) }
 
     /** All rows, every revision, in insertion order, with is_current marking the live version. */
-    fun document(rows: List<Entry>): String {
+    fun document(rows: List<Entry>, shots: Map<String, Shot> = emptyMap()): String {
         val currentSeqs = Timeline.current(rows).map { it.seq }.toSet()
         val sb = StringBuilder(HEADER.joinToString(",")).append("\r\n")
-        rows.sortedBy { it.seq }.forEach { sb.append(row(it, it.seq in currentSeqs)).append("\r\n") }
+        rows.sortedBy { it.seq }.forEach { sb.append(row(it, it.seq in currentSeqs, shots[it.entryId]?.takeIf { _ -> it.revisionN == 0 })).append("\r\n") }
         return sb.toString()
     }
 }

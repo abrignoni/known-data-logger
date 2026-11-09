@@ -1,6 +1,6 @@
-# Known-data logger: spec, revision 3 (2026-11-08)
+# Known-data logger: spec, revision 5 (2026-11-08)
 
-Revision 2 folded in an independent review (2026-11-08). Revision 3 matches version 0.1.0 as built. API claims below were checked
+Revision 2 folded in an independent review (2026-11-08). Revision 3 matches version 0.1.0 as built. Revision 4 added the plan for version 0.2; revision 5 matches 0.2.0 as built. API claims below were checked
 against the Android SDK 36 stubs where marked "(stubs)".
 
 A small app installed on a test device. The researcher records each action as they do it.
@@ -131,7 +131,85 @@ The current version of an entry is the highest revision_n; a tombstone revision 
 This format is its own. It is not `sample_data` (per-module row counts) and claims no
 compatibility with any other tool.
 
-## Later, not in version 1
+## Version 0.2: automatic capture and screenshots
+
+Goal: install the app, turn it on, and use the phone normally. Actions are captured as they happen,
+with a screenshot at the moments that matter. Manual entry stays for what the screen cannot show.
+
+### Capture
+
+An accessibility service records, with the same time fields as every other entry:
+
+- foreground app and screen title changes (window state events)
+- taps, with the tapped element's text, content description and view id
+- typed text, recorded once as the field's final value, never for password fields
+  (`isPassword`), never for the logger's own screens. A field showing its hint is recorded as
+  empty (an empty field reports its hint as its text).
+- system UI events (quick settings toggles such as airplane mode)
+
+Capture runs only between Start session and Stop session, both logged. A package allowlist
+(apps under test, system UI, Settings) limits what is recorded. Raw rows use the new kind
+`auto_event`.
+
+### Marking and labelling
+
+- A floating mark button (accessibility overlay, no extra permission) stamps "this is the
+  action" without leaving the app under test. The mark carries the app last seen in the
+  foreground.
+- Per-app rule files turn raw events into action keys. A rule matches one event type, `tap` or
+  `field_cleared`, by package plus view id and/or a label regex. `field_cleared` means one text
+  change removed all of a field's text (two or more characters); it is the signal for sends in
+  Jetpack Compose apps, which report no tap events (seen with Google Messages on the emulator).
+  Rules are data files, so they can change without a new APK. Shipped rules: Google Messages
+  send (field_cleared) and AOSP Camera shutter (tap), each checked on the emulator.
+- A review screen lists marked moments and unlabelled events; the tester accepts or labels
+  them before export. Accepted labels are normal `action` rows with `refers_to` pointing at the
+  raw event.
+
+### Screenshots
+
+- Taken by the accessibility service (`AccessibilityService.takeScreenshot`, API 30+): no extra
+  permission, no consent prompt, no recording indicator, and it keeps working after a reboot.
+  On Android 8 to 10 the feature is off and the app says so.
+- Triggers: every tap on the mark button (always), each auto-labelled action (on by default,
+  can be turned off), every tap (off by default).
+- The system rate-limits screenshots; a refused or failed capture is logged on the entry, never
+  dropped silently. Screens of apps that block screenshots come back black; the entry records
+  that the frame was empty rather than claiming a picture of the content.
+- Stored as PNG in the app's private folder (no MediaStore rows), named after the entry, with
+  sha256 computed at capture time and kept in the database.
+- New entry field `screenshot`: file name, sha256, capture status, on the entry's original row
+  (revision 0). The export copies the files to `screens/` and lists every file in the manifest
+  with its hash at capture, its hash at export and whether they match.
+- New entry fields `source` and `reviewed`; schema version 2.
+
+### Footprint added in 0.2
+
+- An enabled accessibility service is recorded in the device's secure settings; it is part of
+  the test, and the session start and stop rows say when it was active.
+- On Android 13+ a sideloaded app needs a one-time "Allow restricted settings" step before the
+  service can be turned on (to be confirmed on a device).
+- Some apps change behaviour when an accessibility service is on (mostly banking apps).
+- Anything that uses UiAutomation (uiautomator, automation tools) pauses all accessibility
+  services while it runs; each pause is logged as a disconnect and reconnect.
+- Screenshots take space on the test device and are in any full file system extraction.
+- Still no INTERNET permission, no receivers, no backup.
+
+### Continuous video (optional, off the phone)
+
+For sessions that need full video, record from the Mac with `scrcpy --record` over USB. Nothing
+is written to the test phone. The logger's network time reference is used to align the video
+with the log. Needs USB debugging on. Whether protected screens record as black this way is not
+yet verified.
+
+### Documentation output
+
+An off-device script reads one or more exports (phone A, phone B) and writes an `.xlsx`: a device
+sheet, an accounts sheet, one sheet per app with Date, Time, Action, Content, Counterpart and a
+link to the screenshot, using current revisions only and flagging entries that still need
+detail.
+
+## Later
 
 - iOS build.
 - A checker script in the LEAPP repos that reads the export and LAVA output.

@@ -18,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -29,7 +30,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val repo = Repo(applicationContext)
+        val repo = Repo.get(applicationContext)
         windowStart = repo.loadWindowStart()?.let { Pending(it) }
         setContent {
             MaterialTheme(colorScheme = if (androidx.compose.foundation.isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
@@ -39,7 +40,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private val TABS = listOf("Scenario", "Log", "Timeline", "Export")
+private val TABS = listOf("Scenario", "Capture", "Log", "Timeline", "Export")
 private const val NO_SECRETS = "No passwords or passcodes here. Exports get shared."
 
 @Composable
@@ -48,6 +49,8 @@ fun App(repo: Repo) {
     // Bumped after every write so screens re-read the database.
     var version by remember { mutableIntStateOf(0) }
     val bump: () -> Unit = { version++ }
+    // Re-read the database whenever the app comes back to the front (capture writes while it is away).
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) { version++; onPauseOrDispose { } }
     Scaffold(
         bottomBar = {
             NavigationBar {
@@ -61,8 +64,9 @@ fun App(repo: Repo) {
             key(version) {
                 when (tab) {
                     0 -> ScenarioScreen(repo, bump)
-                    1 -> LogScreen(repo, bump, onExportNeeded = { tab = 3 })
-                    2 -> TimelineScreen(repo, bump)
+                    1 -> CaptureScreen(repo, bump)
+                    2 -> LogScreen(repo, bump, onExportNeeded = { tab = 4 })
+                    3 -> TimelineScreen(repo, bump)
                     else -> ExportScreen(repo, bump)
                 }
             }
@@ -281,34 +285,113 @@ private fun <T> Picker(value: String, options: List<Pair<T, String>>, onPick: (T
     }
 }
 
+// ---------------- Capture ----------------
+
+private fun serviceEnabled(ctx: android.content.Context): Boolean {
+    val enabled = android.provider.Settings.Secure.getString(ctx.contentResolver, android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: ""
+    return enabled.split(':').any { it.equals("${ctx.packageName}/${CaptureService::class.java.name}", true) || it.equals("${ctx.packageName}/.CaptureService", true) }
+}
+
+@Composable
+fun CaptureScreen(repo: Repo, bump: () -> Unit) {
+    val ctx = LocalContext.current
+    val enabled = serviceEnabled(ctx)
+    val active = repo.flag(Repo.KEY_SESSION, false)
+    var shotAuto by remember { mutableStateOf(repo.flag(Repo.KEY_SHOT_AUTO, true)) }
+    var shotTap by remember { mutableStateOf(repo.flag(Repo.KEY_SHOT_TAP, false)) }
+    var allApps by remember { mutableStateOf(repo.flag(Repo.KEY_ALL_APPS, false)) }
+    val ready = repo.scenarioId.isNotBlank() && repo.deviceLabel.isNotBlank()
+    val rules = remember { repo.loadRules() }
+
+    Column(Modifier.verticalScroll(rememberScrollState())) {
+        Section("Capture service")
+        Text(if (enabled) "On" else "Off. Turn on \"Known-data logger\" in Accessibility settings.",
+            color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+        OutlinedButton(onClick = { ctx.startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) }) { Text("Open accessibility settings") }
+        Text("On Android 13 and later, a sideloaded app may first need App info, menu, Allow restricted settings.", style = MaterialTheme.typography.bodySmall)
+
+        Section("Session")
+        Text(if (active) "Capturing. The red MARK button is on screen." else "Not capturing.")
+        Button(enabled = enabled && ready, modifier = Modifier.fillMaxWidth().height(56.dp), onClick = {
+            val start = !active
+            repo.setFlag(Repo.KEY_SESSION, start)
+            repo.log(Draft(action = if (start) "capture_session_start" else "capture_session_stop", source = Source.SYSTEM,
+                detail = if (start) "apps: " + (if (allApps) "all" else repo.capturePackages().sorted().joinToString(" ")) +
+                    "; screenshots: auto=$shotAuto every_tap=$shotTap" else null), kind = Kind.SYSTEM_EVENT)
+            CaptureService.instance?.syncSession()
+            toast(ctx, if (start) "Session started" else "Session stopped"); bump()
+        }) { Text(if (active) "Stop session" else "Start session") }
+        if (!ready) Text("Set the scenario id and device label first.", color = MaterialTheme.colorScheme.error)
+
+        Section("Options (applied at session start)")
+        Row { Checkbox(shotAuto, { shotAuto = it; repo.setFlag(Repo.KEY_SHOT_AUTO, it) }); Text("Screenshot each auto-labelled action", Modifier.padding(top = 12.dp)) }
+        Row { Checkbox(shotTap, { shotTap = it; repo.setFlag(Repo.KEY_SHOT_TAP, it) }); Text("Screenshot every tap", Modifier.padding(top = 12.dp)) }
+        Row { Checkbox(allApps, { allApps = it; repo.setFlag(Repo.KEY_ALL_APPS, it) }); Text("Capture all apps, not only apps under test", Modifier.padding(top = 12.dp)) }
+        Text("The MARK button always takes a screenshot." +
+            (if (android.os.Build.VERSION.SDK_INT < 30) " Screenshots need Android 11 or later; this phone will log them as unsupported." else ""),
+            style = MaterialTheme.typography.bodySmall)
+        Text("Captured apps: " + (if (allApps) "all" else repo.capturePackages().sorted().joinToString(", ")), style = MaterialTheme.typography.bodySmall)
+
+        Section("Auto-label rules (${rules.size})")
+        rules.forEach { r -> Text("${r.id}: ${r.pkg} -> ${r.action}", style = MaterialTheme.typography.bodySmall) }
+        Text("Override or add rules with a rules.json in the app's external files folder (adb push).", style = MaterialTheme.typography.bodySmall)
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
 // ---------------- Timeline ----------------
+
+private val FILTERS = listOf("To review", "Actions", "Everything")
+
+/** Selected timeline filter, kept across screen refreshes. */
+private val timelineFilter = mutableIntStateOf(1)
 
 @Composable
 fun TimelineScreen(repo: Repo, bump: () -> Unit) {
     val rows = remember { repo.db.entries() }
+    val shots = remember { repo.db.shots() }
     val current = remember(rows) { Timeline.current(rows).reversed() }
-    val pending = current.count { it.needsDetail }
+    val review = remember(rows) { Review.pending(rows).map { it.entryId }.toSet() }
+    var filter by remember { timelineFilter }
     var editing by remember { mutableStateOf<Entry?>(null) }
     val labels = remember { repo.db.apps().associate { it.pkg to it.label } }
+    val shown = when (filter) {
+        0 -> current.filter { it.entryId in review }
+        1 -> current.filter { it.kind != Kind.AUTO_EVENT || it.entryId in review }
+        else -> current
+    }
 
     Column {
         Section("Timeline, newest first")
-        if (pending > 0) Text("$pending entr${if (pending == 1) "y needs" else "ies need"} detail", color = MaterialTheme.colorScheme.error)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FILTERS.forEachIndexed { i, f ->
+                FilterChip(selected = filter == i, onClick = { filter = i },
+                    label = { Text(if (i == 0) "$f (${review.size})" else f) })
+            }
+        }
         LazyColumn {
-            items(current, key = { it.entryId }) { e ->
+            items(shown, key = { it.entryId }) { e ->
+                // A screenshot is stored against the entry id, so every revision shows it.
+                val shot = shots[e.entryId]
                 Column(Modifier.fillMaxWidth().clickable { editing = e }.padding(vertical = 8.dp)) {
+                    val title = when {
+                        e.isMark -> "MARK"
+                        e.needsDetail -> "NEEDS DETAIL"
+                        else -> templateLabel(e.action)
+                    }
                     Text(
-                        "${hhmmss(e.stamp)}  ${if (e.needsDetail) "NEEDS DETAIL" else templateLabel(e.action)}" +
-                            (if (e.revisionN > 0) "  (rev ${e.revisionN})" else ""),
+                        "${hhmmss(e.stamp)}  $title" + (if (e.revisionN > 0) "  (rev ${e.revisionN})" else "") +
+                            (if (e.entryId in review) "  [review]" else ""),
                         fontWeight = FontWeight.Medium,
                     )
                     val sub = listOfNotNull(
-                        e.kind.takeIf { it != Kind.ACTION },
+                        e.source.takeIf { it != Source.MANUAL },
                         e.appPackage?.let { labels[it] ?: it },
                         e.counterpart?.let { (if (e.direction == "in") "from " else "to ") + it },
                         e.windowS?.let { "window ${"%.0f".format(it)} s" },
                         e.content?.let { "\"$it\"" },
                         e.refersTo?.let { "refers to an earlier entry" },
+                        shot?.let { "screenshot ${it.status}" },
                         e.detail,
                     ).joinToString(", ")
                     if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.bodySmall)
@@ -317,25 +400,49 @@ fun TimelineScreen(repo: Repo, bump: () -> Unit) {
             }
         }
     }
-    editing?.let { e -> EditDialog(repo, e, onDone = { editing = null; bump() }) }
+    editing?.let { e -> EditDialog(repo, e, shots[e.entryId], onDone = { editing = null; bump() }) }
 }
 
 @Composable
-private fun EditDialog(repo: Repo, e: Entry, onDone: () -> Unit) {
+private fun ShotThumb(repo: Repo, shot: Shot?) {
+    if (shot?.file == null) { shot?.let { Text("Screenshot: ${it.status}", style = MaterialTheme.typography.bodySmall) }; return }
+    val bmp = remember(shot.file) {
+        android.graphics.BitmapFactory.decodeFile(java.io.File(repo.screensDir(), shot.file).path,
+            android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 })
+    }
+    if (bmp != null) androidx.compose.foundation.Image(bmp.asImageBitmap(), contentDescription = "Screenshot",
+        modifier = Modifier.height(240.dp).padding(vertical = 4.dp))
+    if (shot.status != "ok") Text("Screenshot: ${shot.status}", style = MaterialTheme.typography.bodySmall)
+}
+
+@Composable
+private fun EditDialog(repo: Repo, e: Entry, shot: Shot?, onDone: () -> Unit) {
     val ctx = LocalContext.current
-    var action by remember { mutableStateOf(e.action) }
-    var content by remember { mutableStateOf(e.content ?: "") }
+    val labellingMark = e.isMark
+    val rawEvent = e.kind == Kind.AUTO_EVENT && !e.isMark
+    var action by remember { mutableStateOf(if (labellingMark || rawEvent) "" else e.action) }
+    var content by remember { mutableStateOf(if (labellingMark) "" else e.content ?: "") }
     var counterpart by remember { mutableStateOf(e.counterpart ?: "") }
     var conversation by remember { mutableStateOf(e.conversationId ?: "") }
-    var note by remember { mutableStateOf(e.detail ?: "") }
+    var note by remember { mutableStateOf(if (labellingMark || rawEvent) "" else e.detail ?: "") }
     var quality by remember { mutableStateOf(e.timeQuality) }
     var expected by remember { mutableStateOf(e.expectedArtifacts.joinToString(", ")) }
+    fun expectedList() = expected.split(',', ' ').map { it.trim() }.filter { it.isNotEmpty() }
     AlertDialog(
         onDismissRequest = onDone,
-        title = { Text("Edit ${hhmmss(e.stamp)}") },
+        title = { Text((if (labellingMark) "Label mark " else if (rawEvent) "Label event " else "Edit ") + hhmmss(e.stamp)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                Text("Edits are saved as a new revision. The action time stays fixed.", style = MaterialTheme.typography.bodySmall)
+                ShotThumb(repo, shot)
+                Text(
+                    when {
+                        labellingMark || rawEvent -> "Saving creates an action at this moment that points at the captured event."
+                        e.source == Source.AUTO_RULE && !e.reviewed -> "Labelled by ${e.detail ?: "a rule"}. Accept it, or change it and save."
+                        else -> "Edits are saved as a new revision. The action time stays fixed."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                if (rawEvent) Text("Captured: ${e.action} ${e.content?.let { "\"$it\"" } ?: ""} ${e.detail ?: ""}", style = MaterialTheme.typography.bodySmall)
                 Picker(value = action.ifBlank { "Pick a template" }, options = ACTION_TEMPLATES.map { it to templateLabel(it) }, onPick = { action = it })
                 OutlinedTextField(action, { action = it }, label = { Text("Action") })
                 OutlinedTextField(content, { content = it }, label = { Text("Content") }, supportingText = { Text(NO_SECRETS) })
@@ -344,24 +451,41 @@ private fun EditDialog(repo: Repo, e: Entry, onDone: () -> Unit) {
                 Row { TimeQuality.ALL.forEach { q -> FilterChip(selected = quality == q, onClick = { quality = q }, label = { Text(q) }) } }
                 OutlinedTextField(expected, { expected = it }, label = { Text("Expected artifacts") })
                 OutlinedTextField(note, { note = it }, label = { Text("Note") }, supportingText = { Text(NO_SECRETS) })
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!labellingMark && !rawEvent) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = {
                         repo.log(Draft(appPackage = e.appPackage, action = "deleted_item", refersTo = e.entryId, counterpart = e.counterpart, conversationId = e.conversationId))
                         toast(ctx, "Deletion logged now, pointing at this entry"); onDone()
                     }) { Text("I deleted this, log it") }
-                    TextButton(onClick = { repo.tombstone(e); toast(ctx, "Entry removed (kept as a tombstone)"); onDone() }) { Text("Remove entry") }
+                }
+                TextButton(onClick = { repo.tombstone(e); toast(ctx, "Removed (kept as a tombstone)"); onDone() }) {
+                    Text(if (labellingMark) "Discard mark" else "Remove entry")
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                repo.revise(e, Draft(
-                    appPackage = e.appPackage, action = action.trim(), content = content, counterpart = counterpart,
-                    direction = e.direction, conversationId = conversation, timeQuality = quality,
-                    expectedArtifacts = expected.split(',', ' ').map { it.trim() }.filter { it.isNotEmpty() }, detail = note,
-                ))
-                onDone()
-            }) { Text("Save revision") }
+            Row {
+                if (e.source == Source.AUTO_RULE && !e.reviewed) TextButton(onClick = {
+                    repo.revise(e, Draft(appPackage = e.appPackage, action = e.action, content = e.content, counterpart = e.counterpart,
+                        direction = e.direction, conversationId = e.conversationId, timeQuality = e.timeQuality,
+                        expectedArtifacts = e.expectedArtifacts, detail = e.detail))
+                    onDone()
+                }) { Text("Accept") }
+                TextButton(onClick = {
+                    if (labellingMark || rawEvent) {
+                        if (action.isBlank()) { toast(ctx, "Pick or type an action first"); return@TextButton }
+                        repo.log(Draft(appPackage = e.appPackage, action = action.trim(), content = content, counterpart = counterpart,
+                            conversationId = conversation, timeQuality = quality, expectedArtifacts = expectedList(), detail = note,
+                            refersTo = e.entryId, source = if (labellingMark) Source.MARK else Source.MANUAL), stamp = e.stamp, detect = false)
+                    } else {
+                        repo.revise(e, Draft(
+                            appPackage = e.appPackage, action = action.trim(), content = content, counterpart = counterpart,
+                            direction = e.direction, conversationId = conversation, timeQuality = quality,
+                            expectedArtifacts = expectedList(), detail = note,
+                        ))
+                    }
+                    onDone()
+                }) { Text(if (labellingMark || rawEvent) "Save label" else "Save revision") }
+            }
         },
         dismissButton = { TextButton(onClick = onDone) { Text("Cancel") } },
     )

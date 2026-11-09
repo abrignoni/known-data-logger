@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "google_messages_send",
+      "package": "com.google.android.apps.messaging",
+      "event": "field_cleared",
+      "view_id": "com.google.android.apps.messaging:id/compose_message_text",
+      "label_regex": null,
+      "action": "sent_message",
+      "content": "last_typed",
+      "verified_with": "Messages messages.android_20240528_00_RC01 on an Android 15 emulator, 2026-11-08. The Send button reports no tap event; the compose field clearing in one change is the signal."
+    },
+    {
+      "id": "aosp_camera_shutter",
+      "package": "com.android.camera2",
+      "event": "tap",
+      "view_id": "com.android.camera2:id/shutter_button",
+      "label_regex": null,
+      "action": "took_photo",
+      "content": null,
+      "verified_with": "Camera 2.0.002 on an Android 15 emulator, 2026-11-08"
+    }
+  ]
+}

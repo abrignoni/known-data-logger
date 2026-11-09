@@ -1,4 +1,4 @@
-# kl.db layout (schema 1)
+# kl.db layout (schema 2)
 
 Path on the device: `/data/data/com.abrignoni.knowndatalogger/databases/kl.db`.
 `PRAGMA user_version` holds the schema number. Journal mode is DELETE (no `-wal`).
@@ -37,11 +37,25 @@ Apps under test. Version fields are read from PackageManager when the app is add
 | account | handle typed by the user |
 | added_utc_ms | when it was added to the list |
 
+## screenshots (schema 2)
+
+| column | meaning |
+|---|---|
+| entry_id | the entry the screenshot belongs to (its original row) |
+| file | PNG name under the app's private `files/screens/`, null when none was taken |
+| sha256 | hash of the PNG computed when it was written |
+| status | `ok`, `blank` (every sampled pixel black or near black), `failed:<reason>` or `unsupported` (Android 10 and earlier) |
+| utc_ms | when the screenshot row was written |
+
 ## entries
 
 Every row the app writes, including revisions, tombstones and system rows. Columns match the
 `actions.jsonl` fields in [SPEC.md](SPEC.md), except `boot_wall_ms`, which is computed
 (`utc_ms - elapsed_ms`) and not stored, and `expected_artifacts`, stored as a JSON array in text.
+
+Schema 2 added `source` (`manual`, `auto_event`, `auto_rule`, `mark`, `system`) and `reviewed`
+(0 only for auto-labelled actions nobody has accepted). Rows from schema 1 read as manual and
+reviewed.
 
 The current version of an entry is the row with the highest `revision_n` for its `entry_id`.
 If that row has `kind = 'tombstone'`, the entry was removed. Order by

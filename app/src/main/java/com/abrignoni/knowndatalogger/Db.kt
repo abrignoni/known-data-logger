@@ -57,10 +57,23 @@ class Db(context: Context) : SQLiteOpenHelper(context, NAME, null, SCHEMA_VERSIO
                 refers_to TEXT, expected_artifacts TEXT NOT NULL, detail TEXT)"""
         )
         db.execSQL("CREATE INDEX entries_entry_id ON entries(entry_id)")
+        upgradeTo2(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // Schema 1 is the first; later versions add migrations here, never drop data.
+        // Migrations only add; they never drop or rewrite data.
+        if (oldVersion < 2) upgradeTo2(db)
+    }
+
+    /** Schema 2: row source, review flag, screenshots. Existing rows become manual and reviewed. */
+    private fun upgradeTo2(db: SQLiteDatabase) {
+        db.execSQL("ALTER TABLE entries ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'")
+        db.execSQL("ALTER TABLE entries ADD COLUMN reviewed INTEGER NOT NULL DEFAULT 1")
+        db.execSQL(
+            """CREATE TABLE screenshots (
+                entry_id TEXT PRIMARY KEY, file TEXT, sha256 TEXT, status TEXT NOT NULL,
+                utc_ms INTEGER NOT NULL)"""
+        )
     }
 
     fun insert(e: Entry): Long {
@@ -75,6 +88,7 @@ class Db(context: Context) : SQLiteOpenHelper(context, NAME, null, SCHEMA_VERSIO
             put("action", e.action); put("content", e.content); put("counterpart", e.counterpart)
             put("direction", e.direction); put("conversation_id", e.conversationId); put("refers_to", e.refersTo)
             put("expected_artifacts", JSONArray(e.expectedArtifacts).toString()); put("detail", e.detail)
+            put("source", e.source); put("reviewed", if (e.reviewed) 1 else 0)
         }
         return writableDatabase.insertOrThrow("entries", null, v)
     }
@@ -106,8 +120,26 @@ class Db(context: Context) : SQLiteOpenHelper(context, NAME, null, SCHEMA_VERSIO
             action = str("action")!!, content = str("content"), counterpart = str("counterpart"),
             direction = str("direction"), conversationId = str("conversation_id"), refersTo = str("refers_to"),
             expectedArtifacts = (0 until arts.length()).map { arts.getString(it) }, detail = str("detail"),
+            source = str("source") ?: Source.MANUAL, reviewed = (long("reviewed") ?: 1L) != 0L,
         )
     }
+
+    fun putShot(s: Shot) {
+        writableDatabase.insertWithOnConflict("screenshots", null, ContentValues().apply {
+            put("entry_id", s.entryId); put("file", s.file); put("sha256", s.sha256)
+            put("status", s.status); put("utc_ms", s.utcMs)
+        }, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+    fun shots(): Map<String, Shot> =
+        readableDatabase.rawQuery("SELECT * FROM screenshots", null).use { c ->
+            val out = HashMap<String, Shot>()
+            while (c.moveToNext()) {
+                val id = c.str("entry_id")!!
+                out[id] = Shot(id, c.str("file"), c.str("sha256"), c.str("status")!!, c.long("utc_ms") ?: 0)
+            }
+            out
+        }
 
     fun setting(key: String): String? =
         readableDatabase.rawQuery("SELECT value FROM settings WHERE key=?", arrayOf(key)).use {

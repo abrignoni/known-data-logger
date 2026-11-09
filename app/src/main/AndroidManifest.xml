@@ -32,6 +32,18 @@
             </intent-filter>
         </activity>
 
+        <!-- Capture: an accessibility service, bound only by the system (BIND_ACCESSIBILITY_SERVICE). -->
+        <service
+            android:name=".CaptureService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/capture_service" />
+        </service>
+
         <!-- Removes the receiver and startup provider that Compose dependencies would add. -->
         <receiver android:name="androidx.profileinstaller.ProfileInstallReceiver" tools:node="remove" />
         <provider android:name="androidx.startup.InitializationProvider"

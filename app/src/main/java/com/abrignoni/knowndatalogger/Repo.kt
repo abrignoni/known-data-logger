@@ -26,10 +26,30 @@ data class Draft(
     val expectedArtifacts: List<String> = emptyList(),
     val detail: String? = null,
     val refersTo: String? = null,
+    val source: String = Source.MANUAL,
+    val reviewed: Boolean = true,
 )
 
-class Repo(private val context: Context) {
+class Repo private constructor(private val context: Context) {
+    companion object {
+        @Volatile private var instance: Repo? = null
+
+        /** One Repo per process, shared by the screens and the capture service. */
+        fun get(context: Context): Repo =
+            instance ?: synchronized(this) { instance ?: Repo(context.applicationContext).also { instance = it } }
+
+        const val KEY_SESSION = "capture_session_active"
+        const val KEY_SHOT_AUTO = "shot_on_auto_action"
+        const val KEY_SHOT_TAP = "shot_on_every_tap"
+        const val KEY_ALL_APPS = "capture_all_apps"
+        val DEFAULT_CAPTURE_PACKAGES = setOf("com.android.systemui", "com.android.settings")
+    }
+
     val db = Db(context)
+
+    /** Stamp of the newest forward-time row, so change detection does not re-read the table. */
+    private var lastStamp: Stamp? = null
+    private var lastStampLoaded = false
     private val resolver get() = context.contentResolver
     private val pm get() = context.packageManager
 
@@ -41,6 +61,28 @@ class Repo(private val context: Context) {
         set(v) = db.putSetting("device_label", v.trim())
 
     fun stamp(): Stamp = Clocks.stamp(resolver)
+
+    fun flag(key: String, default: Boolean): Boolean = db.setting(key)?.let { it == "1" } ?: default
+    fun setFlag(key: String, v: Boolean) = db.putSetting(key, if (v) "1" else "0")
+
+    /** Packages the capture service records: apps under test plus system UI and Settings. */
+    fun capturePackages(): Set<String> = db.apps().map { it.pkg }.toSet() + DEFAULT_CAPTURE_PACKAGES
+
+    /** Bundled rules, overridden rule by rule by an optional rules.json pushed to the app's external folder. */
+    fun loadRules(): List<Rule> {
+        val bundled = try {
+            parseRules(context.assets.open("rules/default.json").bufferedReader().use { it.readText() })
+        } catch (e: Exception) { emptyList() }
+        val override = try {
+            File(context.getExternalFilesDir(null) ?: context.filesDir, "rules.json").takeIf { it.exists() }
+                ?.let { parseRules(it.readText()) } ?: emptyList()
+        } catch (e: Exception) { emptyList() }
+        return Rules.merge(bundled, override)
+    }
+
+    fun screensDir(): File = File(context.filesDir, "screens").apply { mkdirs() }
+
+    fun recordShot(shot: Shot) = db.putShot(shot)
 
     /** Start stamp of an open Start/Done window, kept in the database so a killed app keeps it. */
     fun saveWindowStart(s: Stamp?) {
@@ -85,10 +127,20 @@ class Repo(private val context: Context) {
     fun liveFile(): File = File(context.getExternalFilesDir(null) ?: context.filesDir, "actions-live.jsonl")
 
     /** Logs system rows for detected reboots and clock or zone changes, then returns them. */
-    private fun systemRowsFor(stamp: Stamp): List<Entry> =
-        Timeline.detectChanges(db.entries(), stamp).map { (kind, text) ->
-            write(base(kind, stamp).copy(action = if (kind == Kind.CLOCK_CHANGE) "clock_change_detected" else "boot_detected", detail = text))
+    private fun systemRowsFor(stamp: Stamp): List<Entry> {
+        if (!lastStampLoaded) {
+            lastStamp = db.entries().filter { it.revisionN == 0 }.maxWithOrNull(Timeline.ORDER)?.stamp
+            lastStampLoaded = true
         }
+        val rows = Timeline.detectChangesFrom(lastStamp, stamp).map { (kind, text) ->
+            write(base(kind, stamp).copy(
+                action = if (kind == Kind.CLOCK_CHANGE) "clock_change_detected" else "boot_detected",
+                detail = text, source = Source.SYSTEM,
+            ))
+        }
+        lastStamp = stamp
+        return rows
+    }
 
     private fun base(kind: String, stamp: Stamp) = Entry(
         entryId = UUID.randomUUID().toString(),
@@ -101,8 +153,12 @@ class Repo(private val context: Context) {
     )
 
     /** Logs an action at the given stamp. Returns any system rows logged first, then the entry. */
-    fun log(draft: Draft, stamp: Stamp = stamp(), windowS: Double? = null, kind: String = Kind.ACTION): List<Entry> {
-        val sys = systemRowsFor(stamp)
+    fun log(
+        draft: Draft, stamp: Stamp = stamp(), windowS: Double? = null, kind: String = Kind.ACTION,
+        detect: Boolean = true,
+    ): List<Entry> {
+        // Back-dated rows (a Start/Done window, a label for an earlier mark) skip change detection.
+        val sys = if (detect) systemRowsFor(stamp) else emptyList()
         val e = base(kind, stamp).copy(
             timeQuality = draft.timeQuality,
             windowS = windowS,
@@ -117,6 +173,8 @@ class Repo(private val context: Context) {
             refersTo = draft.refersTo,
             expectedArtifacts = draft.expectedArtifacts,
             detail = draft.detail?.ifBlank { null },
+            source = draft.source,
+            reviewed = draft.reviewed,
         )
         return sys + write(e)
     }
@@ -140,6 +198,7 @@ class Repo(private val context: Context) {
                 timeQuality = edited.timeQuality,
                 expectedArtifacts = edited.expectedArtifacts,
                 detail = edited.detail?.ifBlank { null },
+                reviewed = true,
             )
         )
     }
@@ -259,9 +318,25 @@ class Repo(private val context: Context) {
         val name = exportFolderName(s)
         log(Draft(action = "export", detail = "folder $name"), s, kind = Kind.EXPORT)
         val rows = db.entries()
-        val jsonlBytes = jsonl(rows).toByteArray(Charsets.UTF_8)
-        val csvBytes = Csv.document(rows).toByteArray(Charsets.UTF_8)
-        val manifestBytes = manifest(rows, jsonlBytes, s).toString(2).toByteArray(Charsets.UTF_8)
+        val shots = db.shots()
+        val jsonlBytes = jsonl(rows, shots).toByteArray(Charsets.UTF_8)
+        val csvBytes = Csv.document(rows, shots).toByteArray(Charsets.UTF_8)
+        // Re-hash each screenshot as it is exported and compare with the hash taken at capture.
+        val shotFiles = shots.values.filter { it.file != null }.mapNotNull { sh ->
+            val f = File(screensDir(), sh.file!!)
+            if (!f.exists()) null else Triple(sh, f.readBytes(), f)
+        }
+        val shotList = JSONArray(shots.values.sortedBy { it.utcMs }.map { sh ->
+            val bytes = shotFiles.firstOrNull { it.first.entryId == sh.entryId }?.second
+            val now = bytes?.let { sha256Hex(it) }
+            JSONObject().apply {
+                put("entry_id", sh.entryId); put("file", sh.file ?: JSONObject.NULL); put("status", sh.status)
+                put("sha256_at_capture", sh.sha256 ?: JSONObject.NULL); put("sha256_at_export", now ?: JSONObject.NULL)
+                put("hash_match", if (sh.sha256 != null && now != null) sh.sha256 == now else JSONObject.NULL)
+            }
+        })
+        val manifestBytes = manifest(rows, jsonlBytes, s).apply { put("screenshots", shotList) }
+            .toString(2).toByteArray(Charsets.UTF_8)
 
         val parent = DocumentsContract.buildDocumentUriUsingTree(treeUri, DocumentsContract.getTreeDocumentId(treeUri))
         val dir = DocumentsContract.createDocument(resolver, parent, DocumentsContract.Document.MIME_TYPE_DIR, name)
@@ -273,6 +348,15 @@ class Repo(private val context: Context) {
         put("manifest.json", "application/json", manifestBytes)
         put("actions.jsonl", "application/octet-stream", jsonlBytes)
         put("actions.csv", "text/csv", csvBytes)
+        if (shotFiles.isNotEmpty()) {
+            val screens = DocumentsContract.createDocument(resolver, dir, DocumentsContract.Document.MIME_TYPE_DIR, "screens")
+                ?: error("Could not create screens folder")
+            shotFiles.forEach { (sh, bytes, _) ->
+                val doc = DocumentsContract.createDocument(resolver, screens, "image/png", sh.file!!.removeSuffix(".png"))
+                    ?: error("Could not create ${sh.file}")
+                resolver.openOutputStream(doc, "w")!!.use { it.write(bytes) }
+            }
+        }
         return name
     }
 }
