@@ -8,8 +8,9 @@ forensic tool can then check each action against what the tool reports.
 
 Author: Alexis Brignoni.
 
-This manual describes version 0.3.0 at commit `7dac29f`. Every screenshot comes from an Android 15
-emulator (Google APIs image, API 35, 1080 x 2400, no Play Store) with made-up test data: the
+This manual describes KDL 0.3.0, the v0.3.0 release on GitHub. Every screenshot comes from an
+Android 15 emulator (Google APIs image, API 35, 1080 x 2400, no Play Store) running a debug build of
+0.3.0, with made-up test data: the
 phone numbers are 555 numbers and the scenario is called `msg-demo-01`. The emulator's time zone
 was America/New_York (UTC-05:00), so the times you see are local to that zone.
 
@@ -38,14 +39,47 @@ was America/New_York (UTC-05:00), so the times you see are local to that zone.
   [section 5](#where-inferred-actions-come-from)).
 - A computer with `adb` (Android platform tools) to install the app and copy the export off the
   phone.
-- Python 3 with `openpyxl` to make the spreadsheet (`python3 -m pip install openpyxl`).
-- The APK. Build it from the repository with JDK 17 and the Android SDK:
+- Python 3 with `openpyxl` to make the spreadsheet (`python3 -m pip install openpyxl`). The script,
+  `tools/make_documentation.py`, is in the release's source code download and in the repository.
+  The APK alone does not include it.
+- The APK: `KDL-0.3.0.apk` from the v0.3.0 release on GitHub, and the release's `SHA256SUMS` file.
+
+### Check the download
+
+Compare the APK's SHA-256 with the line for `KDL-0.3.0.apk` in `SHA256SUMS`. They must match.
+
+```bash
+shasum -a 256 KDL-0.3.0.apk
+```
+
+On Linux, `sha256sum KDL-0.3.0.apk` works too. On Windows:
+
+```
+certutil -hashfile KDL-0.3.0.apk SHA256
+```
+
+You can also check who signed it. `apksigner` comes with the Android SDK build tools:
+
+```bash
+apksigner verify --print-certs KDL-0.3.0.apk
+```
+
+The line `Signer #1 certificate SHA-256 digest:` must read
+`ab957515938e78247caa26a3747e7e429b4a6bd766854a8fdf3aa8929bb50faf`. That is the release key's fingerprint,
+`AB:95:75:15:93:8E:78:24:7C:AA:26:A3:74:7E:7E:42:9B:4A:6B:D7:66:85:4A:8F:DF:3A:A8:92:9B:B5:0F:AF`, written the way
+`apksigner` prints it (lowercase, no colons).
+
+### Build it yourself
+
+With JDK 17 and the Android SDK, from the repository:
 
 ```bash
 JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew assembleDebug
 ```
 
-The APK lands in `app/build/outputs/apk/debug/app-debug.apk`.
+The APK lands in `app/build/outputs/apk/debug/app-debug.apk`, signed with your own debug key, not the
+release key. See [the warning in section 2](#a-build-and-the-release-do-not-mix) before you put it on
+a phone that has the release.
 
 KDL has been tried on an Android 15 emulator and on a Pixel 7a with Android 17 (8 November 2026).
 Other phones and versions have not been tried.
@@ -57,23 +91,45 @@ Other phones and versions have not been tried.
 Connect the phone with USB debugging on and run:
 
 ```bash
-adb install app-debug.apk
+adb install KDL-0.3.0.apk
 ```
 
 On a phone with more than one user profile, install into the test profile only. For example, for
 user 10:
 
 ```bash
-adb install --user 10 app-debug.apk
+adb install --user 10 KDL-0.3.0.apk
 ```
 
 On the Pixel 7a with Android 17 (8 November 2026), an `adb install` did not trigger Android's
 "restricted settings" block. Other phones were not tried. Go on to the [first run](#3-first-run).
 
+The release key is registered with Google's Android developer verification for KDL's package name
+(9 November 2026). Google says verification expands globally in 2027 and does not cover installs
+from a file yet. Once it does, an unregistered app can only be installed through Android's
+"advanced flow" or with `adb`, so the registration keeps the release installable from a file.
+Apps installed with `adb` do not need verification at all.
+
+### A build and the release do not mix
+
+A debug build you made yourself and the release APK are signed with different keys. Android will not
+install one over the other. On the emulator, installing a copy signed with a different key over the
+installed app failed, with or without `-r`:
+
+```
+Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package com.abrignoni.knowndatalogger signatures do not match newer version; ignoring!]
+```
+
+The installed copy and its data were left as they were. To switch, you have to uninstall KDL first,
+and uninstalling deletes its log: on the emulator, reinstalling after an uninstall started the first
+run again with empty fields, and `actions-live.jsonl` started over. **Export and copy the export off
+the phone before you uninstall.**
+
 ### From an APK file on the phone
 
 If you copy the APK to the phone and open it in the Files app, Android first stops you because
-Files is not allowed to install apps.
+Files is not allowed to install apps. On the Pixel 7a (8 November 2026), Play Protect also offered to
+scan the APK before installing it, called it safe, and then offered Install.
 
 | Files, Download folder | The first stop | Install unknown apps |
 |---|---|---|
