@@ -168,6 +168,8 @@ order (boot count, then time since boot), which stays right across clock changes
 
 Field definitions are in [docs/SPEC.md](docs/SPEC.md).
 
+The step-by-step user manual, with screenshots, is [docs/USER_MANUAL.md](docs/USER_MANUAL.md).
+
 ## Build
 
 Builds locally, no CI. Needs JDK 17 and the Android SDK with platform 37.2. Gradle finds the SDK
