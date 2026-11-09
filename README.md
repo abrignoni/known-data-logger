@@ -8,6 +8,9 @@ anyone validating a parser can check each action against the tool output.
 
 It is meant for test devices only. Never install it on an evidence device.
 
+On the home screen it is labelled **KDL**. App info, Accessibility settings and Android's
+permission dialogs show the full name, Known-data logger.
+
 ## What it records
 
 Each entry gets the device clock (UTC ms), the time zone, the time since boot, the boot count from

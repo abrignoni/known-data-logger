@@ -1,4 +1,6 @@
 <resources>
     <string name="app_name">Known-data logger</string>
+    <!-- Short name under the launcher icon; App info, Accessibility settings and dialogs keep app_name. -->
+    <string name="launcher_name">KDL</string>
     <string name="capture_description">Records taps, typed text (never password fields) and screen changes in the apps under test while a capture session is on, and takes screenshots at marked moments. For test phones only. Nothing leaves the phone except through your own export.</string>
 </resources>
