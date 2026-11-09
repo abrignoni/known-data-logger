@@ -51,7 +51,11 @@ Incoming messages and calls come from notifications. Notifications posted by the
 are recorded with their title (usually the sender or number) and text, even while the phone is
 locked. Message and missed-call notifications also become `received_message` and `missed_call`
 for review; a call notification becomes `incoming_call` only when the app marks it as an incoming
-call (Android 12 and later), because dialers post ongoing calls in the same category. Toasts and
+call (Android 12 and later), because dialers post ongoing calls in the same category. While the
+phone is locked, Android 17 (seen on a Pixel 7a) sends the notification event without the
+notification's details: no sender, text or category, only a short line such as "New message.". Those
+are recorded with that line, marked "notification details withheld by Android while locked", and
+put on the review list for you to label. Toasts and
 group summaries are ignored, and the same notification re-posted within 60 seconds is logged once.
 Tried on an Android 15 emulator (8 November 2026) with an SMS and a call sent from the emulator
 console.
@@ -175,6 +179,9 @@ Version 0.3.0, Android only. Tested on an Android 15 emulator and on a Pixel 7a 
   screenshot, an export, the hash chain (41 rows) and the spreadsheet all worked
 - incoming texts showed only "New message" on the phone itself in that profile, and the log
   recorded the same; message content depends on the profile's notification settings
+- with a test PIN set, the PIN never reached the log (not even in the database file's bytes), no
+  keypad taps or System UI rows were recorded while locked, and a text arriving while locked was
+  kept as a withheld notification for review
 - iOS and a checker script that reads the export against LEAPP output are planned.
 
 Author: Alexis Brignoni

@@ -48,6 +48,8 @@ object AutoAction {
  */
 object NotificationMap {
     const val CALL_TYPE_INCOMING = 1
+    /** Detail on a notification event that arrived without its Notification (Android withheld it while locked). */
+    const val WITHHELD = "notification details withheld by Android while locked"
 
     fun actionFor(category: String?, callType: Int? = null): String? = when (category) {
         "msg" -> "received_message"
@@ -172,6 +174,10 @@ data class Entry(
 ) {
     val isMark: Boolean get() = kind == Kind.AUTO_EVENT && action == AutoAction.MARK
 
+    /** A notification whose details Android withheld; only a person can say what it was. */
+    val isWithheldNotification: Boolean
+        get() = kind == Kind.AUTO_EVENT && action == AutoAction.NOTIFICATION && detail == NotificationMap.WITHHELD
+
     /** A stamped entry that still has no action written. */
     val needsDetail: Boolean get() = kind == Kind.ACTION && action.isBlank()
 }
@@ -230,7 +236,7 @@ object Review {
         val resolvedMarks = current.mapNotNull { it.refersTo }.toSet()
         return current.filter {
             (it.kind == Kind.ACTION && it.source == Source.AUTO_RULE && !it.reviewed) ||
-                (it.isMark && it.entryId !in resolvedMarks) ||
+                ((it.isMark || it.isWithheldNotification) && it.entryId !in resolvedMarks) ||
                 it.needsDetail
         }
     }

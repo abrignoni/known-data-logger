@@ -227,7 +227,10 @@ value as text so content cannot run as a formula.
   events with title as counterpart, text as content, direction `in`, and category. Categories
   `msg` and `missed_call` add unreviewed `received_message` and `missed_call`; `call` adds
   `incoming_call` only with `EXTRA_CALL_TYPE` 1 (incoming, API 31+). Notifications are recorded
-  while locked. Toasts (no Notification attached) and group summaries are skipped; the same
+  while locked. On Android 17 a notification event arriving while locked has no parcelableData
+  (no title, text or category; seen on a Pixel 7a); it is recorded with the event's short text,
+  detail "notification details withheld by Android while locked", and joins the review list until
+  a label refers to it. Toasts are recognised by class name, not by missing data. Toasts (no Notification attached) and group summaries are skipped; the same
   notification within 60 s is logged once; the list resets each session. With "withhold codes"
   on (default), 4 to 8 digit runs in text mentioning a code are replaced in notifications,
   screen titles and tap labels.

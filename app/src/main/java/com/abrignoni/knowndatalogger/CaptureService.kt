@@ -287,8 +287,22 @@ class CaptureService : AccessibilityService() {
      * and missed-call categories also get an auto-labelled action for review.
      */
     private fun onNotification(event: AccessibilityEvent, pkg: String) {
-        // Toasts arrive as the same event type without a Notification; they are not incoming events.
-        val n = event.parcelableData as? android.app.Notification ?: return
+        // Toasts arrive as the same event type; they are not incoming events.
+        if (event.className?.toString()?.contains("Toast") == true) return
+        val n = event.parcelableData as? android.app.Notification
+        if (n == null) {
+            // Seen on Android 17 (Pixel 7a): while locked, the event comes without the Notification, only a
+            // short text. Keep it, mark it withheld, and leave the label to review (no category to go on).
+            val shown = masked(event.text?.joinToString(" ")?.takeIf { it.isNotBlank() })
+            val key = "$pkg|withheld|$shown"
+            val now = android.os.SystemClock.elapsedRealtime()
+            val last = seenNotifications[key]
+            if (last != null && now - last < 5_000) return
+            seenNotifications.remove(key); seenNotifications[key] = now
+            repo.log(Draft(appPackage = pkg, action = AutoAction.NOTIFICATION, content = shown, direction = "in",
+                detail = NotificationMap.WITHHELD, source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT)
+            return
+        }
         if (n.flags and android.app.Notification.FLAG_GROUP_SUMMARY != 0) return
         val extras = n.extras
         val title = extras.getCharSequence(android.app.Notification.EXTRA_TITLE)?.toString()

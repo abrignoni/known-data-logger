@@ -35,6 +35,9 @@ ACTION_COLUMNS = [
 ]
 
 
+# Detail the app writes on a notification that arrived without its details (NotificationMap.WITHHELD).
+WITHHELD = "notification details withheld by Android while locked"
+
 # Packages the logger always captures, which are not in the apps-under-test list.
 BUILTIN_LABELS = {"com.android.settings": "Settings", "com.android.systemui": "System UI"}
 
@@ -138,6 +141,9 @@ def pending_review(cur):
             out.append((r, "auto label not accepted"))
         elif r["kind"] == "auto_event" and r["action"] == "mark" and r["entry_id"] not in resolved:
             out.append((r, "mark without a label"))
+        elif (r["kind"] == "auto_event" and r["action"] == "notification" and r.get("detail") == WITHHELD
+              and r["entry_id"] not in resolved):
+            out.append((r, "notification details withheld while locked"))
         elif r["kind"] == "action" and not r["action"].strip():
             out.append((r, "stamped, no action written"))
     return out

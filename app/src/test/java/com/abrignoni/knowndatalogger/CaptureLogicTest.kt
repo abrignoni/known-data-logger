@@ -30,6 +30,16 @@ class CaptureLogicTest {
         assertEquals(setOf("rule1", "mark1", "stamp"), Review.pending(rows).map { it.entryId }.toSet())
     }
 
+    @Test fun withheldNotificationWaitsForReviewUntilLabelled() {
+        val n = e("n1", kind = Kind.AUTO_EVENT, action = AutoAction.NOTIFICATION, source = Source.AUTO_EVENT)
+            .copy(detail = NotificationMap.WITHHELD)
+        val normal = e("n2", kind = Kind.AUTO_EVENT, action = AutoAction.NOTIFICATION, source = Source.AUTO_EVENT)
+            .copy(detail = "category msg")
+        assertEquals(setOf("n1"), Review.pending(listOf(n, normal)).map { it.entryId }.toSet())
+        val label = e("l1", action = "received_message", refersTo = "n1")
+        assertTrue(Review.pending(listOf(n, normal, label)).isEmpty())
+    }
+
     @Test fun tombstonedMarkLeavesReview() {
         val rows = listOf(
             e("mark1", kind = Kind.AUTO_EVENT, action = AutoAction.MARK, source = Source.MARK),

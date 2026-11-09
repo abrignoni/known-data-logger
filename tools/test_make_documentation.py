@@ -176,6 +176,13 @@ class DocTest(unittest.TestCase):
         checks = dict(md.load_export(d)["checks"])
         self.assertIn("MISMATCH with manifest", checks["hash chain"])
 
+    def test_withheld_notification_needs_review(self):
+        rows = [row(1, "n", "notification", kind="auto_event", source="auto_event", detail=md.WITHHELD)]
+        self.assertEqual(["notification details withheld while locked"],
+                         [w for _, w in md.pending_review(md.current(rows))])
+        rows.append(row(2, "l", "received_message", refers_to="n"))
+        self.assertEqual([], md.pending_review(md.current(rows)))
+
     def test_sheet_names_are_valid_and_unique(self):
         used = set()
         self.assertEqual("a_b", md.sheet_name("a/b", used))
