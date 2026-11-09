@@ -265,13 +265,19 @@ class TextBuffer {
 }
 
 object Csv {
+    /**
+     * Column order follows what an examiner reads first: when, what happened, its status, the
+     * screenshot, context, then clock internals and identifiers. Raw epoch values come last.
+     */
     val HEADER = listOf(
-        "seq", "entry_id", "revision_n", "is_current", "kind", "scenario_id", "device_label", "profile_id",
-        "local_time", "utc_time", "tz_id", "tz_offset_min", "utc_ms", "elapsed_ms", "boot_count",
-        "boot_wall_ms", "network_time_ms", "gnss_time_ms", "time_quality", "window_s", "edited_utc_ms",
-        "app_package", "app_version", "account", "action", "content", "counterpart", "direction",
-        "conversation_id", "refers_to", "expected_artifacts", "detail", "source", "reviewed",
-        "screenshot_file", "screenshot_sha256", "screenshot_status",
+        "local_time", "utc_time",
+        "action", "app_package", "content", "counterpart", "direction", "conversation_id",
+        "is_current", "reviewed", "source", "kind", "time_quality", "window_s",
+        "screenshot_file", "screenshot_status",
+        "detail", "refers_to", "expected_artifacts", "account", "app_version", "device_label", "scenario_id",
+        "tz_id", "tz_offset_min", "network_time_utc", "boot_count", "elapsed_ms", "utc_ms", "boot_wall_ms",
+        "network_time_ms", "gnss_time_ms", "edited_utc_ms",
+        "entry_id", "revision_n", "seq", "profile_id", "screenshot_sha256",
     )
 
     fun field(v: Any?): String {
@@ -281,27 +287,51 @@ object Csv {
         } else s
     }
 
+    // Fixed millisecond width, so every value has the same shape and sorts as text.
+    private val LOCAL = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSxxx")
+    private val UTC = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC)
+
     fun localIso(utcMs: Long, offsetMin: Int): String =
-        OffsetDateTime.ofInstant(Instant.ofEpochMilli(utcMs), ZoneOffset.ofTotalSeconds(offsetMin * 60))
-            .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+        OffsetDateTime.ofInstant(Instant.ofEpochMilli(utcMs), ZoneOffset.ofTotalSeconds(offsetMin * 60)).format(LOCAL)
 
-    fun utcIso(utcMs: Long): String = DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochMilli(utcMs))
+    fun utcIso(utcMs: Long): String = UTC.format(Instant.ofEpochMilli(utcMs))
 
-    fun row(e: Entry, isCurrent: Boolean, shot: Shot? = null): String = listOf(
-        e.seq, e.entryId, e.revisionN, isCurrent, e.kind, e.scenarioId, e.deviceLabel, e.profileId,
-        localIso(e.stamp.utcMs, e.stamp.tzOffsetMin), utcIso(e.stamp.utcMs), e.stamp.tzId,
-        e.stamp.tzOffsetMin, e.stamp.utcMs, e.stamp.elapsedMs, e.stamp.bootCount, e.stamp.bootWallMs,
-        e.stamp.networkTimeMs, e.stamp.gnssTimeMs, e.timeQuality, e.windowS, e.editedUtcMs,
-        e.appPackage, e.appVersion, e.account, e.action, e.content, e.counterpart, e.direction,
-        e.conversationId, e.refersTo, e.expectedArtifacts.joinToString(";"), e.detail, e.source, e.reviewed,
-        shot?.file, shot?.sha256, shot?.status,
-    ).joinToString(",") { field(it) }
+    /** Values by column name; written in HEADER order. */
+    fun values(e: Entry, isCurrent: Boolean, shot: Shot? = null): Map<String, Any?> = mapOf(
+        "local_time" to localIso(e.stamp.utcMs, e.stamp.tzOffsetMin), "utc_time" to utcIso(e.stamp.utcMs),
+        "action" to e.action, "app_package" to e.appPackage, "content" to e.content, "counterpart" to e.counterpart,
+        "direction" to e.direction, "conversation_id" to e.conversationId,
+        "is_current" to isCurrent, "reviewed" to e.reviewed, "source" to e.source, "kind" to e.kind,
+        "time_quality" to e.timeQuality, "window_s" to e.windowS,
+        "screenshot_file" to shot?.file, "screenshot_status" to shot?.status,
+        "detail" to e.detail, "refers_to" to e.refersTo, "expected_artifacts" to e.expectedArtifacts.joinToString(";"),
+        "account" to e.account, "app_version" to e.appVersion, "device_label" to e.deviceLabel, "scenario_id" to e.scenarioId,
+        "tz_id" to e.stamp.tzId, "tz_offset_min" to e.stamp.tzOffsetMin,
+        "network_time_utc" to e.stamp.networkTimeMs?.let { utcIso(it) },
+        "boot_count" to e.stamp.bootCount, "elapsed_ms" to e.stamp.elapsedMs, "utc_ms" to e.stamp.utcMs,
+        "boot_wall_ms" to e.stamp.bootWallMs, "network_time_ms" to e.stamp.networkTimeMs,
+        "gnss_time_ms" to e.stamp.gnssTimeMs, "edited_utc_ms" to e.editedUtcMs,
+        "entry_id" to e.entryId, "revision_n" to e.revisionN, "seq" to e.seq, "profile_id" to e.profileId,
+        "screenshot_sha256" to shot?.sha256,
+    )
 
-    /** All rows, every revision, in insertion order, with is_current marking the live version. */
+    fun row(e: Entry, isCurrent: Boolean, shot: Shot? = null): String {
+        val v = values(e, isCurrent, shot)
+        return HEADER.joinToString(",") { field(v[it]) }
+    }
+
+    /**
+     * All rows, every revision, in insertion order, with is_current marking the live version.
+     * Every revision shows its entry's screenshot, and a label made from a mark or captured event
+     * shows that event's, so filtering to current rows keeps the screenshots.
+     */
     fun document(rows: List<Entry>, shots: Map<String, Shot> = emptyMap()): String {
         val currentSeqs = Timeline.current(rows).map { it.seq }.toSet()
         val sb = StringBuilder(HEADER.joinToString(",")).append("\r\n")
-        rows.sortedBy { it.seq }.forEach { sb.append(row(it, it.seq in currentSeqs, shots[it.entryId]?.takeIf { _ -> it.revisionN == 0 })).append("\r\n") }
+        rows.sortedBy { it.seq }.forEach {
+            val shot = shots[it.entryId] ?: it.refersTo?.let { r -> shots[r] }
+            sb.append(row(it, it.seq in currentSeqs, shot)).append("\r\n")
+        }
         return sb.toString()
     }
 }

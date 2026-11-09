@@ -126,7 +126,10 @@ elapsed_ms, final boot_count, sha256 of actions.jsonl.
 
 The current version of an entry is the highest revision_n; a tombstone revision removes it.
 
-`actions.csv`: same rows flattened, local time and UTC in separate columns.
+`actions.csv`: same rows flattened, columns in reading order: local and UTC time (fixed
+millisecond width), what happened, status, screenshot, context, then clock internals and
+identifiers. Every revision shows its entry's screenshot, and a label made from a mark shows the
+mark's. `actions.jsonl` keeps the screenshot on the original row only.
 
 This format is its own. It is not `sample_data` (per-module row counts) and claims no
 compatibility with any other tool.

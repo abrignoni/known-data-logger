@@ -71,8 +71,9 @@ class ModelTest {
     }
 
     @Test fun csvLocalTimeUsesStoredOffset() {
-        assertEquals("2026-11-08T09:00:00-05:00", Csv.localIso(1_794_146_400_000, -300))
-        assertEquals("2026-11-08T14:00:00Z", Csv.utcIso(1_794_146_400_000))
+        assertEquals("2026-11-08T09:00:00.000-05:00", Csv.localIso(1_794_146_400_000, -300))
+        assertEquals("2026-11-08T09:00:00.250-05:00", Csv.localIso(1_794_146_400_250, -300))
+        assertEquals("2026-11-08T14:00:00.000Z", Csv.utcIso(1_794_146_400_000))
     }
 
     @Test fun csvMarksOnlyCurrentRevision() {
@@ -80,8 +81,16 @@ class ModelTest {
         val doc = Csv.document(listOf(entry("x", 0, s), entry("x", 1, s))).trim().split("\r\n")
         assertEquals(3, doc.size)
         assertEquals(Csv.HEADER.size, Csv.HEADER.toSet().size)
-        assertTrue(doc[1].split(",")[3] == "false")
-        assertTrue(doc[2].split(",")[3] == "true")
+        val i = Csv.HEADER.indexOf("is_current")
+        assertTrue(doc[1].split(",")[i] == "false")
+        assertTrue(doc[2].split(",")[i] == "true")
+    }
+
+    @Test fun csvHasEveryColumnOnceTimeFirst() {
+        val e = entry("x", 0, stamp(1_794_146_400_000, 1_000))
+        assertEquals(Csv.HEADER.toSet(), Csv.values(e, true).keys)
+        assertEquals(listOf("local_time", "utc_time", "action"), Csv.HEADER.take(3))
+        assertEquals("2026-11-08T14:00:00.000Z", Csv.document(listOf(e)).split("\r\n")[1].split(",")[1])
     }
 
     @Test fun jsonCarriesNullsAndBootWall() {

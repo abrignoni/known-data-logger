@@ -91,7 +91,9 @@ A folder named `kdl_<scenario>_<device>_<UTC time>` with:
 - `manifest.json`: device profile snapshots, apps under test (version when added and at export),
   checker tolerances, export time, and the sha256 of `actions.jsonl`.
 - `actions.jsonl`: every row, every revision, one JSON object per line.
-- `actions.csv`: the same rows with local and UTC time columns and an `is_current` column.
+- `actions.csv`: the same rows for a spreadsheet, columns in reading order: time, what happened
+  (action, app, content, counterpart), status (current, reviewed, source), screenshot, context,
+  then clock internals and identifiers. Filter `is_current` to TRUE for the live version of each entry.
 - `screens/`: the screenshots, listed with their hashes in the manifest.
 
 ## Documentation (.xlsx)

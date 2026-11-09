@@ -133,16 +133,16 @@ class CaptureLogicTest {
         assertTrue(Timeline.detectChangesFrom(null, s).isEmpty())
     }
 
-    @Test fun screenshotOnlyOnOriginalRowInJsonAndCsv() {
-        val rows = listOf(e("x"), e("x", rev = 1))
+    @Test fun screenshotOnOriginalRowInJsonButEveryRevisionInCsv() {
+        val rows = listOf(e("x"), e("x", rev = 1), e("lab", refersTo = "x"))
         val shots = mapOf("x" to Shot("x", "x.png", "ab", "ok", 1))
         val lines = jsonl(rows, shots).trim().split("\n").map { JSONObject(it) }
         assertEquals("x.png", lines[0].getJSONObject("screenshot").getString("file"))
         assertTrue(lines[1].isNull("screenshot"))
+        assertTrue(lines[2].isNull("screenshot"))
         val csv = Csv.document(rows, shots).trim().split("\r\n")
         val idx = Csv.HEADER.indexOf("screenshot_file")
-        assertEquals("x.png", csv[1].split(",")[idx])
-        assertEquals("", csv[2].split(",")[idx])
-        assertFalse(lines[0].getBoolean("reviewed").not())
+        assertEquals(listOf("x.png", "x.png", "x.png"), csv.drop(1).map { it.split(",")[idx] })
+        assertTrue(lines[0].getBoolean("reviewed"))
     }
 }
