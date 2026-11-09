@@ -123,6 +123,11 @@ def build_app(root):
     con.commit()
     con.execute("UPDATE messages SET hidden = 1 WHERE body = 'Hide this note'")
     con.commit()
+    con.execute("CREATE TABLE tags (name TEXT PRIMARY KEY, n INTEGER) WITHOUT ROWID")
+    con.executemany("INSERT INTO tags VALUES (?, ?)", [("Tag beta two", 1), ("Tag beta two (copy)", 2)])
+    con.commit()
+    con.execute("DELETE FROM tags WHERE name = 'Tag beta two'")
+    con.commit()
     for s in ("", "-wal", "-shm"):
         shutil.copyfile(src + s, db + s)
     con.close()
@@ -142,6 +147,8 @@ def build_app(root):
         f.write("startup\nadded item Buy stamps\n")
     with open(os.path.join(base, "files", "datastore", "user.preferences_pb"), "wb") as f:
         f.write(protobuf_bytes([(1, protobuf_bytes([(1, "note"), (2, "Meet at the library")])), (2, 5)]))
+    with open(os.path.join(base, "files", "datastore", "greeting.preferences_pb"), "w") as f:
+        json.dump({"greeting": "Good morning team"}, f)  # a DataStore written with a JSON serializer
     write_mmkv(os.path.join(base, "files", "reminders"), [("last_reminder", "Water the plants"), ("count", "x")])
     write_leveldb(os.path.join(base, "app_webview", "Local Storage", "leveldb"),
                   [(b"_https://example.test\x00\x01pinned", b"\x01Call the plumber")])
@@ -182,6 +189,11 @@ def entries():
         row(16, "d9", "deleted_message", refers_to="e9", **x),
         row(17, "d10", "deleted_item", refers_to="e10", **x),
         row(18, "d0", "deleted_message", **x),
+        row(19, "e19", "sent_media", content="photo.jpg", **x),
+        row(20, "e20", "typed_text", kind="auto_event", content="Good morning team", source="auto_event", **x),
+        row(21, "e21", "received_message", content="Never stored text", counterpart="+1 555 010 2030",
+            direction="in", **x),
+        row(22, "d22", "deleted_item", content="Tag beta two", **x),
     ]
 
 
@@ -252,6 +264,8 @@ class LocateTest(unittest.TestCase):
     def test_deletions(self):
         dels = {}
         for r in sheet(self.out, "Deletions"):
+            if r["Refers to"] is None and r["Searched"]:
+                continue  # d22, checked in its own test
             self.assertNotIn(r["Refers to"], dels)  # one outcome per deletion here
             dels[r["Refers to"]] = r
         self.assertIn("only in an earlier state", dels["e9"]["Outcome"])
@@ -274,6 +288,16 @@ class LocateTest(unittest.TestCase):
         h = self.hits_for("e10")
         self.assertTrue(any(x["State"] == "current" for x in h))
         self.assertFalse(any(x["State"].startswith("Earlier version") for x in h))
+
+    def test_media_name_datastore_json_and_counterpart_only(self):
+        self.assertTrue(any(x["Field"] == "file name" and x["Match"] == "exact" for x in self.hits_for("e19")))
+        self.assertTrue(any(x["Store type"] == "JSON" for x in self.hits_for("e20")))
+        self.assertTrue(self.entries["e21"]["Status"].startswith("content not found; only the counterpart"))
+
+    def test_without_rowid_deletion_is_not_collapsed(self):
+        outcomes = [r["Outcome"] for r in sheet(self.out, "Deletions") if r["Searched"] == "content: Tag beta two"]
+        self.assertIn("present in the current state", outcomes)
+        self.assertTrue(any(o.startswith("only in an earlier state: Not in current state") for o in outcomes), outcomes)
 
     def test_time_only(self):
         rows = [r for r in sheet(self.out, "Time only") if r["Entry id"] == "e14"]

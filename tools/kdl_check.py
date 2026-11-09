@@ -102,7 +102,7 @@ def datetime_ms(value):
 
 def bucket(status):
     """Coverage column for a status. Only a plain 'found' counts as found."""
-    if status in ("found", "ambiguous", "mismatched", "missing"):
+    if status in ("found", "ambiguous", "mismatched", "missing", "not gradable"):
         return status
     return "found with a caveat" if status.startswith("found") else "ambiguous"
 
@@ -139,6 +139,8 @@ def grade(entry, art, rows, types, tol):
         times = [(c, ms) for c, ms in times if ms is not None]
         cands.append((rid, row, best, times))
     if not nds:
+        if not dt_cols:
+            return "not gradable", [], "no text to search and the artifact has no datetime column", None, None
         hits = [(rid, c, ms) for rid, row, _, times in cands for c, ms in times if start <= ms <= end]
         if not hits:
             return "missing", [], "no text to search and no datetime inside the tolerance", None, None
@@ -174,18 +176,21 @@ def grade(entry, art, rows, types, tol):
     _, rid, row, best, inside = timed[0]
     delta = round((inside[0][1] - entry["utc_ms"]) / 1000, 3)
     detail = "; ".join(f"{f} in {c} ({k})" for f, (c, k) in best.items()) + f"; {inside[0][0]} {delta:+.1f} s"
-    dnote = kc.direction_note(entry, delta)
-    if dnote:
-        detail += f" ({dnote})"
     if len(top) > 1:
         return "ambiguous", [t[1] for t in top], detail + f"; {len(top)} rows equally good", rid, delta
+    if len(timed) > 1:
+        detail += f"; {len(timed) - 1} weaker candidate(s)"
     dcol, sent = views.get("directionColumn"), views.get("directionSentValue")
     if dcol and sent is not None and entry.get("direction") in ("in", "out") and dcol in row:
+        if row[dcol] in (None, ""):
+            return "found, direction not stored", [rid], detail + f"; {dcol} is empty", rid, delta
         is_sent = str(row[dcol]) == str(sent)
         if is_sent != (entry["direction"] == "out"):
             return "mismatched", [rid], detail + f"; {dcol} = {row[dcol]!r} contradicts the logged direction " \
                                                  f"{entry['direction']!r}", rid, delta
-    return "found", [rid], detail + (f"; {len(timed) - 1} weaker candidate(s)" if len(timed) > 1 else ""), rid, delta
+    if any("weak" in k for _, k in best.values()) and not any("weak" not in k for _, k in best.values()):
+        return "found, weak match", [rid], detail, rid, delta
+    return "found", [rid], detail, rid, delta
 
 
 def session_windows(export, tol):
@@ -251,6 +256,16 @@ def main(argv=None):
         for spec, ents in plan.items():
             art = out.find(spec)
             key = (dev, spec)
+            core = spec.rpartition(":")[0].lower()
+            if art is None and core and core != out.core:
+                coverage[key] = [dev, spec, None, 0, 0, 0, 0, 0, 0, None,
+                                 f"{len(ents)} entr{'y' if len(ents) == 1 else 'ies'} not gradable here: this output is "
+                                 f"{out.core}, the entries expect {core}"]
+                for e in ents:
+                    entry_rows.append([dev, kc.entry_label(e), e["action"], e.get("content"), e.get("counterpart"),
+                                       e.get("direction"), spec, "not gradable", f"this output is {out.core}", "", None,
+                                       e["entry_id"]])
+                continue
             if art is None:
                 coverage[key] = [dev, spec, out.core, len(ents), 0, 0, 0, 0, len(ents), 0.0,
                                  f"not in this output ({out.core} {out.version}): every entry counted missing"]
@@ -271,10 +286,13 @@ def main(argv=None):
                 entry_rows.append([dev, kc.entry_label(e), e["action"], e.get("content"), e.get("counterpart"),
                                    e.get("direction"), f"{out.core}:{art['artifact_key']}", status, detail,
                                    ", ".join(str(i) for i in ids[:20]), delta, e["entry_id"]])
-            n = len(ents)
+            n = len(ents) - counts["not gradable"]
+            note = f"tolerances {tol_note}"
+            if counts["not gradable"]:
+                note += f"; {counts['not gradable']} entr{'y' if counts['not gradable'] == 1 else 'ies'} not gradable"
             coverage[key] = [dev, f"{out.core}:{art['artifact_key']}", art.get("name"), n, counts["found"],
                              counts["found with a caveat"], counts["ambiguous"], counts["mismatched"], counts["missing"],
-                             round(counts["found"] / n, 3) if n else None, f"tolerances {tol_note}"]
+                             round(counts["found"] / n, 3) if n else None, note]
             # Rows inside a capture session that no entry accounts for.
             wins = session_windows(export, tol)
             dt_cols = [c for c, t in types.items() if t == "datetime"]

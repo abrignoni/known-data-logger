@@ -248,6 +248,7 @@ def read_sqlite(st):
     if journal:
         unread.append(f"hot rollback journal ({os.path.getsize(st.path + '-journal')} bytes) not applied")
     st.deletion_context = "not read: " + ", ".join(unread)
+    queries = []
     for _, table, sql in objects:
         if table.startswith("sqlite_"):
             continue
@@ -259,26 +260,29 @@ def read_sqlite(st):
             continue
         st.tables[table] = {"columns": cols, "rows": len(rows), "label": label}
         for r in rows:
-            where = f"rowid {r[0]}" if rowid else "row"
-            vals = r[1:] if rowid else r
-            st.records.append(Rec(st, label, where, list(zip(cols, vals))))
-        if wal:
-            _earlier_rows(st, table, label, rowid)
+            st.records.append(Rec(st, label, row_key(r, rowid), list(zip(cols, r[1:] if rowid else r))))
+        queries.append((table, label, cols, rowid))
     con.close()
     if wal:
-        try:
-            with sqlite_wal.WalStates(st.path, include=(sqlite_wal.KIND_COMMITTED, sqlite_wal.KIND_EARLIER,
-                                                        sqlite_wal.KIND_UNCOMMITTED)) as w:
-                st.notes.append(w.summary())
-        except Exception as ex:  # noqa: BLE001 - reported, never hidden
-            st.notes.append(f"write-ahead log summary failed: {type(ex).__name__}: {ex}")
+        _earlier_rows(st, queries)
+
+
+def row_key(values, rowid):
+    """'rowid N', or for a table without a usable rowid a key made of the row's own values,
+    so two different rows never share a key."""
+    if rowid:
+        return f"rowid {values[0]}"
+    return f"row {hashlib.sha1(repr(tuple(values)).encode()).hexdigest()[:10]} (no rowid; keyed by its values)"
 
 
 def _select_all(con, table):
     q = '"' + table.replace('"', '""') + '"'
     try:
         cur = con.execute(f"SELECT rowid AS kdl_rowid, * FROM {q}")
-        return [d[0] for d in cur.description][1:], cur.fetchall(), True
+        cols = [d[0] for d in cur.description][1:]
+        # A column named rowid, oid or _rowid_ hides the real rowid behind that name.
+        if not {c.lower() for c in cols} & {"rowid", "oid", "_rowid_"}:
+            return cols, cur.fetchall(), True
     except sqlite3.Error:
         pass
     try:
@@ -288,29 +292,71 @@ def _select_all(con, table):
         return None, str(ex), False
 
 
-def _earlier_rows(st, table, label, rowid):
-    q = '"' + table.replace('"', '""') + '"'
-    query = f"SELECT rowid AS kdl_rowid, * FROM {q}" if rowid else f"SELECT * FROM {q}"
+def _earlier_rows(st, queries):
+    """Rows the other states of the write-ahead log hold and the current state does not.
+
+    The same comparison as sqlite_wal.rows_not_in_current (rows compare by every value; with a
+    rowid, a row whose rowid the current state still holds is an earlier version), run for every
+    table inside one pass over the states, so the database and its log are copied once per state
+    rather than once per table and state."""
+    include = (sqlite_wal.KIND_COMMITTED, sqlite_wal.KIND_EARLIER, sqlite_wal.KIND_UNCOMMITTED)
+    current, keys, found, broken = {}, {}, {t: {} for t, _, _, _ in queries}, set()
     try:
-        cols, rows, _ = sqlite_wal.rows_not_in_current(
-            st.path, query, key_columns=[0] if rowid else None,
-            include=(sqlite_wal.KIND_COMMITTED, sqlite_wal.KIND_EARLIER, sqlite_wal.KIND_UNCOMMITTED))
-    except Exception as ex:  # noqa: BLE001
-        st.notes.append(f"earlier WAL states of {table} not read: {type(ex).__name__}: {ex}")
+        with sqlite_wal.WalStates(st.path, include=include) as w:
+            first = True
+            for state in w.states():
+                for table, _, _, rowid in queries:
+                    if table in broken:
+                        continue
+                    q = '"' + table.replace('"', '""') + '"'
+                    try:
+                        rows = state.connection.execute(
+                            f"SELECT rowid AS kdl_rowid, * FROM {q}" if rowid else f"SELECT * FROM {q}").fetchall()
+                    except sqlite3.Error:
+                        if first:
+                            broken.add(table)
+                        continue  # a state where the table or a column does not exist yet
+                    if first:
+                        current[table] = set(rows)
+                        keys[table] = {r[0] for r in rows} if rowid else set()
+                        continue
+                    for r in rows:
+                        if r in current[table]:
+                            continue
+                        seen = found[table].setdefault(r, {"committed": None, "earlier": None, "uncommitted": False})
+                        if state.kind == sqlite_wal.KIND_UNCOMMITTED:
+                            seen["uncommitted"] = True
+                            continue
+                        slot = "committed" if state.kind == sqlite_wal.KIND_COMMITTED else "earlier"
+                        if seen[slot] is None:
+                            seen[slot] = [state.number, state.number]
+                        else:
+                            seen[slot][0] = state.number
+                first = False
+            st.notes.append(w.summary())
+    except Exception as ex:  # noqa: BLE001 - reported, never hidden
+        st.notes.append(f"earlier write-ahead log states not read: {type(ex).__name__}: {ex}")
         return
-    for er in rows:
-        parts = []
-        if er.first_state is not None:
-            parts.append(f"committed states {er.first_state}-{er.last_state}")
-        if er.earlier_generation:
-            parts.append(f"previous log generation commits {er.earlier_generation[0]}-{er.earlier_generation[1]}")
-        if er.uncommitted:
-            parts.append("uncommitted frames")
-        state = f"{er.status} ({', '.join(parts)})"
-        vals = list(er.values)
-        where = f"rowid {vals[0]}" if rowid else "row"
-        st.records.append(Rec(st, label, where, list(zip(cols[1:] if rowid else cols, vals[1:] if rowid else vals)),
-                              state=state))
+    for table, label, cols, rowid in queries:
+        if table in broken:
+            st.notes.append(f"earlier write-ahead log states of {table} not read: the table did not read in the current state")
+        for r, seen in found[table].items():
+            committed, earlier = seen["committed"], seen["earlier"]
+            if committed is None and earlier is None:
+                status = sqlite_wal.UNCOMMITTED_CHANGE
+            elif rowid and r[0] in keys.get(table, ()):
+                status = sqlite_wal.EARLIER_VERSION
+            else:
+                status = sqlite_wal.NOT_IN_CURRENT
+            parts = []
+            if committed:
+                parts.append(f"committed states {committed[0]}-{committed[1]}")
+            if earlier:
+                parts.append(f"previous log generation commits {earlier[0]}-{earlier[1]}")
+            if seen["uncommitted"]:
+                parts.append("uncommitted frames")
+            st.records.append(Rec(st, label, row_key(r, rowid), list(zip(cols, r[1:] if rowid else r)),
+                                  state=f"{status} ({', '.join(parts)})"))
 
 
 def _strings_from_json_text(name, text, out):
@@ -520,7 +566,8 @@ def classify_and_read(name, path, st):
     if label:
         st.kind = label
         if media:
-            st.status, st.reason = "media, not a store", "file name and path searched only"
+            st.status, st.reason = "media, not a store", "file name and path searched; content not read"
+            st.records.append(Rec(st, "", "file", [("file name", os.path.basename(name)), ("path", name)]))
         else:
             st.fail(f"{label}: no reader in this tool")
         return
@@ -528,7 +575,11 @@ def classify_and_read(name, path, st):
     if (base.endswith((".pb", "_pb", ".proto", ".protobuf", ".preferences_pb")) or "/datastore/" in name) and size <= MAX_TEXT_BYTES:
         with open(path, "rb") as f:
             read_protobuf(st, f.read())
-        return
+        if st.status == "read":
+            return
+        # A store under datastore/ can be JSON or text (a serializer other than protobuf).
+        st.notes.append(f"not read as protobuf: {st.reason}")
+        st.status, st.reason, st.kind = "read", "", ""
     if size <= MAX_TEXT_BYTES:
         with open(path, "rb") as f:
             raw = f.read()
@@ -555,6 +606,9 @@ def classify_and_read(name, path, st):
             read_text(st, text)
             return
     st.kind = "unknown"
+    if size > MAX_TEXT_BYTES:
+        st.fail(f"{size} bytes, not SQLite or a known format, and over the {MAX_TEXT_BYTES} byte limit for reading as text")
+        return
     st.fail(f"no reader for this format (first bytes {head[:8].hex()}, extension {os.path.splitext(base)[1] or 'none'})")
 
 
@@ -604,14 +658,19 @@ def build_stores(staged, package, media_names):
             st.notes.append("MediaStore lists this file as written by the app")
         stores.append(st)
     inventory = []
+    by_name = {s.name: s for s in stores}
     for n in names:
         p = staged[n]
+        digest, size = hashlib.sha256(), 0
         with open(p, "rb") as f:
-            data = f.read()
-        head = data[:8].hex()
+            head = f.read(8).hex()
+            f.seek(0)
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                digest.update(chunk)
+                size += len(chunk)
         owner = member_of.get(n)
-        st = next((s for s in stores if s.name == (owner or n)), None)
-        inventory.append([n, len(data), hashlib.sha256(data).hexdigest(), head, os.path.splitext(n)[1],
+        st = by_name.get(owner or n)
+        inventory.append([n, size, digest.hexdigest(), head, os.path.splitext(n)[1],
                           st.kind if st else "", owner or "", st.status if st and not owner else "",
                           (st.reason if st and not owner else ""), len(st.records) if st and not owner else None])
     return stores, inventory
@@ -701,9 +760,18 @@ def field_pattern(name):
     return re.sub(r"\[\d+\]", "[*]", re.sub(r"_\d+$", "_N", name))
 
 
+def is_primary(h):
+    has_content = any(n.searchable and n.field == "content" for n in kc.needles(h["entry"]))
+    return h["needle"].field == "content" or not has_content
+
+
 def column_profile(entries, hits):
     """Per (store, container): content fields, time fields with epochs, and constant or
-    direction-linked columns across the current rows that carry a content hit."""
+    direction-linked columns across the current rows that carry a content hit.
+
+    Times, constants and direction come from primary hits only: the content when the entry
+    logged content, otherwise the counterpart. A counterpart turns up on rows of other
+    messages to the same person, which would lend them this entry's time and direction."""
     by_container = collections.OrderedDict()
     for h in hits:
         if h["needle"].field == "conversation_id":
@@ -716,8 +784,9 @@ def column_profile(entries, hits):
         content = collections.defaultdict(set)
         for h in hs:
             content[field_pattern(h["field"])].add(id(h["entry"]))
+        prim = [h for h in hs if is_primary(h)]
         times = collections.defaultdict(list)
-        for h in hs:
+        for h in prim:
             for tf, epoch, delta in h["times"]:
                 times[(field_pattern(tf), epoch)].append((id(h["entry"]), delta, (h["rec"].container, h["rec"].where)))
         time_lines = []
@@ -728,13 +797,14 @@ def column_profile(entries, hits):
             # One row matched by several entries (a conversation's last-update time) is one reading.
             status = "consistent" if n >= 3 and nrows >= 3 and not other else "candidate"
             deltas = [d for _, d, _ in vals]
-            every = "yes" if n == len(ents) else f"no ({n} of {len(ents)})"
+            n_prim = len({id(h["entry"]) for h in prim})
+            every = "yes" if n == n_prim else f"no ({n} of {n_prim})"
             time_lines.append(f"{tf}: {epoch}, {status}, {n} entr{'y' if n == 1 else 'ies'} over {nrows} "
                               f"row{'' if nrows == 1 else 's'}, delta {min(deltas):+.1f}..{max(deltas):+.1f} s, "
                               f"holds for every entry with a hit here: {every}")
         # constant and direction-linked fields, on current rows only, one row per record
         recs = {}
-        for h in hs:
+        for h in prim:
             if h["rec"].state == "current":
                 recs[id(h["rec"])] = (h["rec"], h["entry"].get("direction"))
         notes = []
@@ -891,13 +961,16 @@ def main(argv=None):
         media_names = set()
         if media_paths:
             rests = {re.sub(r"^/(?:storage/emulated|data/media)/\d+/|^/sdcard/", "", p) for p in media_paths}
+            by_base = collections.defaultdict(set)
+            for r in rests:
+                by_base[r.rsplit("/", 1)[-1]].add(r)
 
             def is_media(n):
-                return any(n.endswith("/" + r) for r in rests)
+                return any(n.endswith("/" + r) for r in by_base.get(n.rsplit("/", 1)[-1], ()))
             more = ex.stage(lambda n: n not in staged and is_media(n), stage_dir)
             staged.update(more)
             media_names = {n for n in staged if is_media(n)}
-            missing = [r for r in sorted(rests) if not any(n.endswith("/" + r) for n in staged)]
+            missing = [r for r in sorted(rests) if not any(n.endswith("/" + r) for n in media_names)]
             if missing:
                 media_note += f"; {len(missing)} listed file(s) not in the extraction"
         stores, inventory = build_stores(staged, a.package, media_names)
@@ -915,7 +988,9 @@ def main(argv=None):
             if "not read" in n and st.status == "read":
                 not_read.append([st.name, st.kind, "partly read: " + n])
     for r in ex.rejected:
-        not_read.append([r, "member name", "rejected: absolute or '..' path, never joined to the staging folder"])
+        not_read.append([r, "member name", "rejected: '..' in the member name, never joined to the staging folder"])
+    n_unread = sum(1 for s in stores if s.status == "not read")
+    n_partial = len(not_read) - n_unread - len(ex.rejected)
 
     hits_by_entry = collections.defaultdict(list)
     for h in hits:
@@ -928,15 +1003,23 @@ def main(argv=None):
             n_time = next((len(f) for en, f in tonly if en is e), 0)
             status = f"no text to search; {n_time} time-only field(s) (Time only sheet), not counted as found"
         elif hs:
-            strong = [h for h in hs if not h["guess"] and "weak" not in h["kind"]]
-            if any(h["rec"].state == "current" for h in strong):
+            # With content logged, only a content hit counts: a counterpart turns up in contact
+            # and participant tables whether or not the message itself was stored.
+            has_content = any(n.searchable and n.field == "content" for n in nds)
+            main = [h for h in hs if h["needle"].field == "content"] if has_content else hs
+            strong = [h for h in main if not h["guess"] and "weak" not in h["kind"]]
+            if not main:
+                status = (f"content not found; only the counterpart or thread label matched "
+                          f"({n_unread} store(s) not read)")
+            elif any(h["rec"].state == "current" for h in strong):
                 status = "found"
             elif strong:
                 status = "found only in earlier or deleted records (State column on the Hits sheet)"
             else:
                 status = "found, weak or guessed matches only"
         else:
-            status = f"not found in the {sum(1 for s in stores if s.status == 'read')} store(s) read; {len(not_read)} not read"
+            status = (f"not found in the {sum(1 for s in stores if s.status == 'read')} store(s) read; "
+                      f"{n_unread} store(s) not read")
         named = [d for d in deletions if d["utc_ms"] >= e["utc_ms"] and (
             d.get("refers_to") == e["entry_id"]
             or any(n.n == kc.norm(d.get("content") or "") for n in nds if n.field == "content"))]
@@ -948,8 +1031,7 @@ def main(argv=None):
     hit_rows = []
     for h in hits:
         e = h["entry"]
-        tl = "; ".join(f"{f}: {ep}, {d:+.1f}" + (f" ({kc.direction_note(e, d)})" if kc.direction_note(e, d) else "")
-                       for f, ep, d in h["times"])
+        tl = "; ".join(f"{f}: {ep}, {d:+.1f}" for f, ep, d in h["times"])
         hit_rows.append([kc.entry_label(e), e["action"], h["needle"].field, h["needle"].value, h["kind"], h["store"].name,
                          h["store"].kind, h["rec"].container, h["rec"].where, h["field"], excerpt(h["value"]),
                          h["rec"].state, tl, "yes" if h["guess"] else "no", e["entry_id"]])
@@ -974,7 +1056,8 @@ def main(argv=None):
         ("Current rows not searched", f"{len(skipped)} (other apps, no app, or events a label refers to)"),
         ("Files staged", len(inventory)),
         ("Stores read", sum(1 for s in stores if s.status == "read")),
-        ("Stores not read", f"{len(not_read)} (Not read sheet)"),
+        ("Stores not read", f"{n_unread} (Not read sheet, which also lists {n_partial} note(s) on stores read only in "
+                            f"part and {len(ex.rejected)} rejected member name(s))"),
         ("Media", media_note),
         ("Scope", "Only the stores read are searched. SQLite freelist pages, freeblocks, unallocated space and "
                   "unapplied rollback journals are not read. A value not found may still be on the phone."),

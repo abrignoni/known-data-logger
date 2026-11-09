@@ -146,7 +146,24 @@ class CheckTest(unittest.TestCase):
         out = os.path.join(self.tmp, "i.xlsx")
         kk.main(["--export", self.ea, "--leapp-output", f"phoneA={o}", "-o", out])
         per = {r["Entry id"]: r for r in sheet(out, "Per entry")}
-        self.assertEqual(per["e1"]["Status"], "missing")  # expected an aleapp artifact, this is iLEAPP output
+        self.assertEqual(per["e1"]["Status"], "not gradable")  # expected an aleapp artifact, this is iLEAPP output
+        cov = sheet(out, "Coverage")
+        self.assertEqual(cov[0]["Entries graded"], 0)
+        self.assertIn("this output is ileapp", cov[0]["Note"])
+
+    def test_grade_edge_cases(self):
+        art = {"data_views": {"conversation": {"directionColumn": "direction", "directionSentValue": "Outgoing"}}}
+        types = {"timestamp": "datetime"}
+        tol = {"exact": 120, "before_after": 300, "approximate": 900}
+        e = {"utc_ms": T0, "content": "See you at 6pm", "direction": "out"}
+        rows = [(1, {"timestamp": T0 // 1000, "message": "See you at 6pm", "direction": None})]
+        self.assertEqual(kk.grade(e, art, rows, types, tol)[0], "found, direction not stored")
+        e2 = {"utc_ms": T0, "content": "Hola"}
+        rows2 = [(1, {"timestamp": T0 // 1000, "message": "hola", "direction": "Outgoing"})]
+        self.assertEqual(kk.grade(e2, art, rows2, types, tol)[0], "found, weak match")
+        e3 = {"utc_ms": T0}
+        self.assertEqual(kk.grade(e3, art, [(1, {"message": "x"})], {}, tol)[0], "not gradable")
+        self.assertEqual(kk.bucket("found, weak match"), "found with a caveat")
 
     def test_float_and_iso_datetimes(self):
         self.assertEqual(kk.datetime_ms(1794146401.5), 1794146401500)

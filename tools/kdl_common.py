@@ -62,7 +62,7 @@ def window_ms(entry, tol):
     """(start_ms, end_ms) a stored time may fall in to match this entry.
 
     Symmetric around the tap: the before/after relation is the tester's claim, so the signed
-    delta is reported and compared with it rather than used to cut the window. A windowed entry
+    delta is reported rather than used to cut the window. A windowed entry
     (window_s) spans the window plus the exact tolerance on both sides."""
     t = entry["utc_ms"]
     w = entry.get("window_s")
@@ -72,17 +72,6 @@ def window_ms(entry, tol):
     q = entry.get("time_quality") or "exact"
     s = tol["before_after"] if q in ("before", "after") else tol.get(q, tol["exact"])
     return t - s * 1000, t + s * 1000
-
-
-def direction_note(entry, delta_s):
-    """Says when a store time contradicts the tester's before/after claim."""
-    q = entry.get("time_quality")
-    # time_quality describes the tap relative to the act: "after" = tapped after the act.
-    if q == "after" and delta_s > 0:
-        return "store time is after the tap, but the tap was logged as after the act"
-    if q == "before" and delta_s < 0:
-        return "store time is before the tap, but the tap was logged as before the act"
-    return None
 
 
 def searched_entries(export, package):

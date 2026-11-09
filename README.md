@@ -200,8 +200,9 @@ evidence for a person writing one.
 
 Tried on an Android 15 emulator (9 November 2026) with Google Clock and Google Messages: an alarm
 label in two tables, a world clock city that the app stores with an accent the tester did not type,
-a deleted alarm reported as not found with the database's freelist count, a running timer found by
-its wall clock and its since-boot time, and the two text messages with their time column. The
+a deleted alarm reported as not found with the database's freelist count, a running timer listed
+on the Time only sheet by its wall clock and its since-boot time, and the two text messages with
+their time column. The
 hits named here were checked by opening the stores by hand.
 
 ## Checking a LEAPP artifact (kdl_check.py)
