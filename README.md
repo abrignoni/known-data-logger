@@ -8,6 +8,9 @@ anyone validating a parser can check each action against the tool output.
 
 It is meant for test devices only. Never install it on an evidence device.
 
+The signed APK is on this repository's Releases page. The [user manual](docs/USER_MANUAL.md) covers
+installing it, checking its hash and signer, and every screen.
+
 On the home screen it is labelled **KDL**. App info, Accessibility settings and Android's
 permission dialogs show the full name, Known-data logger.
 
@@ -51,8 +54,8 @@ What is captured, only in the apps under test plus System UI and Settings unless
   spell a PIN. Tested in the Wi-Fi dialog: the SSID typed beside it was captured, the password
   (hidden or shown) was not, not even in the database file.
 - while the phone is locked, only notifications from the captured apps and the app's own system
-  rows (package changes, reboots) are recorded; taps, typed text and screens are not (not yet
-  tried with a PIN set)
+  rows (package changes, reboots) are recorded; taps, typed text and screens are not (tried with
+  a test PIN on a Pixel 7a, see Status)
 - screen titles are the window's title only: System UI also reports the whole notification
   shade, and that text is never recorded
 - a field cleared in one step, which is how apps built with Jetpack Compose show a send: they
@@ -230,7 +233,7 @@ The step-by-step user manual, with screenshots, is [docs/USER_MANUAL.md](docs/US
 
 ## Build
 
-Builds locally, no CI. Needs JDK 17 and the Android SDK with platform 37.2. Gradle finds the SDK
+Builds locally. Needs JDK 17 and the Android SDK with platform 37.2. Gradle finds the SDK
 through `sdk.dir` in `local.properties` (not committed) or the `ANDROID_HOME` variable.
 
 ```bash
@@ -262,13 +265,13 @@ Version 0.3.0, Android only. Tested on an Android 15 emulator and on a Pixel 7a 
   restricted settings"; installing the same APK from the Files app did (Android recorded it as a
   local-file install), and Allow restricted settings in App info cleared it
 - sends in Google Messages (October 2026 build), an incoming call, a missed call, a MARK with its
-  screenshot, an export, the hash chain (41 rows) and the spreadsheet all worked
+  screenshot, an export, the hash chain and the spreadsheet all worked
 - incoming texts showed only "New message" on the phone itself in that profile, and the log
   recorded the same; message content depends on the profile's notification settings
 - with a test PIN set, the PIN never reached the log (not even in the database file's bytes), no
   keypad taps or System UI rows were recorded while locked, and a text arriving while locked was
   kept as a withheld notification for review
-- two texts that both showed only "New message." and arrived 34 seconds apart while unlocked were
+- two texts that both showed only "New message." and arrived less than a minute apart while unlocked were
   recorded as two notifications and two `received_message` entries
 - the app icon's one-colour layer showed correctly with the launcher's themed (Minimal) icon style,
   which this launcher applies to the home screen only

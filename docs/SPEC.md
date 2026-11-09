@@ -7,15 +7,15 @@ A small app installed on a test device. The researcher records each action as th
 The app exports a machine-readable log that sits in `documentation/` beside the extraction,
 and that can be checked against LEAPP output.
 
-Decided: native Kotlin, Android only for version 1, sideloaded APK, private repo under
-abrignoni/, built locally (no GitHub Actions).
+Decided: native Kotlin, Android only for version 1, sideloaded APK, repository
+abrignoni/known-data-logger, built and signed locally.
 
 ## Why, and what exists
 
 Known data today is a hand-kept document. Joshua Hickman's published images (Pixel3_A11,
-Pixel3_A12 on Corpus) use a PDF: phone information, OS version information, accounts, then
+Pixel3_A12) use a PDF: phone information, OS version information, accounts, then
 per app the name, version, install date and time, username, a note, and a table of actions
-(date, time to the minute, action). The Pixel 8 Pro log is a spreadsheet with free-form blocks
+(date, time to the minute, action). Another test phone's log is a spreadsheet with free-form blocks
 side by side. Both read well, but no script can read them, times are minute precision and typed
 by hand, and the time zone is a sentence in the header.
 
@@ -51,7 +51,7 @@ Each entry stores:
 - `elapsed_ms`: `SystemClock.elapsedRealtime()`, includes deep sleep, monotonic within a boot.
 - `boot_count`: `Settings.Global.BOOT_COUNT` (stubs: constant "boot_count"; API 24; read without a
   permission per the Settings.Global page). A `boot_count` setting is present in
-  `settings_global.xml` on the Pixel3_A11 corpus image (read with an XML parser). Android 12+
+  `settings_global.xml` on the Pixel3_A11 image (read with an XML parser). Android 12+
   images store that file as binary XML and were not checked. Ordering key is (boot_count,
   elapsed_ms, seq).
 - `boot_wall_ms` = utc_ms minus elapsed_ms. Within one boot_count it is constant unless the clock
@@ -270,4 +270,4 @@ tolerances. Details and limits are in the README.
 ## Not verified yet
 
 - BOOT_COUNT read without a permission on the Android 15 emulator (values 1, then 2 after a
-  reboot). Not yet tried on a physical phone or other Android versions.
+  reboot), and on a Pixel 7a with Android 17 (no reboot tried there). Other versions not tried.
