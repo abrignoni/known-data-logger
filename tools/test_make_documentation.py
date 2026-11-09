@@ -139,7 +139,7 @@ class DocTest(unittest.TestCase):
 
     def test_chain_vector_matches_kotlin(self):
         r = {"account": None, "action": "sent_message", "app_package": "com.example.chat", "app_version": "1.2",
-             "boot_count": 3, "content": "H\u00e9 \"q\" \\ line\nnext \U0001F600 bell\u0007", "conversation_id": None,
+             "boot_count": 3, "content": "H\u00e9 \"q\" \\ line\nnext \U0001F600 bell\u0007 del\u007f", "conversation_id": None,
              "counterpart": "phone B", "detail": None, "device_label": "phoneA", "direction": "out",
              "edited_utc_ms": 1700000000500, "elapsed_ms": 123456, "entry_id": "e1", "expected_artifacts": ["aleapp:x", "y"],
              "gnss_time_ms": None, "kind": "action", "network_time_ms": 1700000000000, "prev_hash": "abc", "profile_id": 1,
@@ -147,7 +147,7 @@ class DocTest(unittest.TestCase):
              "time_quality": "exact", "tz_id": "America/New_York", "tz_offset_min": -300, "utc_ms": 1700000000123,
              "window_s": 5.894}
         # Same vector as ChainTest.canonicalMatchesPython in the app.
-        self.assertEqual("02e5c1e190e0fd352d836bf5a0a315324f18cc18ac257edaf52dafb273bab7e1",
+        self.assertEqual("23843a77b64530aba2b30d3ddaac1b19013cfcf924101dd6e799fef6ae99ac44",
                          hashlib.sha256(md.chain_canonical(r).encode("ascii")).hexdigest())
 
     def _chained(self, rows):

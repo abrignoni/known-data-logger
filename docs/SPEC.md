@@ -151,7 +151,10 @@ An accessibility service records, with the same time fields as every other entry
   logger's own screens. A field showing its hint is recorded as empty (an empty field reports its
   hint as its text). While a password field has focus, taps are recorded without a label.
 - taps and screens in System UI, with no special handling
-- nothing while the phone is locked (KeyguardManager.isKeyguardLocked)
+- while locked (KeyguardManager.isKeyguardLocked) no taps, typed text or screens; notifications
+  and system rows still are
+- screen titles: the first text item of the window event only (System UI puts the whole
+  notification shade in the later items)
 
 Capture runs only between Start session and Stop session, both logged. A package allowlist
 (apps under test, system UI, Settings) limits what is recorded. Raw rows use the new kind
@@ -222,23 +225,31 @@ value as text so content cannot run as a formula.
 
 - Notifications (`typeNotificationStateChanged`) from captured apps are recorded as `notification`
   events with title as counterpart, text as content, direction `in`, and category. Categories
-  `msg`, `call` and `missed_call` add unreviewed `received_message`, `incoming_call` and
-  `missed_call` actions. Notifications are recorded while the phone is locked; nothing else is.
-  Repeats of the same notification (same package, title, text, category) within the last 50 are
-  skipped.
+  `msg` and `missed_call` add unreviewed `received_message` and `missed_call`; `call` adds
+  `incoming_call` only with `EXTRA_CALL_TYPE` 1 (incoming, API 31+). Notifications are recorded
+  while locked. Toasts (no Notification attached) and group summaries are skipped; the same
+  notification within 60 s is logged once; the list resets each session. With "withhold codes"
+  on (default), 4 to 8 digit runs in text mentioning a code are replaced in notifications,
+  screen titles and tap labels.
 - Teach mode: labelling a captured tap or field_cleared event, or a mark whose source event is
   found (the newest tap or cleared field in the same app, same boot, at most 30 s before), can
-  save a rule to the local `rules.json`. A rule from an event without a view id matches the exact
-  label. Taught and removed rules are logged; the manifest lists every rule in effect with its
+  save a rule to the local `rules.json`. A tap without a view id is matched on its whole label
+  (anchored, case-insensitive); a cleared field needs a view id. Saving refuses when `rules.json`
+  exists but does not parse cleanly. Taught and removed rules are logged; the manifest lists every rule in effect with its
   origin (bundled or local).
-- During a session, a runtime receiver logs `app_installed`, `app_updated` and `app_removed` for
-  captured apps with old and new versions; at session start, `app_version_changed_since_added`
-  flags apps whose version differs from when they were added.
+- During a session, a runtime receiver logs `app_installed`, `app_updated`, `app_removed` and
+  `app_data_cleared` for captured apps with versions; at session start,
+  `app_version_changed_since_last_seen` flags an app whose version differs from the last version
+  logged, once.
 - Hash chain, schema 3: `prev_hash` and `row_hash` on every row. The hash is SHA-256 over a
   canonical JSON of the row (keys sorted, no spaces, ASCII with \uXXXX escapes, window as whole
   milliseconds, without boot_wall_ms and screenshot) including prev_hash, in seq order from an
   empty first link. The manifest records the row count, last seq, last hash and the first break.
-  Rows written before schema 3 are hashed at upgrade and a `hash_chain_backfilled` row says so.
+  Rows written before schema 3 are hashed on first use after the upgrade and a
+  `hash_chain_backfilled` row says so. Free text is cleaned of unpaired UTF-16 surrogates (to
+  U+FFFD) before it is stored and hashed, so the database, the export and both verifiers read the
+  same text. The generator checks a noted hash with `--expect-hash` and warns when its chain
+  result differs from the app's.
 
 ## Later
 

@@ -60,8 +60,9 @@ class CaptureService : AccessibilityService() {
     private var pkgs: Set<String> = emptySet()
     /** Fields seen as password fields this session; they stay withheld even if shown as plain text. */
     private val secretKeys = HashSet<String>()
-    /** Recent notifications, so an app re-posting the same one is logged once. */
-    private val seenNotifications = ArrayDeque<String>()
+    /** Recent notifications (key to elapsed ms), so a re-post within 60 s is logged once. */
+    private val seenNotifications = LinkedHashMap<String, Long>()
+    private var maskCodes = true
     /** Version of each captured app when the session started or last changed. */
     private val versions = HashMap<String, String?>()
     private var packageReceiver: android.content.BroadcastReceiver? = null
@@ -75,6 +76,8 @@ class CaptureService : AccessibilityService() {
         pkgs = repo.capturePackages()
         rules = repo.loadRules()
         secretKeys.clear()
+        seenNotifications.clear()
+        maskCodes = repo.flag(Repo.KEY_MASK_CODES, true)
         if (active) { showMark(); startPackageWatch() } else { flushText(); removeMark(); stopPackageWatch() }
     }
 
@@ -89,11 +92,14 @@ class CaptureService : AccessibilityService() {
         for (p in pkgs) {
             val now = repo.appVersion(p)
             versions[p] = now
-            val then = added[p]
-            if (p in added && then != now) {
-                repo.log(Draft(appPackage = p, action = "app_version_changed_since_added", source = Source.SYSTEM,
-                    detail = "version ${then ?: "unknown"} when added, ${now ?: "not installed"} now"), kind = Kind.SYSTEM_EVENT)
+            if (p !in added) continue
+            // Compared with the last version logged, so a change is reported once, not at every reconnect.
+            val known = repo.knownVersion(p) ?: added[p]
+            if (known != now) {
+                repo.log(Draft(appPackage = p, action = "app_version_changed_since_last_seen", source = Source.SYSTEM,
+                    detail = "version ${known ?: "unknown"} last seen, ${now ?: "not installed"} now"), kind = Kind.SYSTEM_EVENT)
             }
+            repo.setKnownVersion(p, now)
         }
         if (packageReceiver != null) return
         val r = object : android.content.BroadcastReceiver() {
@@ -103,6 +109,7 @@ class CaptureService : AccessibilityService() {
             addAction(android.content.Intent.ACTION_PACKAGE_ADDED)
             addAction(android.content.Intent.ACTION_PACKAGE_REPLACED)
             addAction(android.content.Intent.ACTION_PACKAGE_REMOVED)
+            addAction(android.content.Intent.ACTION_PACKAGE_DATA_CLEARED)
             addDataScheme("package")
         }
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(r, f, android.content.Context.RECEIVER_NOT_EXPORTED)
@@ -125,9 +132,11 @@ class CaptureService : AccessibilityService() {
             android.content.Intent.ACTION_PACKAGE_REPLACED -> "app_updated"
             android.content.Intent.ACTION_PACKAGE_ADDED -> if (replacing) return else "app_installed"
             android.content.Intent.ACTION_PACKAGE_REMOVED -> if (replacing) return else "app_removed"
+            android.content.Intent.ACTION_PACKAGE_DATA_CLEARED -> "app_data_cleared"
             else -> return
         }
         versions[p] = now
+        repo.setKnownVersion(p, now)
         repo.log(Draft(appPackage = p, action = action, source = Source.SYSTEM,
             detail = "version ${old ?: "none"} to ${now ?: "none"}"), kind = Kind.SYSTEM_EVENT)
     }
@@ -228,7 +237,7 @@ class CaptureService : AccessibilityService() {
         }
         val src = event.source
         val viewId = src?.viewIdResourceName
-        val label = labelOf(event, src)
+        val label = masked(labelOf(event, src))
         val typedBefore = text.currentOrLast(pkg)
         flushText()
         val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.TAP, content = label,
@@ -248,8 +257,14 @@ class CaptureService : AccessibilityService() {
         return true
     }
 
+    /** Masks codes when the option is on; used for every captured text that can show notification content. */
+    private fun masked(t: String?): String? = if (maskCodes) NotificationMap.maskCodes(t).first else t
+
     private fun onScreen(event: AccessibilityEvent, pkg: String) {
-        val title = event.text?.joinToString(" ")?.takeIf { it.isNotBlank() } ?: event.className?.toString() ?: ""
+        // Only the first text item is the window's title. System UI puts the whole notification shade,
+        // every notification's text included, into the later items, so they are never recorded.
+        val title = masked(event.text?.firstOrNull { !it.isNullOrBlank() }?.toString()?.take(200))
+            ?: event.className?.toString() ?: ""
         val key = pkg to title
         if (key == lastScreen) return
         if (lastScreen?.first != pkg) text.forgetLast()
@@ -264,20 +279,30 @@ class CaptureService : AccessibilityService() {
      * and missed-call categories also get an auto-labelled action for review.
      */
     private fun onNotification(event: AccessibilityEvent, pkg: String) {
-        val n = event.parcelableData as? android.app.Notification
-        val extras = n?.extras
-        val title = extras?.getCharSequence(android.app.Notification.EXTRA_TITLE)?.toString()
-        val body = (extras?.getCharSequence(android.app.Notification.EXTRA_BIG_TEXT)
-            ?: extras?.getCharSequence(android.app.Notification.EXTRA_TEXT))?.toString()
+        // Toasts arrive as the same event type without a Notification; they are not incoming events.
+        val n = event.parcelableData as? android.app.Notification ?: return
+        if (n.flags and android.app.Notification.FLAG_GROUP_SUMMARY != 0) return
+        val extras = n.extras
+        val title = extras.getCharSequence(android.app.Notification.EXTRA_TITLE)?.toString()
+        var body = (extras.getCharSequence(android.app.Notification.EXTRA_BIG_TEXT)
+            ?: extras.getCharSequence(android.app.Notification.EXTRA_TEXT))?.toString()
             ?: event.text?.joinToString(" ")?.takeIf { it.isNotBlank() }
-        val category = n?.category
-        val key = "$pkg|$title|$body|$category"
-        if (key in seenNotifications) return
-        seenNotifications.addLast(key)
-        if (seenNotifications.size > 50) seenNotifications.removeFirst()
+        val category = n.category
+        val callType = if (Build.VERSION.SDK_INT >= 31 && extras.containsKey(android.app.Notification.EXTRA_CALL_TYPE))
+            extras.getInt(android.app.Notification.EXTRA_CALL_TYPE) else null
+        val now = android.os.SystemClock.elapsedRealtime()
+        val key = "$pkg|$title|$body|$category|$callType"
+        val last = seenNotifications[key]
+        if (last != null && now - last < 60_000) return
+        seenNotifications.remove(key); seenNotifications[key] = now
+        if (seenNotifications.size > 100) seenNotifications.remove(seenNotifications.keys.first())
+        val (shown, masked) = if (maskCodes) NotificationMap.maskCodes(body) else body to false
+        body = shown
+        val detail = "category ${category ?: "none"}" + (callType?.let { ", call type $it" } ?: "") +
+            (if (masked) ", 4 to 8 digit code withheld" else "")
         val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.NOTIFICATION, content = body, counterpart = title,
-            direction = "in", detail = "category ${category ?: "none"}", source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
-        val action = NotificationMap.actionFor(category) ?: return
+            direction = "in", detail = detail, source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
+        val action = NotificationMap.actionFor(category, callType) ?: return
         repo.log(Draft(appPackage = pkg, action = action, content = body, counterpart = title, direction = "in",
             refersTo = raw.entryId, detail = "auto: notification category $category", source = Source.AUTO_RULE,
             reviewed = false), stamp = raw.stamp, detect = false)

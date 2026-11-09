@@ -14,10 +14,26 @@ class TeachAndNotifyTest {
 
     @Test fun notificationCategoriesMapToActions() {
         assertEquals("received_message", NotificationMap.actionFor("msg"))
-        assertEquals("incoming_call", NotificationMap.actionFor("call"))
+        assertEquals("incoming_call", NotificationMap.actionFor("call", NotificationMap.CALL_TYPE_INCOMING))
+        assertNull(NotificationMap.actionFor("call"))        // no CallStyle type: left as a raw event
+        assertNull(NotificationMap.actionFor("call", 2))     // ongoing call
         assertEquals("missed_call", NotificationMap.actionFor("missed_call"))
         assertNull(NotificationMap.actionFor("email"))
         assertNull(NotificationMap.actionFor(null))
+    }
+
+    @Test fun codesAreWithheldOnlyNearCodeWords() {
+        assertEquals("Your code is [code withheld]" to true, NotificationMap.maskCodes("Your code is 482913"))
+        assertEquals("OTP: [code withheld]. Do not share" to true, NotificationMap.maskCodes("OTP: 1234. Do not share"))
+        assertEquals("Meet at 1530 by gate 12345" to false, NotificationMap.maskCodes("Meet at 1530 by gate 12345"))
+        assertEquals("Code 123 too short" to false, NotificationMap.maskCodes("Code 123 too short"))
+        assertEquals(null to false, NotificationMap.maskCodes(null))
+    }
+
+    @Test fun loneSurrogatesAreReplaced() {
+        assertEquals("ok \uD83D\uDE00", cleanText("ok \uD83D\uDE00"))
+        assertEquals("cut \uFFFD", cleanText("cut \uD83D"))
+        assertEquals("\uFFFD start", cleanText("\uDE00 start"))
     }
 
     @Test fun viewIdIsReadFromDetail() {

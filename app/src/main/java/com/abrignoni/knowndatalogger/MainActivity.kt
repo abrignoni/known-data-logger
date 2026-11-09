@@ -300,6 +300,7 @@ fun CaptureScreen(repo: Repo, bump: () -> Unit) {
     var shotAuto by remember { mutableStateOf(repo.flag(Repo.KEY_SHOT_AUTO, true)) }
     var shotTap by remember { mutableStateOf(repo.flag(Repo.KEY_SHOT_TAP, false)) }
     var allApps by remember { mutableStateOf(repo.flag(Repo.KEY_ALL_APPS, false)) }
+    var maskCodes by remember { mutableStateOf(repo.flag(Repo.KEY_MASK_CODES, true)) }
     val ready = repo.scenarioId.isNotBlank() && repo.deviceLabel.isNotBlank()
     val rules = remember { repo.loadRules() }
 
@@ -326,6 +327,7 @@ fun CaptureScreen(repo: Repo, bump: () -> Unit) {
         Section("Options (applied at session start)")
         Row(Modifier.fillMaxWidth().clickable { shotAuto = !shotAuto; repo.setFlag(Repo.KEY_SHOT_AUTO, shotAuto) }) { Checkbox(shotAuto, { shotAuto = it; repo.setFlag(Repo.KEY_SHOT_AUTO, it) }); Text("Screenshot each auto-labelled action", Modifier.padding(top = 12.dp)) }
         Row(Modifier.fillMaxWidth().clickable { shotTap = !shotTap; repo.setFlag(Repo.KEY_SHOT_TAP, shotTap) }) { Checkbox(shotTap, { shotTap = it; repo.setFlag(Repo.KEY_SHOT_TAP, it) }); Text("Screenshot every tap", Modifier.padding(top = 12.dp)) }
+        Row(Modifier.fillMaxWidth().clickable { maskCodes = !maskCodes; repo.setFlag(Repo.KEY_MASK_CODES, maskCodes) }) { Checkbox(maskCodes, { maskCodes = it; repo.setFlag(Repo.KEY_MASK_CODES, it) }); Text("Withhold codes in notifications (4 to 8 digits near words like code or OTP)", Modifier.padding(top = 12.dp)) }
         Row(Modifier.fillMaxWidth().clickable { allApps = !allApps; repo.setFlag(Repo.KEY_ALL_APPS, allApps) }) { Checkbox(allApps, { allApps = it; repo.setFlag(Repo.KEY_ALL_APPS, it) }); Text("Capture all apps, not only apps under test", Modifier.padding(top = 12.dp)) }
         Text("The MARK button always takes a screenshot." +
             (if (android.os.Build.VERSION.SDK_INT < 30) " Screenshots need Android 11 or later; this phone will log them as unsupported." else ""),
@@ -339,7 +341,9 @@ fun CaptureScreen(repo: Repo, bump: () -> Unit) {
                 Text("${r.id}: ${r.event} in ${r.pkg} -> ${r.action}" + if (r.id in local) " (local)" else " (bundled)",
                     style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f).padding(top = 12.dp))
                 if (r.id in local) TextButton(onClick = {
-                    repo.removeLocalRule(r.id); CaptureService.instance?.reloadRules(); bump()
+                    try { repo.removeLocalRule(r.id); CaptureService.instance?.reloadRules() }
+                    catch (ex: IllegalStateException) { toast(ctx, ex.message ?: "Rule not removed") }
+                    bump()
                 }) { Text("Remove") }
             }
         }
@@ -445,7 +449,10 @@ private fun EditDialog(repo: Repo, e: Entry, shot: Shot?, onDone: () -> Unit) {
             rawEvent && e.action in setOf(AutoAction.TAP, AutoAction.FIELD_CLEARED) && e.appPackage != null -> e
             labellingMark -> sourceEventFor(e, repo.db.entries())
             else -> null
-        }?.takeIf { viewIdOf(it) != null || !it.content.isNullOrBlank() }
+        }?.takeIf {
+            // A cleared field is matched by view id only: its label would be the typed message itself.
+            viewIdOf(it) != null || (it.action == AutoAction.TAP && !it.content.isNullOrBlank())
+        }
     }
     var teach by remember { mutableStateOf(false) }
     var teachUseTyped by remember { mutableStateOf(teachSource?.action == AutoAction.FIELD_CLEARED) }
@@ -507,19 +514,24 @@ private fun EditDialog(repo: Repo, e: Entry, shot: Shot?, onDone: () -> Unit) {
                         if (teach && src != null) {
                             val vid = viewIdOf(src)
                             val pkgV = repo.appVersion(src.appPackage)
-                            repo.saveTaughtRule(Rule(
-                                id = "taught_${src.appPackage}_${action.trim()}_${src.stamp.utcMs}".replace(Regex("[^A-Za-z0-9_.]"), "_"),
-                                pkg = src.appPackage!!,
-                                viewId = vid,
-                                labelRegex = if (vid == null) "^" + Regex.escape(src.content!!) + "$" else null,
-                                action = action.trim(),
-                                content = if (teachUseTyped) "last_typed" else null,
-                                verifiedWith = "taught on ${repo.deviceLabel} (${android.os.Build.MODEL}), app version ${pkgV ?: "unknown"}, " +
-                                    Csv.utcIso(System.currentTimeMillis()),
-                                event = if (src.action == AutoAction.FIELD_CLEARED) RuleEvent.FIELD_CLEARED else RuleEvent.TAP,
-                            ))
-                            CaptureService.instance?.reloadRules()
-                            toast(ctx, "Rule saved")
+                            try {
+                                repo.saveTaughtRule(Rule(
+                                    id = "taught_${src.appPackage}_${action.trim()}_${src.stamp.utcMs}".replace(Regex("[^A-Za-z0-9_.]"), "_"),
+                                    pkg = src.appPackage!!,
+                                    viewId = vid,
+                                    labelRegex = if (vid == null) "^" + Regex.escape(src.content!!) + "$" else null,
+                                    action = action.trim(),
+                                    content = if (teachUseTyped) "last_typed" else null,
+                                    verifiedWith = "taught on ${repo.deviceLabel} (${android.os.Build.MODEL}), app version ${pkgV ?: "unknown"}, " +
+                                        Csv.utcIso(System.currentTimeMillis()),
+                                    event = if (src.action == AutoAction.FIELD_CLEARED) RuleEvent.FIELD_CLEARED else RuleEvent.TAP,
+                                ))
+                                CaptureService.instance?.reloadRules()
+                                toast(ctx, "Rule saved")
+                            } catch (ex: IllegalStateException) {
+                                // rules.json could not be read cleanly; it is left untouched.
+                                toast(ctx, ex.message ?: "Rule not saved")
+                            }
                         }
                     } else {
                         repo.revise(e, Draft(

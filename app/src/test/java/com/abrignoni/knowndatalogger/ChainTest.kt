@@ -11,7 +11,7 @@ class ChainTest {
         stamp = Stamp(1700000000123, "America/New_York", -300, 123456, 3, 1700000000000, null),
         timeQuality = "exact", windowS = 5.894, editedUtcMs = 1700000000500, appPackage = "com.example.chat",
         appVersion = "1.2", account = null, action = "sent_message",
-        content = "Hé \"q\" \\ line\nnext 😀 bell\u0007", counterpart = "phone B", direction = "out",
+        content = "Hé \"q\" \\ line\nnext 😀 bell\u0007 del\u007f", counterpart = "phone B", direction = "out",
         conversationId = null, refersTo = null, expectedArtifacts = listOf("aleapp:x", "y"), detail = null,
         source = "manual", reviewed = true,
     )
@@ -19,7 +19,7 @@ class ChainTest {
     @Test fun canonicalMatchesPython() {
         assertEquals(
             "{\"account\":null,\"action\":\"sent_message\",\"app_package\":\"com.example.chat\",\"app_version\":\"1.2\"," +
-                "\"boot_count\":3,\"content\":\"H\\u00e9 \\\"q\\\" \\\\ line\\nnext \\ud83d\\ude00 bell\\u0007\"," +
+                "\"boot_count\":3,\"content\":\"H\\u00e9 \\\"q\\\" \\\\ line\\nnext \\ud83d\\ude00 bell\\u0007 del\\u007f\"," +
                 "\"conversation_id\":null,\"counterpart\":\"phone B\",\"detail\":null,\"device_label\":\"phoneA\"," +
                 "\"direction\":\"out\",\"edited_utc_ms\":1700000000500,\"elapsed_ms\":123456,\"entry_id\":\"e1\"," +
                 "\"expected_artifacts\":[\"aleapp:x\",\"y\"],\"gnss_time_ms\":null,\"kind\":\"action\"," +
@@ -29,7 +29,7 @@ class ChainTest {
                 "\"utc_ms\":1700000000123,\"window_ms\":5894}",
             Chain.canonical(fixed, "abc"),
         )
-        assertEquals("02e5c1e190e0fd352d836bf5a0a315324f18cc18ac257edaf52dafb273bab7e1", Chain.rowHash(fixed, "abc"))
+        assertEquals("23843a77b64530aba2b30d3ddaac1b19013cfcf924101dd6e799fef6ae99ac44", Chain.rowHash(fixed, "abc"))
     }
 
     private fun chain(n: Int): List<Entry> {

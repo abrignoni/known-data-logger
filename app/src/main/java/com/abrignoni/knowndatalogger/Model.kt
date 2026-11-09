@@ -41,15 +41,53 @@ object AutoAction {
     const val NOTIFICATION = "notification"
 }
 
-/** Actions inferred from a notification's category (Notification.CATEGORY_*). Others stay raw events. */
+/**
+ * Actions inferred from a notification's category (Notification.CATEGORY_*). A "call" notification
+ * is an incoming call only when its CallStyle type says so (Notification.EXTRA_CALL_TYPE 1, API 31+):
+ * dialers also post ongoing calls under "call". Anything else stays a raw event.
+ */
 object NotificationMap {
-    fun actionFor(category: String?): String? = when (category) {
+    const val CALL_TYPE_INCOMING = 1
+
+    fun actionFor(category: String?, callType: Int? = null): String? = when (category) {
         "msg" -> "received_message"
-        "call" -> "incoming_call"
+        "call" -> if (callType == CALL_TYPE_INCOMING) "incoming_call" else null
         "missed_call" -> "missed_call"
         else -> null
     }
+
+    private val CODE_WORDS = Regex("""\b(code|otp|passcode|pin|verification|verify|2fa|one[- ]time)\b""", RegexOption.IGNORE_CASE)
+    private val DIGITS = Regex("""(?<!\d)\d{4,8}(?!\d)""")
+
+    /** Withholds 4 to 8 digit runs in text that talks about codes. Returns the text and whether it changed. */
+    fun maskCodes(text: String?): Pair<String?, Boolean> {
+        if (text == null || !CODE_WORDS.containsMatchIn(text)) return text to false
+        val out = DIGITS.replace(text, "[code withheld]")
+        return out to (out != text)
+    }
 }
+
+/** Replaces unpaired UTF-16 surrogates (from text cut mid-character) with U+FFFD, so every store reads the same text. */
+fun cleanText(s: String?): String? {
+    if (s == null) return null
+    val sb = StringBuilder(s.length)
+    var i = 0
+    while (i < s.length) {
+        val c = s[i]
+        if (c.isHighSurrogate() && i + 1 < s.length && s[i + 1].isLowSurrogate()) { sb.append(c).append(s[i + 1]); i += 2; continue }
+        sb.append(if (c.isSurrogate()) '\uFFFD' else c)
+        i++
+    }
+    return sb.toString()
+}
+
+/** Cleans every free-text field of an entry before it is stored and hashed. */
+fun Entry.cleaned(): Entry = copy(
+    action = cleanText(action)!!, content = cleanText(content), counterpart = cleanText(counterpart),
+    conversationId = cleanText(conversationId), detail = cleanText(detail), account = cleanText(account),
+    appVersion = cleanText(appVersion), expectedArtifacts = expectedArtifacts.map { cleanText(it)!! },
+    scenarioId = cleanText(scenarioId)!!, deviceLabel = cleanText(deviceLabel)!!,
+)
 
 /** View id recorded in a raw tap or field_cleared row's detail ("view <id>, class <name>"). */
 fun viewIdOf(e: Entry): String? = e.detail?.let { Regex("""(?:^|, )view ([^,]+)""").find(it)?.groupValues?.get(1) }
@@ -446,7 +484,7 @@ object Chain {
                 c == '\t' -> sb.append("\\t")
                 c == '\b' -> sb.append("\\b")
                 c == '\u000C' -> sb.append("\\f")
-                c.code < 0x20 || c.code > 0x7f -> sb.append("\\u%04x".format(c.code))
+                c.code < 0x20 || c.code >= 0x7f -> sb.append("\\u%04x".format(c.code))
                 else -> sb.append(c)
             }
         }

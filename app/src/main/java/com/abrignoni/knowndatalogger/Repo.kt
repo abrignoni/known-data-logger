@@ -42,6 +42,7 @@ class Repo private constructor(private val context: Context) {
         const val KEY_SHOT_AUTO = "shot_on_auto_action"
         const val KEY_SHOT_TAP = "shot_on_every_tap"
         const val KEY_ALL_APPS = "capture_all_apps"
+        const val KEY_MASK_CODES = "mask_notification_codes"
         val DEFAULT_CAPTURE_PACKAGES = setOf("com.android.systemui", "com.android.settings")
     }
 
@@ -62,6 +63,10 @@ class Repo private constructor(private val context: Context) {
 
     fun stamp(): Stamp = Clocks.stamp(resolver)
 
+    /** Last version of a captured app that the log has accounted for. */
+    fun knownVersion(pkg: String): String? = db.setting("known_version:$pkg")
+    fun setKnownVersion(pkg: String, v: String?) = db.putSetting("known_version:$pkg", v ?: "")
+
     fun flag(key: String, default: Boolean): Boolean = db.setting(key)?.let { it == "1" } ?: default
     fun setFlag(key: String, v: Boolean) = db.putSetting(key, if (v) "1" else "0")
 
@@ -79,6 +84,22 @@ class Repo private constructor(private val context: Context) {
         rulesFile().takeIf { it.exists() }?.let { parseRules(it.readText()) } ?: emptyList()
     } catch (e: Exception) { emptyList() }
 
+    /**
+     * Local rules for rewriting the file. Refuses when the file exists but does not parse cleanly
+     * (bad JSON or a rule dropped for a bad regex), so saving never destroys rules pushed by hand.
+     */
+    private fun localRulesForWrite(): List<Rule> {
+        val f = rulesFile()
+        if (!f.exists()) return emptyList()
+        val text = f.readText()
+        val parsed = try { parseRules(text) } catch (e: Exception) { null }
+        val declared = try { JSONObject(text).getJSONArray("rules").length() } catch (e: Exception) { -1 }
+        if (parsed == null || parsed.size != declared) {
+            error("rules.json has a rule this app cannot read; fix or remove it before saving rules")
+        }
+        return parsed
+    }
+
     /** Bundled rules, overridden rule by rule by the local rules.json. */
     fun loadRules(): List<Rule> = Rules.merge(bundledRules(), localRules())
 
@@ -87,13 +108,13 @@ class Repo private constructor(private val context: Context) {
 
     /** Saves a rule taught in the app into rules.json and logs that it was added. */
     fun saveTaughtRule(rule: Rule) {
-        rulesFile().writeText(rulesToJson(Rules.merge(localRules(), listOf(rule))))
+        rulesFile().writeText(rulesToJson(Rules.merge(localRulesForWrite(), listOf(rule))))
         log(Draft(appPackage = rule.pkg, action = "rule_taught", source = Source.SYSTEM,
             detail = "${rule.id}: ${rule.event} ${rule.viewId ?: rule.labelRegex} -> ${rule.action}"), kind = Kind.SYSTEM_EVENT)
     }
 
     fun removeLocalRule(id: String) {
-        rulesFile().writeText(rulesToJson(localRules().filter { it.id != id }))
+        rulesFile().writeText(rulesToJson(localRulesForWrite().filter { it.id != id }))
         log(Draft(action = "rule_removed", source = Source.SYSTEM, detail = id), kind = Kind.SYSTEM_EVENT)
     }
 
@@ -165,8 +186,9 @@ class Repo private constructor(private val context: Context) {
      * all write, and the chain needs one writer at a time.
      */
     @Synchronized
-    private fun write(e: Entry): Entry {
+    private fun write(raw: Entry): Entry {
         ensureChain()
+        val e = raw.cleaned()
         val w = db.writableDatabase
         val saved: Entry
         w.beginTransaction()

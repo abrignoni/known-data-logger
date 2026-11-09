@@ -39,20 +39,36 @@ What is captured, only in the apps under test plus System UI and Settings unless
   password field has focus, taps are recorded without their label, so an on-screen keypad cannot
   spell a PIN. Tested in the Wi-Fi dialog: the SSID typed beside it was captured, the password
   (hidden or shown) was not, not even in the database file.
-- nothing at all while the phone is locked (not yet tried with a PIN set)
+- while the phone is locked, only notifications from the captured apps and the app's own system
+  rows (package changes, reboots) are recorded; taps, typed text and screens are not (not yet
+  tried with a PIN set)
+- screen titles are the window's title only: System UI also reports the whole notification
+  shade, and that text is never recorded
 - a field cleared in one step, which is how apps built with Jetpack Compose show a send: they
   report no tap event for their buttons (seen with Google Messages)
 
 Incoming messages and calls come from notifications. Notifications posted by the apps under test
 are recorded with their title (usually the sender or number) and text, even while the phone is
-locked. Notifications in the message, call and missed call categories also become
-`received_message`, `incoming_call` and `missed_call` for review. Tested on the emulator with an
-SMS and a call sent from the emulator console.
+locked. Message and missed-call notifications also become `received_message` and `missed_call`
+for review; a call notification becomes `incoming_call` only when the app marks it as an incoming
+call (Android 12 and later), because dialers post ongoing calls in the same category. Toasts and
+group summaries are ignored, and the same notification re-posted within 60 seconds is logged once.
+Tried on an Android 15 emulator (8 November 2026) with an SMS and a call sent from the emulator
+console.
+
+Notifications can carry one-time codes. By default ("Withhold codes in notifications" on the
+Capture tab), any run of 4 to 8 digits in text that mentions a code, OTP, PIN or verification is
+replaced with `[code withheld]`, in notifications, screen titles and tap labels. On the emulator,
+an SMS code was absent from the database file and the live copy afterwards. Codes in other wording
+are not caught, so keep real accounts off test phones.
 
 Auto-label rules turn events into actions, for example a cleared message field in Google Messages
 becomes `sent_message` with the text as content. Rules ship in `app/src/main/assets/rules/`. You can
 teach new ones in the app: label a captured tap, cleared field or mark in Timeline and tick "Make a
-rule". Taught rules are saved in `rules.json` in the app's external files folder, where you can
+rule". A rule from a tap without a view id matches the tap's label (whole label, case-insensitive),
+so that label is stored in the rule; check taught rules before sharing them. A cleared field can
+only be taught when it has a view id, because its label would be the typed message. If
+`rules.json` has a rule the app cannot read, saving refuses rather than overwriting it. Taught rules are saved in `rules.json` in the app's external files folder, where you can
 pull them to share or push someone else's. Each shipped rule says
 which app version it was checked against. Auto labels stay "to review" until someone accepts them.
 
@@ -74,8 +90,9 @@ Known limits:
 - Some apps behave differently when an accessibility service is on.
 - Rules break when an app changes its screens or runs in another language. Review catches it.
 
-Apps under test that are installed, updated or removed during a session are logged with their
-versions. At session start, any app whose version differs from when it was added is flagged.
+Apps under test that are installed, updated or removed, or have their data cleared, during a
+session are logged with their versions. At session start, an app whose version differs from the
+last one the log accounted for is flagged once.
 
 ## Hash chain (0.3)
 
@@ -83,8 +100,11 @@ Every row carries `prev_hash` and `row_hash`: a SHA-256 over the row's fields an
 row's hash. Changing, removing or reordering a row breaks every hash after it, and
 `make_documentation.py` checks the whole chain. The Export screen shows the newest row's hash;
 write it in your documentation, because someone who rewrites the whole chain can only be caught
-against a copy of that last hash kept somewhere else. Rows written before 0.3 are hashed when the
-app is upgraded, and a `hash_chain_backfilled` row says so.
+against a copy of a hash kept somewhere else. Check it later with
+`make_documentation.py ... --expect-hash <hash>`: the Scenario sheet says whether it is still in the
+chain and where. The generator also warns when its own chain check and the app's (recorded in the
+manifest at export) disagree. Rows written before 0.3 are hashed the first time the upgraded app
+writes a row or shows the Export screen, and a `hash_chain_backfilled` row says so.
 
 For full video, record from a Mac over USB with `scrcpy --record` so nothing is written to the
 phone, and line it up with the log using the network time column.

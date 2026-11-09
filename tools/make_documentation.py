@@ -69,6 +69,15 @@ def verify_chain(rows):
     return f"intact, {len(ordered)} rows, last hash {prev}", None
 
 
+def find_hash(exports, wanted):
+    """Where a hash noted earlier (from the Export screen) sits in the chain, or None."""
+    for e in exports:
+        for r in e["rows"]:
+            if r.get("row_hash") == wanted:
+                return os.path.basename(e["folder"]), r["seq"]
+    return None
+
+
 def load_export(folder):
     """Reads one export. Returns a dict with the manifest, all rows and check results."""
     with open(os.path.join(folder, "manifest.json"), encoding="utf-8") as f:
@@ -80,12 +89,15 @@ def load_export(folder):
     want = manifest.get("files", {}).get("actions.jsonl", {}).get("sha256")
     got = hashlib.sha256(raw).hexdigest()
     checks.append(("actions.jsonl sha256", "match" if want == got else f"MISMATCH (manifest {want}, file {got})"))
-    status, _ = verify_chain(rows)
+    status, bad = verify_chain(rows)
     hc = manifest.get("hash_chain") or {}
     if hc and rows and status.startswith("intact"):
         last = max(rows, key=lambda r: r["seq"])
         if hc.get("last_row_hash") != last.get("row_hash") or hc.get("rows") != len(rows):
             status = "MISMATCH with manifest: rows were added or removed after the manifest was written"
+    if hc and hc.get("first_break_seq") != bad and not status.startswith("MISMATCH"):
+        # The app checks the chain too when it exports; if the two disagree, one of them is wrong.
+        status += (f"; MISMATCH: the app reported first break {hc.get('first_break_seq')}, this check found {bad}")
     checks.append(("hash chain", status))
     shots = {}
     for s in manifest.get("screenshots", []):
@@ -368,8 +380,14 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("exports", nargs="+", help="export folder(s)")
     ap.add_argument("-o", "--output", required=True, help="output .xlsx path")
+    ap.add_argument("--expect-hash", action="append", default=[],
+                    help="a row hash noted from the app's Export screen; reported as found or missing (repeatable)")
     a = ap.parse_args(argv)
     exports = [load_export(f) for f in a.exports]
+    for h in a.expect_hash:
+        where = find_hash(exports, h.strip().lower())
+        result = f"found at seq {where[1]} in {where[0]}" if where else "MISSING: rows were removed or the chain was rewritten"
+        exports[0]["checks"].append((f"noted hash {h[:12]}...", result))
     info = build(exports, a.output)
     print(f"Wrote {a.output}: {info['actions']} actions, {info['review']} to review, {info['events']} captured events")
     print("Sheets: " + ", ".join(info["sheets"]))
