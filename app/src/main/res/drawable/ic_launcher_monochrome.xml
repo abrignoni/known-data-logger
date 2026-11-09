@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Timeline with three events at equal distance from the line; see README, App icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="4.5" android:strokeLineCap="round" android:pathData="M24,54 L70,54"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M68,46 L82,54 L68,62 Z"/>
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="2.5" android:strokeLineCap="round" android:pathData="M36,54 L36,43.5"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M30.5,38 a5.5,5.5 0 1,0 11.0,0 a5.5,5.5 0 1,0 -11.0,0 Z"/>
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="2.5" android:strokeLineCap="round" android:pathData="M51,54 L51,64.5"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M45.5,70 a5.5,5.5 0 1,0 11.0,0 a5.5,5.5 0 1,0 -11.0,0 Z"/>
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="2.5" android:strokeLineCap="round" android:pathData="M66,54 L66,43.5"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M60.5,38 a5.5,5.5 0 1,0 11.0,0 a5.5,5.5 0 1,0 -11.0,0 Z"/>
+</vector>
