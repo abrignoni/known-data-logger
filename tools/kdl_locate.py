@@ -463,12 +463,27 @@ def read_leveldb(st):
         return
     try:
         with ccl_leveldb.RawLevelDb(st.path) as db:
-            for r in db.iterate_records_raw():
-                state = "current" if r.state == ccl_leveldb.KeyState.Live else f"LevelDB {r.state.name} record"
-                st.records.append(Rec(st, os.path.basename(str(r.origin_file)), f"seq {r.seq}",
-                                      [("key", r.user_key), ("value", r.value)], state=state))
+            raw = list(db.iterate_records_raw())
+            damage = sum(len(getattr(f, "damage", None) or []) for f in db._files)
     except Exception as ex:  # noqa: BLE001
         st.fail(f"LevelDB reader failed: {type(ex).__name__}: {ex}")
+        return
+    # The newest write of a key is its current value; older writes stay in the files until compaction.
+    newest = {}
+    for r in raw:
+        if r.user_key not in newest or r.seq > newest[r.user_key]:
+            newest[r.user_key] = r.seq
+    for r in raw:
+        if r.seq != newest[r.user_key]:
+            state = "LevelDB earlier write of this key (superseded)"
+        elif r.state == ccl_leveldb.KeyState.Live:
+            state = "current"
+        else:
+            state = f"LevelDB {r.state.name} record (newest write of this key)"
+        st.records.append(Rec(st, os.path.basename(str(r.origin_file)), f"seq {r.seq}",
+                              [("key", r.user_key), ("value", r.value)], state=state))
+    if damage:
+        st.notes.append(f"{damage} damaged range(s) the LevelDB reader skipped: not read")
 
 
 def read_indexeddb(st):
@@ -673,6 +688,11 @@ def build_stores(staged, package, media_names):
         inventory.append([n, size, digest.hexdigest(), head, os.path.splitext(n)[1],
                           st.kind if st else "", owner or "", st.status if st and not owner else "",
                           (st.reason if st and not owner else ""), len(st.records) if st and not owner else None])
+    for st in stores:
+        if st.kind in ("LevelDB", "IndexedDB"):  # a folder store: one row for the store itself
+            size = sum(r[1] for r in inventory if r[6] == st.name)
+            inventory.append([st.name + "/", size, "(folder)", "", "", st.kind, "", st.status, st.reason, len(st.records)])
+    inventory.sort(key=lambda r: r[0])
     return stores, inventory
 
 

@@ -304,6 +304,11 @@ class LocateTest(unittest.TestCase):
         self.assertTrue(any(r["Field"] == "taken_ms" and r["Epoch"] == "Unix milliseconds" for r in rows))
         self.assertIn("not counted as found", self.entries["e14"]["Status"])
 
+    def test_leveldb_store_has_its_own_inventory_row(self):
+        inv = {r["Path"]: r for r in sheet(self.out, "Inventory")}
+        row = next(v for k, v in inv.items() if k.endswith("Local Storage/leveldb/"))
+        self.assertEqual((row["Store type"], row["Status"], row["Records read"]), ("LevelDB", "read", 1))
+
     def test_not_read_is_never_empty(self):
         nr = {r["Store"]: r["Reason"] for r in sheet(self.out, "Not read")}
         broken = next(k for k in nr if k.endswith("broken.db"))
