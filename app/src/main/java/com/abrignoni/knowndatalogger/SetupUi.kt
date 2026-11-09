@@ -147,6 +147,11 @@ private fun AppsPage(repo: Repo, bump: () -> Unit, back: () -> Unit) {
                 HorizontalDivider(color = Kdl.Line)
             }
             OutlinedButton(onClick = { picking = true }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) { Text("Add app") }
+            OutlinedButton(onClick = {
+                val have = apps.map { it.pkg }.toSet()
+                repo.launcherApps().filter { it.first !in have }.forEach { repo.addApp(it.first, it.second, null) }
+                apps = repo.db.apps(); bump()
+            }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Add all apps") }
             SwitchRow("Capture all apps", "Not only the apps above", allApps) { allApps = it; repo.setFlag(Repo.KEY_ALL_APPS, it) }
             Text("System UI and Settings are always captured. Changes apply when the next session starts.",
                 color = Kdl.Muted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
