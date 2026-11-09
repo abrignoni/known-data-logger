@@ -8,9 +8,9 @@ forensic tool can then check each action against what the tool reports.
 
 Author: Alexis Brignoni.
 
-This manual describes KDL 0.3.0, the v0.3.0 release on GitHub. Every screenshot comes from an
+This manual describes KDL 0.3.1, the v0.3.1 release on GitHub. Every screenshot comes from an
 Android 15 emulator (Google APIs image, API 35, 1080 x 2400, no Play Store) running a debug build of
-0.3.0, with made-up test data: the
+0.3.0 or of the code that became 0.3.1, with made-up test data: the
 phone numbers are 555 numbers and the scenario is called `msg-demo-01`. The emulator's time zone
 was America/New_York (UTC-05:00), so the times you see are local to that zone.
 
@@ -42,26 +42,26 @@ was America/New_York (UTC-05:00), so the times you see are local to that zone.
 - Python 3 with `openpyxl` to make the spreadsheet (`python3 -m pip install openpyxl`). The script,
   `tools/make_documentation.py`, is in the release's source code download and in the repository.
   The APK alone does not include it.
-- The APK: `KDL-0.3.0.apk` from the v0.3.0 release on GitHub, and the release's `SHA256SUMS` file.
+- The APK: `KDL-0.3.1.apk` from the v0.3.1 release on GitHub, and the release's `SHA256SUMS` file.
 
 ### Check the download
 
-Compare the APK's SHA-256 with the line for `KDL-0.3.0.apk` in `SHA256SUMS`. They must match.
+Compare the APK's SHA-256 with the line for `KDL-0.3.1.apk` in `SHA256SUMS`. They must match.
 
 ```bash
-shasum -a 256 KDL-0.3.0.apk
+shasum -a 256 KDL-0.3.1.apk
 ```
 
-On Linux, `sha256sum KDL-0.3.0.apk` works too. On Windows:
+On Linux, `sha256sum KDL-0.3.1.apk` works too. On Windows:
 
 ```
-certutil -hashfile KDL-0.3.0.apk SHA256
+certutil -hashfile KDL-0.3.1.apk SHA256
 ```
 
 You can also check who signed it. `apksigner` comes with the Android SDK build tools:
 
 ```bash
-apksigner verify --print-certs KDL-0.3.0.apk
+apksigner verify --print-certs KDL-0.3.1.apk
 ```
 
 The line `Signer #1 certificate SHA-256 digest:` must read
@@ -91,14 +91,14 @@ Other phones and versions have not been tried.
 Connect the phone with USB debugging on and run:
 
 ```bash
-adb install KDL-0.3.0.apk
+adb install KDL-0.3.1.apk
 ```
 
 On a phone with more than one user profile, install into the test profile only. For example, for
 user 10:
 
 ```bash
-adb install --user 10 KDL-0.3.0.apk
+adb install --user 10 KDL-0.3.1.apk
 ```
 
 On the Pixel 7a with Android 17 (8 November 2026), an `adb install` did not trigger Android's
@@ -365,8 +365,8 @@ An inferred action is a guess until someone accepts it.
 
 In the demo, the send rule knew the text of the message but not who it went to. Rules do not fill
 in the counterpart, so it was added with **Change**. In 0.3.0, actions inferred by a rule also leave
-the direction empty, and the edit sheet has no direction field. Builds made from the repository after
-0.3.0 write `out` for them, as they do for a hand-logged send.
+the direction empty, and the edit sheet has no direction field. From 0.3.1, KDL writes `out` for
+them, as it does for a hand-logged send.
 
 | Accept all, with Undo | After Undo |
 |---|---|
@@ -683,7 +683,7 @@ a **Device and system** sheet.
 In the 0.3.0 script some rows reach no sheet at all: the export rows, device snapshots, and the
 `app_version_changed_since_last_seen` and `app_data_cleared` rows. Its Scenario list looks for a
 different name for the version row and does not list the others. They are in `actions.csv` and
-`actions.jsonl`. The script in the repository after 0.3.0 lists all of them on the Scenario sheet.
+`actions.jsonl`. The script from 0.3.1 on lists all of them on the Scenario sheet.
 
 ## 10. The hash chain
 
@@ -745,7 +745,7 @@ noted hash catches it:
 ![Last row cut: only the noted hash is missing](manual/sheet-scenario-missing.png)
 
 The 0.3.0 script prints no warning for a missing noted hash, and it exits with 0 in every case, so
-read the **noted hash** line on the Scenario sheet. The script in the repository after 0.3.0 prints a
+read the **noted hash** line on the Scenario sheet. The script from 0.3.1 on prints a
 `WARNING` for it too, and exits with 1 when any check fails.
 
 ## 11. What KDL does not do
