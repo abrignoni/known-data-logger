@@ -842,7 +842,18 @@ Scenario sheet.
 
 ### I want to start over
 
-KDL has no reset button. On the Android 15 emulator, KDL's App info has **Storage & cache**, then
-**Clear storage**, which asks to delete the app's data. That was not run for this manual, so what it
-leaves behind was not checked.
-Export first if you need what is there.
+KDL has no reset button. Use Android's: in KDL's App info, tap **Storage & cache**, then **Clear
+storage**, then **Delete**. Export first, and copy the export off the phone if you need it.
+
+| Delete app data? | Opening KDL afterwards |
+|---|---|
+| ![Delete app data](manual/startover-1-delete.png) | ![The first run again](manual/startover-2-first-run.png) |
+
+On the Android 15 emulator (9 November 2026), clearing KDL's storage:
+
+- deleted the database, the screenshots, `actions-live.jsonl` and `rules.json` (taught rules
+  included)
+- switched KDL's capture off in Accessibility
+- left the export folders in Documents as they were
+
+Opening KDL then started the first run again with empty fields. Turn capture back on at step 3.
