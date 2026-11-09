@@ -16,7 +16,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
+
+/** On when every listed app is checked, Off when none is, Indeterminate in between. */
+internal fun checkAllState(listed: List<String>, chosen: Collection<String>): ToggleableState {
+    val n = listed.count { it in chosen }
+    return when {
+        listed.isEmpty() || n == 0 -> ToggleableState.Off
+        n == listed.size -> ToggleableState.On
+        else -> ToggleableState.Indeterminate
+    }
+}
 
 /** First run: test-phone notice and scenario, apps, capture service, done. */
 @Composable
@@ -82,6 +93,17 @@ fun Onboarding(repo: Repo, onDone: () -> Unit) {
                     }
                     1 -> {
                         Text("Capture records only these apps, plus System UI and Settings.", color = Kdl.Muted, modifier = Modifier.padding(bottom = 8.dp))
+                        val pkgs = launcher.map { it.first }
+                        val state = checkAllState(pkgs, chosen)
+                        val toggleAll = {
+                            if (state == ToggleableState.On) chosen.removeAll(pkgs.toSet())
+                            else chosen.addAll(pkgs.filter { it !in chosen })
+                        }
+                        Row(Modifier.fillMaxWidth().clickable { toggleAll() }.heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
+                            TriStateCheckbox(state, { toggleAll() })
+                            Text("Check all", style = MaterialTheme.typography.bodyLarge)
+                        }
+                        HorizontalDivider(color = Kdl.Line)
                         LazyColumn {
                             items(launcher) { (pkg, label) ->
                                 Row(Modifier.fillMaxWidth().clickable { if (pkg in chosen) chosen.remove(pkg) else chosen.add(pkg) }

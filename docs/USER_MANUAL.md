@@ -186,8 +186,9 @@ Both go into every row of the log and into the export folder's name.
 ![Pick apps with Camera, Messages and Phone ticked](manual/firstrun-2-pick-apps.png)
 
 Tick the apps under test. The list shows apps with a launcher icon, without KDL itself. Capture
-records only the apps you tick, plus System UI and Settings, which are always captured. You can
-change the list later in [Setup](#apps).
+records only the apps you tick, plus System UI and Settings, which are always captured. **Check
+all** at the top ticks every app in the list, and tapping it again clears them all. It shows a dash
+when only some are ticked. You can change the list later in [Setup](#apps).
 
 ### Step 3: Turn on capture
 
@@ -513,10 +514,14 @@ Change the scenario id or the device label. Tap **Save**. New rows carry the new
 
 The apps under test, with the version each had when it was added. **Remove** takes one off.
 **Add app** opens a list of launcher apps. Pick one, and fill in an **Account handle** if the test
-uses an account (optional). No passwords here.
+uses an account (optional). No passwords here. **Add all apps** adds every launcher app that is not
+in the list yet, without account handles. Apps already in the list keep theirs. Apps installed
+later are not added; tap it again or use **Add app**.
 
 **Capture all apps** records every app, not only the ones in the list. System UI and Settings are
-always captured.
+always captured. The difference from **Add all apps**: only the apps in the list go into the
+export's list of apps under test, with their versions when added and at export, and only they are
+checked for a version change at session start.
 
 At session start, KDL compares each app's version with the last version it logged. If it changed,
 an `app_version_changed_since_last_seen` row says so, once.
