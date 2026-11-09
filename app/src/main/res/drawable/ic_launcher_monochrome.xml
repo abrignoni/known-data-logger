@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Timeline with three events at equal distance from the line; see README, App icon. -->
+<!-- App icon: a timeline with an arrowhead and three events, all at the same distance from the line,
+     centred in the 108 x 108 viewport. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="4.5" android:strokeLineCap="round" android:pathData="M24,54 L70,54"/>
-    <path android:fillColor="#FFFFFFFF" android:pathData="M68,46 L82,54 L68,62 Z"/>
-    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="2.5" android:strokeLineCap="round" android:pathData="M31,54 L31,43.5"/>
-    <path android:fillColor="#FFFFFFFF" android:pathData="M25.5,38 a5.5,5.5 0 1,0 11.0,0 a5.5,5.5 0 1,0 -11.0,0 Z"/>
-    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="2.5" android:strokeLineCap="round" android:pathData="M46,54 L46,64.5"/>
-    <path android:fillColor="#FFFFFFFF" android:pathData="M40.5,70 a5.5,5.5 0 1,0 11.0,0 a5.5,5.5 0 1,0 -11.0,0 Z"/>
-    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="2.5" android:strokeLineCap="round" android:pathData="M61,54 L61,43.5"/>
-    <path android:fillColor="#FFFFFFFF" android:pathData="M55.5,38 a5.5,5.5 0 1,0 11.0,0 a5.5,5.5 0 1,0 -11.0,0 Z"/>
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="4.5" android:strokeLineCap="round" android:pathData="M26.125,54 L72.125,54"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M70.125,46 L84.125,54 L70.125,62 Z"/>
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="2.5" android:strokeLineCap="round" android:pathData="M33.125,54 L33.125,43.5"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M27.625,38 a5.5,5.5 0 1,0 11,0 a5.5,5.5 0 1,0 -11,0 Z"/>
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="2.5" android:strokeLineCap="round" android:pathData="M48.125,54 L48.125,64.5"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M42.625,70 a5.5,5.5 0 1,0 11,0 a5.5,5.5 0 1,0 -11,0 Z"/>
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="2.5" android:strokeLineCap="round" android:pathData="M63.125,54 L63.125,43.5"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M57.625,38 a5.5,5.5 0 1,0 11,0 a5.5,5.5 0 1,0 -11,0 Z"/>
 </vector>
