@@ -257,6 +257,13 @@ certificate fingerprint `AB:95:75:15:93:8E:78:24:7C:AA:26:A3:74:7E:7E:42:9B:4A:6
 APKs signed with that key stay installable on certified Android devices when verification is
 enforced. Debug builds are signed with a different key and are meant for `adb` installs.
 
+`.github/workflows/release.yml` runs the tests and a debug build when started by hand. On a `v*` tag
+it also builds the signed APK in the `release` environment (owner approval, `v*` tags only, the
+keystore and passwords stored as that environment's secrets), checks the version against the tag
+and the signer against the fingerprint above, and creates a draft release with `KDL-<version>.apk`
+and `SHA256SUMS`. Version 0.3.0 was built and signed on the author's computer; the signed path of
+the workflow has not run yet.
+
 ## Status
 
 Version 0.3.0, Android only. Tested on an Android 15 emulator and on a Pixel 7a with Android 17

@@ -1,0 +1,108 @@
+# Builds and tests KDL. On a v* tag it also builds the signed release APK and creates a draft
+# GitHub release with KDL-<version>.apk and SHA256SUMS.
+#
+# The signing job runs in the "release" environment, which needs the owner's approval and only
+# accepts v* tags. The keystore and its passwords are secrets of that environment, so no other
+# job, branch or pull request can read them. The release is created as a draft: write the notes
+# and publish it by hand.
+#
+# Run it by hand (Actions, KDL release, Run workflow) to check the build without signing.
+
+name: KDL release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # SHA-256 of the release certificate registered with Google for com.abrignoni.knowndatalogger.
+  RELEASE_CERT_SHA256: ab957515938e78247caa26a3747e7e429b4a6bd766854a8fdf3aa8929bb50faf
+  BUILD_TOOLS: "36.0.0"
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Android SDK packages
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.2" "build-tools;${BUILD_TOOLS}" > /dev/null
+      - name: App unit tests and debug build
+        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug
+      - name: Python tools tests
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet openpyxl==3.1.5 protobuf==5.29.6
+          "$RUNNER_TEMP/venv/bin/python" -m unittest discover -s tools
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: check
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Android SDK packages
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.2" "build-tools;${BUILD_TOOLS}" > /dev/null
+      - name: Signing settings
+        env:
+          KEYSTORE_B64: ${{ secrets.KDL_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.KDL_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KDL_KEY_PASSWORD }}
+        run: |
+          for v in KEYSTORE_B64 STORE_PASSWORD KEY_PASSWORD; do
+            [ -n "${!v}" ] || { echo "::error::secret for $v is not set in the release environment"; exit 1; }
+          done
+          umask 077
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/kdl-release.jks"
+          mkdir -p "$HOME/.gradle"
+          {
+            echo "KDL_RELEASE_STORE_FILE=$RUNNER_TEMP/kdl-release.jks"
+            echo "KDL_RELEASE_STORE_PASSWORD=$STORE_PASSWORD"
+            echo "KDL_RELEASE_KEY_ALIAS=kdl"
+            echo "KDL_RELEASE_KEY_PASSWORD=$KEY_PASSWORD"
+          } > "$HOME/.gradle/gradle.properties"
+      - name: Build the signed APK
+        run: ./gradlew --no-daemon assembleRelease
+      - name: Check version and signer, write SHA256SUMS
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/release/app-release.apk
+          [ -f "$apk" ] || { echo "::error::no signed APK (was the build unsigned?)"; exit 1; }
+          version="${GITHUB_REF_NAME#v}"
+          bt="$ANDROID_HOME/build-tools/$BUILD_TOOLS"
+          "$bt/aapt2" dump badging "$apk" | grep -q "versionName='$version'" \
+            || { echo "::error::APK versionName does not match tag $GITHUB_REF_NAME"; exit 1; }
+          "$bt/apksigner" verify --print-certs "$apk" | grep -q "certificate SHA-256 digest: $RELEASE_CERT_SHA256" \
+            || { echo "::error::APK is not signed with the registered release key"; exit 1; }
+          mkdir dist
+          cp "$apk" "dist/KDL-$version.apk"
+          (cd dist && sha256sum "KDL-$version.apk" > SHA256SUMS && cat SHA256SUMS)
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" "dist/KDL-$version.apk" dist/SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "KDL $version" \
+            --notes "Built and signed by the release workflow. Write the notes, then publish."
+      - name: Remove signing files
+        if: always()
+        run: rm -f "$RUNNER_TEMP/kdl-release.jks" "$HOME/.gradle/gradle.properties"
