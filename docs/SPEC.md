@@ -254,10 +254,16 @@ value as text so content cannot run as a formula.
   same text. The generator checks a noted hash with `--expect-hash` and warns when its chain
   result differs from the app's.
 
+## Locator and checker (tools)
+
+`tools/kdl_locate.py` finds where an app stored the logged values and times in an extraction;
+`tools/kdl_check.py` grades a LEAPP artifact's LAVA output against the same entries. Both read
+the export with `make_documentation.py` (sha256 and hash chain checks) and use the manifest's
+tolerances. Details and limits are in the README.
+
 ## Later
 
 - iOS build.
-- A checker script in the LEAPP repos that reads the export and LAVA output.
 - An ALEAPP module for the logger's own database.
 - Template packs per app; a look at the Demmel playbook format.
 

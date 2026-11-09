@@ -114,6 +114,8 @@ def searched_entries(export, package):
                 skipped.append((r, "a labelled action refers to this event"))
             elif r.get("detail") == md.WITHHELD:
                 skipped.append((r, "details withheld by Android"))
+            elif not any(n.searchable for n in needles(r)):
+                skipped.append((r, "raw event with no text to search"))
             else:
                 entries.append(r)
     return entries, deletions, skipped, by_id
@@ -226,6 +228,26 @@ def time_readings(value):
 def time_hits(value, start_ms, end_ms, tap_ms):
     """[(epoch, delta seconds from the tap)] for readings inside the window."""
     return [(name, round((ms - tap_ms) / 1000, 3)) for name, ms in time_readings(value) if start_ms <= ms <= end_ms]
+
+
+SINCE_BOOT = "milliseconds since boot (the entry's elapsed_ms; same boot assumed)"
+MIN_SINCE_BOOT_MS = 60_000  # smaller numbers are too common to read as a clock
+
+
+def entry_time_hits(value, entry, start_ms, end_ms):
+    """time_hits plus a reading as milliseconds since boot, against the entry's elapsed_ms.
+
+    KDL logs SystemClock.elapsedRealtime() with every entry, so a store that keeps the same
+    clock lines up with it. Nothing in the store says which boot a value belongs to, so the
+    label says the same boot is assumed."""
+    out = time_hits(value, start_ms, end_ms, entry["utc_ms"])
+    el = entry.get("elapsed_ms")
+    v = as_number(value)
+    if el is not None and isinstance(v, int) and v >= MIN_SINCE_BOOT_MS:
+        lo, hi = el + (start_ms - entry["utc_ms"]), el + (end_ms - entry["utc_ms"])
+        if lo <= v <= hi:
+            out.append((SINCE_BOOT, round((v - el) / 1000, 3)))
+    return out
 
 
 def entry_label(r):

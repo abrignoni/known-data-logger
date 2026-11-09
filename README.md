@@ -168,6 +168,59 @@ order (boot count, then time since boot), which stays right across clock changes
 
 Field definitions are in [docs/SPEC.md](docs/SPEC.md).
 
+## Where the app keeps it (kdl_locate.py)
+
+For an app no LEAPP parses yet: give the locator the export, an extraction of the same phone
+(folder, zip or tar) and the app's package name.
+
+```bash
+python3 tools/kdl_locate.py --export kdl_scenario_phoneA_... --extraction phoneA.tar \
+    --package com.example.app -o locate.xlsx
+```
+
+It copies out every file the app owns (`data/data`, `data/user*/N`, `Android/data|media|obb`, and
+media that MediaStore lists as the app's), opens each store with its own reader and looks for each
+logged value and time. Readers: SQLite, including the earlier states a write-ahead log still holds
+(`sqlite_wal`), XML and JSON, MMKV (`mmkv_parser`), LevelDB and IndexedDB (`ccl`), plain text, and
+protobuf without a schema (every protobuf hit is marked as a guess). The readers are copied into
+`tools/vendor` from their upstream commits; `vendored.json` records each file's hash.
+
+The workbook has a sheet of hits per entry (store, table, row, column, how the text matched, and
+any field of the same row that reads as a time near the entry), a column profile per table (which
+column holds the text, which holds the time and in what epoch, and columns that stay constant), a
+Time only sheet for entries with no text, the deletions with what became of the deleted value, an
+inventory of every file with its hash, and every store it could not read with the reason. Times are
+read as Unix seconds, milliseconds, microseconds and nanoseconds, Cocoa, WebKit and FILETIME, and as
+milliseconds since boot against the entry's `elapsed_ms`.
+
+What it does not do: it reads no SQLite freelist pages, freeblocks or rollback journals, has no
+reader for Android binary XML, and does not follow a time kept in another table joined by an id. A
+value it does not find may still be on the phone. It writes no LEAPP artifact; the workbook is
+evidence for a person writing one.
+
+Tried on an Android 15 emulator (9 November 2026) with Google Clock and Google Messages: an alarm
+label in two tables, a world clock city that the app stores with an accent the tester did not type,
+a deleted alarm reported as not found with the database's freelist count, a running timer found by
+its wall clock and its since-boot time, and the two text messages with their time column. The
+hits named here were checked by opening the stores by hand.
+
+## Checking a LEAPP artifact (kdl_check.py)
+
+```bash
+python3 tools/kdl_check.py --export kdl_scenario_phoneA_... --leapp-output phoneA=ALEAPP_Output_... \
+    [--artifact artifact_key --package com.example.app] -o check.xlsx
+```
+
+It reads the LEAPP output the way LEAPP writes it (`_lava_data.lava` and `_lava_artifacts.db`) and
+grades each labelled action against the artifacts named in its `expected_artifacts`, or against the
+artifacts given with `--artifact`: found, ambiguous, mismatched (text there, time outside the
+tolerance or the direction column contradicting the log) or missing. It adds coverage per artifact,
+the artifact rows inside a capture session that no entry accounts for, and, with two phones, each
+sent message paired with its received copy. Captured raw events are not graded. On the emulator run
+above, ALEAPP's Google Messages artifact was graded found for both messages.
+
+Tests: `python3 -m unittest discover -s tools` (fictional fixtures for every reader).
+
 The step-by-step user manual, with screenshots, is [docs/USER_MANUAL.md](docs/USER_MANUAL.md).
 
 ## Build
@@ -214,7 +267,7 @@ Version 0.3.0, Android only. Tested on an Android 15 emulator and on a Pixel 7a 
   recorded as two notifications and two `received_message` entries
 - the app icon's one-colour layer showed correctly with the launcher's themed (Minimal) icon style,
   which this launcher applies to the home screen only
-- iOS and a checker script that reads the export against LEAPP output are planned.
+- iOS is planned.
 
 ## License
 

@@ -620,8 +620,16 @@ def build_stores(staged, package, media_names):
 # ---- search --------------------------------------------------------------------------------
 
 def search(entries, stores, tol):
-    """Returns hits: list of dicts, one per (entry, record, field, needle)."""
+    """Returns hits: list of dicts, one per (entry, record, field, needle).
+
+    An earlier WAL version of a row is reported only where the matched field differs from the
+    row's current value: an unchanged value in every earlier state says nothing new."""
     hits = []
+    now = {}
+    for st in stores:
+        for rec in st.records:
+            if rec.state == "current":
+                now[(id(st), rec.container, rec.where)] = dict(rec.fields)
     for e in entries:
         nds = [n for n in kc.needles(e) if n.searchable]
         start, end = kc.window_ms(e, tol)
@@ -643,9 +651,13 @@ def search(entries, stores, tol):
                             kind = nd.match_number(v)
                         if not kind:
                             continue
+                        if rec.state.startswith(sqlite_wal.EARLIER_VERSION):
+                            cur = now.get((id(st), rec.container, rec.where))
+                            if cur is not None and cur.get(fname) == v:
+                                continue
                         times = []
                         for tf, tv in rec.fields:
-                            for epoch, delta in kc.time_hits(tv, start, end, e["utc_ms"]):
+                            for epoch, delta in kc.entry_time_hits(tv, e, start, end):
                                 times.append((tf, epoch, delta))
                         hits.append({"entry": e, "store": st, "rec": rec, "field": fname, "needle": nd, "kind": kind,
                                      "value": v, "times": times, "guess": rec.guess or "binary" in kind})
@@ -663,7 +675,7 @@ def time_only(entries, stores, tol):
         for st in stores:
             for rec in st.records:
                 for fname, v in rec.fields:
-                    for epoch, delta in kc.time_hits(v, start, end, e["utc_ms"]):
+                    for epoch, delta in kc.entry_time_hits(v, e, start, end):
                         found.append((st, rec, fname, epoch, delta, v))
         out.append((e, found))
     return out
@@ -707,22 +719,26 @@ def column_profile(entries, hits):
         times = collections.defaultdict(list)
         for h in hs:
             for tf, epoch, delta in h["times"]:
-                times[(field_pattern(tf), epoch)].append((id(h["entry"]), delta))
+                times[(field_pattern(tf), epoch)].append((id(h["entry"]), delta, (h["rec"].container, h["rec"].where)))
         time_lines = []
-        for (tf, epoch), vals in sorted(times.items(), key=lambda kv: -len({e for e, _ in kv[1]})):
-            n = len({e for e, _ in vals})
+        for (tf, epoch), vals in sorted(times.items(), key=lambda kv: -len({e for e, _, _ in kv[1]})):
+            n = len({e for e, _, _ in vals})
+            nrows = len({r for _, _, r in vals})
             other = {ep for (f2, ep) in times if f2 == tf and ep != epoch}
-            status = "consistent" if n >= 3 and not other else "candidate"
-            deltas = [d for _, d in vals]
+            # One row matched by several entries (a conversation's last-update time) is one reading.
+            status = "consistent" if n >= 3 and nrows >= 3 and not other else "candidate"
+            deltas = [d for _, d, _ in vals]
             every = "yes" if n == len(ents) else f"no ({n} of {len(ents)})"
-            time_lines.append(f"{tf}: {epoch}, {status}, {n} entr{'y' if n == 1 else 'ies'}, "
-                              f"delta {min(deltas):+.1f}..{max(deltas):+.1f} s, holds for every entry with a hit here: {every}")
+            time_lines.append(f"{tf}: {epoch}, {status}, {n} entr{'y' if n == 1 else 'ies'} over {nrows} "
+                              f"row{'' if nrows == 1 else 's'}, delta {min(deltas):+.1f}..{max(deltas):+.1f} s, "
+                              f"holds for every entry with a hit here: {every}")
         # constant and direction-linked fields, on current rows only, one row per record
         recs = {}
         for h in hs:
             if h["rec"].state == "current":
                 recs[id(h["rec"])] = (h["rec"], h["entry"].get("direction"))
         notes = []
+        empty = 0
         if len(recs) >= 2:
             fields = collections.OrderedDict()
             for rec, d in recs.values():
@@ -733,7 +749,10 @@ def column_profile(entries, hits):
                     continue
                 vals = {excerpt(v) for v, _ in vs}
                 if len(vals) == 1 and len(vs) == len(recs):
-                    notes.append(f"{f} = {next(iter(vals))} on all {len(vs)} rows")
+                    if vs[0][0] in (None, "", 0, -1, 0.0, b""):
+                        empty += 1
+                    else:
+                        notes.append(f"{f} = {next(iter(vals))} on all {len(vs)} rows")
                     continue
                 ins = {excerpt(v) for v, d in vs if d == "in"}
                 outs = {excerpt(v) for v, d in vs if d == "out"}
@@ -742,6 +761,10 @@ def column_profile(entries, hits):
                 if n_in >= 2 and n_out >= 2 and len(ins) == 1 and len(outs) == 1 and ins != outs:
                     notes.append(f"{f} co-varies with the logged direction across {n_in + n_out} rows "
                                  f"(in: {next(iter(ins))} x{n_in}, out: {next(iter(outs))} x{n_out}); meaning not established")
+        if len(notes) > 12:
+            notes = notes[:12] + [f"{len(notes) - 12} more constant field(s)"]
+        if empty:
+            notes.append(f"{empty} field(s) empty, 0 or -1 on every row (not listed)")
         rows.append([store, container or "", len(ents),
                      "; ".join(f"{f} ({len(s)} entr{'y' if len(s) == 1 else 'ies'})" for f, s in content.items()),
                      "\n".join(time_lines) or "no field in these rows reads as a time inside the tolerance",
@@ -889,8 +912,8 @@ def main(argv=None):
     not_read = [[s.name, s.kind, s.reason] for s in stores if s.status == "not read"]
     for st in stores:
         for n in st.notes:
-            if "not read" in n:
-                not_read.append([st.name, st.kind, n])
+            if "not read" in n and st.status == "read":
+                not_read.append([st.name, st.kind, "partly read: " + n])
     for r in ex.rejected:
         not_read.append([r, "member name", "rejected: absolute or '..' path, never joined to the staging folder"])
 
@@ -957,7 +980,7 @@ def main(argv=None):
                   "unapplied rollback journals are not read. A value not found may still be on the phone."),
         ("Matching", f"Text shorter than {kc.MIN_NEEDLE} characters is not searched; single words shorter than "
                      f"{kc.MIN_CONTAINED} are matched as the whole value only (weak). Times are read in "
-                     f"{', '.join(n for n, _ in kc.EPOCHS)}, within the entry's tolerance, and only in records that "
+                     f"{', '.join(n for n, _ in kc.EPOCHS)}, and as {kc.SINCE_BOOT}, within the entry's tolerance, and only in records that "
                      "also hold a text hit; a time field is 'consistent' only when 3 or more entries agree on one epoch."),
         ("Guesses", "Protobuf decodes are schema-less: field numbers and types are guesses."),
     ]

@@ -270,6 +270,11 @@ class LocateTest(unittest.TestCase):
         self.assertIn("not read", self.entries["e15"]["Status"])
         self.assertTrue(all("com.example.notes.backup" not in x["Store"] for x in self.hits))
 
+    def test_unchanged_earlier_versions_are_not_hits(self):
+        h = self.hits_for("e10")
+        self.assertTrue(any(x["State"] == "current" for x in h))
+        self.assertFalse(any(x["State"].startswith("Earlier version") for x in h))
+
     def test_time_only(self):
         rows = [r for r in sheet(self.out, "Time only") if r["Entry id"] == "e14"]
         self.assertTrue(any(r["Field"] == "taken_ms" and r["Epoch"] == "Unix milliseconds" for r in rows))
@@ -322,11 +327,28 @@ class UnitTest(unittest.TestCase):
         self.assertEqual(kc.time_readings(0), [])
         self.assertEqual([n for n, _ in kc.time_readings(7)], ["Cocoa seconds (2001)"])  # plausible, rarely in a window
 
+    def test_since_boot_reading(self):
+        e = {"utc_ms": T0, "elapsed_ms": 1_713_279}
+        got = kc.entry_time_hits(1_711_204, e, T0 - 120_000, T0 + 120_000)
+        self.assertEqual(got, [(kc.SINCE_BOOT, -2.075)])
+        self.assertEqual(kc.entry_time_hits(5_000, dict(e, elapsed_ms=6_000), T0 - 120_000, T0 + 120_000), [])
+
     def test_window(self):
         e = {"utc_ms": 1000_000, "time_quality": "approximate"}
         self.assertEqual(kc.window_ms(e, kc.DEFAULT_TOLERANCES_S), (1000_000 - 900_000, 1000_000 + 900_000))
         e = {"utc_ms": 1000_000, "window_s": 60}
         self.assertEqual(kc.window_ms(e, kc.DEFAULT_TOLERANCES_S), (1000_000 - 120_000, 1000_000 + 180_000))
+
+    def test_one_row_matched_by_many_entries_stays_a_candidate(self):
+        st = kl.Store("db", "db", "SQLite", ["db"])
+        rec = kl.Rec(st, "threads", "rowid 1", [("snippet", "x"), ("updated_ms", T0)])
+        hits = []
+        for i in range(3):
+            e = {"utc_ms": T0 + i * 1000, "direction": None}
+            hits.append({"entry": e, "store": st, "rec": rec, "field": "snippet", "needle": kc.Needle("content", "x" * 6),
+                         "kind": "exact", "value": "x", "times": [("updated_ms", "Unix milliseconds", -i)], "guess": False})
+        row = kl.column_profile([], hits)[0]
+        self.assertIn("candidate, 3 entries over 1 row", row[4])
 
     def test_clean_name(self):
         self.assertEqual(kl.clean_name("/data/data/x/a.db"), "data/data/x/a.db")
