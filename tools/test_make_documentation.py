@@ -183,6 +183,52 @@ class DocTest(unittest.TestCase):
         rows.append(row(2, "l", "received_message", refers_to="n"))
         self.assertEqual([], md.pending_review(md.current(rows)))
 
+    def test_system_rows_reach_the_scenario_sheet(self):
+        rows = self.rows + [
+            row(7, "v", "app_version_changed_since_last_seen", kind="system_event", source="system",
+                detail="version 1 last seen, 2 now"),
+            row(8, "w", "app_data_cleared", kind="system_event", source="system", detail="version 2 to 2"),
+            row(9, "p", "profile_snapshot", kind="system_event", app_package=None, detail="profile id 2"),
+            row(10, "x", "export", kind="export", app_package=None, detail="folder kdl_sc_phoneA_x"),
+            row(11, "o", "app_version_changed_since_added", kind="system_event", source="system", detail="old name"),
+        ]
+        d = make_export(self.tmp, rows)
+        out = os.path.join(self.tmp, "doc.xlsx")
+        md.build([md.load_export(d)], out)
+        listed = [str(v) for _, v in load_workbook(out)["Scenario"].iter_rows(values_only=True) if v]
+        for action in ("app_version_changed_since_last_seen", "app_data_cleared", "profile_snapshot", "export",
+                       "app_version_changed_since_added"):
+            self.assertTrue(any(v.startswith(action + " ") or v.startswith(action + ":") for v in listed), action)
+
+    def _run_main(self, rows, *extra):
+        import contextlib
+        import io
+        tmp = tempfile.mkdtemp(dir=self.tmp)  # one export folder per call
+        d = make_export(tmp, rows)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = md.main([d, "-o", os.path.join(tmp, "doc.xlsx"), *extra])
+        return code, buf.getvalue()
+
+    def test_missing_noted_hash_warns_and_fails(self):
+        rows = self._chained([row(i, f"e{i}", "a") for i in range(1, 4)])
+        code, out = self._run_main(rows, "--expect-hash", rows[2]["row_hash"])
+        self.assertEqual(0, code)
+        self.assertNotIn("WARNING", out)
+        # The noted row was cut off the end; the rest of the export is consistent.
+        cut = rows[:2]
+        code, out = self._run_main(cut, "--expect-hash", rows[2]["row_hash"])
+        self.assertEqual(1, code)
+        self.assertIn("MISSING", out)
+        self.assertIn("WARNING", out)
+
+    def test_broken_chain_exits_with_one(self):
+        rows = self._chained([row(i, f"e{i}", "a", content=f"c{i}") for i in range(1, 4)])
+        rows[1]["content"] = "changed"
+        code, out = self._run_main(rows)
+        self.assertEqual(1, code)
+        self.assertIn("BROKEN at seq 2", out)
+
     def test_sheet_names_are_valid_and_unique(self):
         used = set()
         self.assertEqual("a_b", md.sheet_name("a/b", used))

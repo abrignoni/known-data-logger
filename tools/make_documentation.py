@@ -73,7 +73,7 @@ def verify_chain(rows):
 
 
 def find_hash(exports, wanted):
-    """Where a hash noted earlier (from the Export screen) sits in the chain, or None."""
+    """Where a hash noted earlier (from the Setup tab's "Latest row hash") sits in the chain, or None."""
     for e in exports:
         for r in e["rows"]:
             if r.get("row_hash") == wanted:
@@ -289,10 +289,7 @@ def build(exports, out_path):
             summary += "; " + ", ".join(notes)
         lines.append(("Capture pauses", summary + (" (listed on the Capture pauses sheet)" if pauses or unexplained else "")))
         for r in cur:
-            if r["kind"] == "clock_change" or r["action"] in (
-                    "boot_detected", "capture_session_start", "capture_session_stop", "export_failed",
-                    "app_installed", "app_updated", "app_removed", "app_version_changed_since_added",
-                    "rule_taught", "rule_removed", "hash_chain_backfilled"):
+            if r["kind"] in ("clock_change", "export") or r["action"] in SCENARIO_EVENTS:
                 d, t, off = local_time(r)
                 app = labels_by_pkg.get(r.get("app_package"), r.get("app_package"))
                 text = f"{r['action']}{' (' + app + ')' if app else ''}: {r.get('detail') or ''}".strip(": ")
@@ -382,12 +379,27 @@ def build(exports, out_path):
             "actions": sum(len(v) for v in per_app.values())}
 
 
+# System rows listed with their date and time on the Scenario sheet. They are not actions, so no
+# app sheet shows them. app_version_changed_since_added is the name 0.3 builds before 9a53de8 wrote.
+SCENARIO_EVENTS = (
+    "boot_detected", "capture_session_start", "capture_session_stop", "export_failed",
+    "app_installed", "app_updated", "app_removed", "app_data_cleared",
+    "app_version_changed_since_last_seen", "app_version_changed_since_added",
+    "profile_snapshot", "rule_taught", "rule_removed", "hash_chain_backfilled",
+)
+
+
+def failed(result):
+    """True when a check result reports a problem."""
+    return any(w in result for w in ("MISMATCH", "MISSING", "BROKEN", "missing"))
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("exports", nargs="+", help="export folder(s)")
     ap.add_argument("-o", "--output", required=True, help="output .xlsx path")
     ap.add_argument("--expect-hash", action="append", default=[],
-                    help="a row hash noted from the app's Export screen; reported as found or missing (repeatable)")
+                    help="a row hash noted from the app's Setup tab (Latest row hash); reported as found or missing (repeatable)")
     a = ap.parse_args(argv)
     exports = [load_export(f) for f in a.exports]
     for h in a.expect_hash:
@@ -397,11 +409,15 @@ def main(argv=None):
     info = build(exports, a.output)
     print(f"Wrote {a.output}: {info['actions']} actions, {info['review']} to review, {info['events']} captured events")
     print("Sheets: " + ", ".join(info["sheets"]))
+    warned = False
     for e in exports:
         for name, result in e["checks"]:
-            if "MISMATCH" in result or "missing" in result or "BROKEN" in result:
+            if failed(result):
+                warned = True
                 print(f"WARNING {os.path.basename(e['folder'])}: {name}: {result}")
+    # A failed check exits with 1, so a script or CI step that runs this cannot miss it.
+    return 1 if warned else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
