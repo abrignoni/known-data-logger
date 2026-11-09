@@ -194,6 +194,10 @@ Version 0.3.0, Android only. Tested on an Android 15 emulator and on a Pixel 7a 
 - with a test PIN set, the PIN never reached the log (not even in the database file's bytes), no
   keypad taps or System UI rows were recorded while locked, and a text arriving while locked was
   kept as a withheld notification for review
+- two texts that both showed only "New message." and arrived 34 seconds apart while unlocked were
+  recorded as two notifications and two `received_message` entries
+- the app icon's one-colour layer showed correctly with the launcher's themed (Minimal) icon style,
+  which this launcher applies to the home screen only
 - iOS and a checker script that reads the export against LEAPP output are planned.
 
 Author: Alexis Brignoni
