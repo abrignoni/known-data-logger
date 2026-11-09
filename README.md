@@ -200,4 +200,8 @@ Version 0.3.0, Android only. Tested on an Android 15 emulator and on a Pixel 7a 
   which this launcher applies to the home screen only
 - iOS and a checker script that reads the export against LEAPP output are planned.
 
+## License
+
+MIT, see `LICENSE`. The app includes Apache 2.0 libraries listed in `THIRD_PARTY_NOTICES.md`.
+
 Author: Alexis Brignoni
