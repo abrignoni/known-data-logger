@@ -371,8 +371,8 @@ fun TimelineScreen(repo: Repo, bump: () -> Unit) {
         }
         LazyColumn {
             items(shown, key = { it.entryId }) { e ->
-                // A screenshot is stored against the entry id, so every revision shows it.
-                val shot = shots[e.entryId]
+                // A screenshot belongs to the entry id; a label made from a mark or event shows the event's.
+                val shot = shots[e.entryId] ?: e.refersTo?.let { shots[it] }
                 Column(Modifier.fillMaxWidth().clickable { editing = e }.padding(vertical = 8.dp)) {
                     val title = when {
                         e.isMark -> "MARK"
@@ -400,7 +400,7 @@ fun TimelineScreen(repo: Repo, bump: () -> Unit) {
             }
         }
     }
-    editing?.let { e -> EditDialog(repo, e, shots[e.entryId], onDone = { editing = null; bump() }) }
+    editing?.let { e -> EditDialog(repo, e, shots[e.entryId] ?: e.refersTo?.let { shots[it] }, onDone = { editing = null; bump() }) }
 }
 
 @Composable
@@ -500,11 +500,17 @@ fun ExportScreen(repo: Repo, bump: () -> Unit) {
     val current = remember(rows) { Timeline.current(rows) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
-            try {
-                lastExport = repo.exportTo(uri); toast(ctx, "Exported"); bump()
-            } catch (e: Exception) {
-                toast(ctx, "Export failed: ${e.message}")
-            }
+            toast(ctx, "Exporting")
+            val main = android.os.Handler(android.os.Looper.getMainLooper())
+            // Off the main thread: a long session can hold many screenshots.
+            Thread {
+                val result = runCatching { repo.exportTo(uri) }
+                main.post {
+                    result.onSuccess { lastExport = it; toast(ctx, "Exported") }
+                        .onFailure { toast(ctx, "Export failed: ${it.message}") }
+                    bump()
+                }
+            }.start()
         }
     }
     Column(Modifier.verticalScroll(rememberScrollState())) {

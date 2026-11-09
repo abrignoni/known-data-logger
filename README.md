@@ -32,9 +32,14 @@ There is no field for passwords or passcodes. Keep those in your private notes.
 
 What is captured, only in the apps under test plus System UI and Settings unless you choose all apps:
 
-- screen changes, taps (label and view id), and typed text as the field's final value
-- never the content of password fields (tested: an SSID typed in the same dialog was captured,
-  the password was not, not even in the database file)
+- screen changes, taps (label and view id), and typed text as the field's final value, stamped
+  at the last keystroke
+- never the content of password fields, including a password shown with "Show password" and
+  number passwords; a field seen once as a password stays withheld for the session. While a
+  password field has focus, taps are recorded without their label, so an on-screen keypad cannot
+  spell a PIN. Tested in the Wi-Fi dialog: the SSID typed beside it was captured, the password
+  (hidden or shown) was not, not even in the database file.
+- nothing at all while the phone is locked (not yet tried with a PIN set)
 - a field cleared in one step, which is how apps built with Jetpack Compose show a send: they
   report no tap event for their buttons (seen with Google Messages)
 
@@ -51,8 +56,13 @@ that blocks screenshots is recorded as `blank`.
 Known limits:
 
 - Tools that drive the phone through UiAutomation (uiautomator, Puma and similar) pause every
-  accessibility service while they run. The log shows each pause as
-  `capture_service_disconnected` and `capture_service_connected` rows.
+  accessibility service while they run. On the emulator each `uiautomator dump` showed up as a
+  `capture_service_disconnected` and `capture_service_connected` pair in the log.
+- A keypad made of buttons in an app with no password field (some banking or vault apps) is
+  recorded tap by tap. Use test personas and test PINs only.
+- Text still being typed when the app is killed is lost; it is written when the field is left.
+- The live copy (`actions-live.jsonl`) holds everything captured, including typed text, and stays
+  on the phone after an export.
 - Some apps behave differently when an accessibility service is on.
 - Rules break when an app changes its screens or runs in another language. Review catches it.
 
@@ -91,8 +101,11 @@ python3 tools/make_documentation.py kdl_scenario_phoneA_... kdl_scenario_phoneB_
 ```
 
 Give it every phone's export for one scenario. It writes a Scenario sheet (devices, detected clock
-changes and reboots, hash checks), an Apps sheet, one sheet per app with each action and a link to
-its screenshot, a Needs review sheet and a Captured events sheet. Needs `openpyxl`.
+changes, reboots and capture pauses, hash checks), an Apps sheet, one sheet per app with each
+action and a link to its screenshot (a label made from a mark links the mark's screenshot), a
+Needs review sheet and a Captured events sheet. Rows are grouped by device in each device's own
+order (boot count, then time since boot), which stays right across clock changes. Needs
+`openpyxl`.
 
 Field definitions are in [docs/SPEC.md](docs/SPEC.md).
 

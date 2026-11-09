@@ -22,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 
 try:
     from openpyxl import Workbook
+    from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
     from openpyxl.styles import Font
     from openpyxl.utils import get_column_letter
 except ImportError:
@@ -46,7 +47,8 @@ def load_export(folder):
     checks.append(("actions.jsonl sha256", "match" if want == got else f"MISMATCH (manifest {want}, file {got})"))
     shots = {}
     for s in manifest.get("screenshots", []):
-        path = os.path.join(folder, "screens", s["file"]) if s.get("file") else None
+        # Only the base name is used, so a manifest cannot point outside screens/.
+        path = os.path.join(folder, "screens", os.path.basename(s["file"])) if s.get("file") else None
         status = s.get("status")
         if path and os.path.exists(path):
             with open(path, "rb") as f:
@@ -96,7 +98,10 @@ def local_time(r):
 
 
 def text_cell(ws, row, col, value):
-    """Writes a value as plain text, so content such as '=1+1' is never read as a formula."""
+    """Writes a value as plain text, so content such as '=1+1' is never read as a formula.
+    Control characters Excel cannot hold are shown as [U+XXXX] instead of failing the build."""
+    if isinstance(value, str):
+        value = ILLEGAL_CHARACTERS_RE.sub(lambda m: f"[U+{ord(m.group()):04X}]", value)
     c = ws.cell(row=row, column=col, value=value)
     if isinstance(value, str):
         c.data_type = "s"
@@ -163,8 +168,9 @@ def build(exports, out_path):
         for name, result in e["checks"]:
             lines.append((f"Check: {name}", result))
         for r in current(e["rows"]):
-            if r["kind"] == "clock_change" or r["action"] in ("boot_detected", "capture_session_start",
-                                                              "capture_session_stop", "capture_service_disconnected"):
+            if r["kind"] == "clock_change" or r["action"] in ("boot_detected", "capture_session_start", "capture_session_stop",
+                                                              "capture_service_disconnected", "capture_service_connected",
+                                                              "export_failed"):
                 d, t, off = local_time(r)
                 lines.append((f"{d} {t} {off}", f"{r['action']}: {r.get('detail') or ''}".strip(": ")))
     for i, (k, v) in enumerate(lines, 1):
@@ -187,23 +193,27 @@ def build(exports, out_path):
                              a.get("account")])
     write_table(ws, ["Device", "App", "Package", "Version when added", "Version at export", "First install", "Account"], app_rows)
 
-    # Actions per app, all devices, ordered by device clock (UTC).
+    # Actions per app. Rows are grouped by device and kept in each device's own order
+    # (boot_count, elapsed_ms, seq), which survives clock changes; devices follow argument order.
     per_app = {}
     review_rows, event_rows = [], []
-    for e in exports:
+    for di, e in enumerate(exports):
         dev = e["manifest"].get("device_label", "")
-        cur = current(e["rows"])
+        cur = current(e["rows"])  # already in device order
         for r, why in pending_review(cur):
             d, t, off = local_time(r)
             review_rows.append([dev, d, t, off, r["action"] or "(none)", r.get("source"), why, r.get("content"), r["entry_id"]])
-        for r in cur:
-            shot = e["shots"].get(r["entry_id"])
+        for pos, r in enumerate(cur):
+            # A label made from a mark or captured event shows that event's screenshot.
+            shot = e["shots"].get(r["entry_id"]) or (e["shots"].get(r["refers_to"]) if r.get("refers_to") else None)
+            order = (di, pos)
             if r["kind"] == "action":
-                per_app.setdefault(r.get("app_package") or "", []).append((r["utc_ms"], action_values(r, dev, shot, out_dir)))
+                per_app.setdefault(r.get("app_package") or "", []).append((order, action_values(r, dev, shot, out_dir)))
             elif r["kind"] == "auto_event":
                 d, t, off = local_time(r)
-                event_rows.append((r["utc_ms"], [dev, d, t, off, labels.get(r.get("app_package"), r.get("app_package")),
-                                                 r["action"], r.get("content"), r.get("detail"), r["entry_id"]]))
+                link = (os.path.relpath(shot["path"], out_dir) if shot and shot["path"] else (shot["status"] if shot else None))
+                event_rows.append((order, [dev, d, t, off, labels.get(r.get("app_package"), r.get("app_package")),
+                                           r["action"], r.get("content"), r.get("detail"), link, r["entry_id"]]))
     for pkg in sorted(per_app, key=lambda p: (p == "", labels.get(p, p).lower())):
         title = labels.get(pkg, pkg) if pkg else "Device and system"
         ws = wb.create_sheet(sheet_name(title, used))
@@ -220,8 +230,13 @@ def build(exports, out_path):
     ws = wb.create_sheet(sheet_name("Needs review", used))
     write_table(ws, ["Device", "Date", "Time", "UTC offset", "Action", "Source", "Why", "Content", "Entry id"], review_rows)
     ws = wb.create_sheet(sheet_name("Captured events", used))
-    write_table(ws, ["Device", "Date", "Time", "UTC offset", "App", "Event", "Content", "Detail", "Entry id"],
+    write_table(ws, ["Device", "Date", "Time", "UTC offset", "App", "Event", "Content", "Detail", "Screenshot", "Entry id"],
                 [v for _, v in sorted(event_rows, key=lambda x: x[0])])
+    for i, v in enumerate([v for _, v in sorted(event_rows, key=lambda x: x[0])], 2):
+        if v[8] and v[8].endswith(".png"):
+            c = ws.cell(row=i, column=9)
+            c.hyperlink = v[8]
+            c.font = Font(color="0563C1", underline="single")
     wb.save(out_path)
     return {"sheets": wb.sheetnames, "review": len(review_rows), "events": len(event_rows),
             "actions": sum(len(v) for v in per_app.values())}

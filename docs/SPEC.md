@@ -142,10 +142,13 @@ An accessibility service records, with the same time fields as every other entry
 
 - foreground app and screen title changes (window state events)
 - taps, with the tapped element's text, content description and view id
-- typed text, recorded once as the field's final value, never for password fields
-  (`isPassword`), never for the logger's own screens. A field showing its hint is recorded as
-  empty (an empty field reports its hint as its text).
-- system UI events (quick settings toggles such as airplane mode)
+- typed text, recorded once as the field's final value and stamped at its last keystroke, never
+  for password fields (`isPassword` or a password input type, including visible and number
+  passwords; a field seen once as a password stays withheld for the session), never for the
+  logger's own screens. A field showing its hint is recorded as empty (an empty field reports its
+  hint as its text). While a password field has focus, taps are recorded without a label.
+- taps and screens in System UI, with no special handling
+- nothing while the phone is locked (KeyguardManager.isKeyguardLocked)
 
 Capture runs only between Start session and Stop session, both logged. A package allowlist
 (apps under test, system UI, Settings) limits what is recorded. Raw rows use the new kind
@@ -162,19 +165,21 @@ Capture runs only between Start session and Stop session, both logged. A package
   Jetpack Compose apps, which report no tap events (seen with Google Messages on the emulator).
   Rules are data files, so they can change without a new APK. Shipped rules: Google Messages
   send (field_cleared) and AOSP Camera shutter (tap), each checked on the emulator.
-- A review screen lists marked moments and unlabelled events; the tester accepts or labels
-  them before export. Accepted labels are normal `action` rows with `refers_to` pointing at the
+- The review list (Timeline, To review) holds marks without a label, auto labels nobody has
+  accepted and stamped entries with no action. Raw events are under Everything and can be
+  labelled from there. Accepted labels are normal `action` rows with `refers_to` pointing at the
   raw event.
 
 ### Screenshots
 
 - Taken by the accessibility service (`AccessibilityService.takeScreenshot`, API 30+): no extra
-  permission, no consent prompt, no recording indicator, and it keeps working after a reboot.
-  On Android 8 to 10 the feature is off and the app says so.
+  permission and no consent prompt (none appeared on the emulator).
+  On Android 8 to 10 the feature is off and the app says so. Capture and screenshots resumed
+  after a reboot on the emulator with no action in the app.
 - Triggers: every tap on the mark button (always), each auto-labelled action (on by default,
   can be turned off), every tap (off by default).
-- The system rate-limits screenshots; a refused or failed capture is logged on the entry, never
-  dropped silently. Screens of apps that block screenshots come back black; the entry records
+- A `pending` screenshot row is written before each capture and updated with the result, so a
+  refused, failed or interrupted capture stays visible. Screens of apps that block screenshots come back black; the entry records
   that the frame was empty rather than claiming a picture of the content.
 - Stored as PNG in the app's private folder (no MediaStore rows), named after the entry, with
   sha256 computed at capture time and kept in the database.
@@ -204,10 +209,11 @@ yet verified.
 
 ### Documentation output
 
-An off-device script reads one or more exports (phone A, phone B) and writes an `.xlsx`: a device
-sheet, an accounts sheet, one sheet per app with Date, Time, Action, Content, Counterpart and a
-link to the screenshot, using current revisions only and flagging entries that still need
-detail.
+An off-device script (`tools/make_documentation.py`) reads one or more exports (phone A, phone
+B) and writes an `.xlsx`: Scenario (devices, detected changes, hash checks), Apps, one sheet per
+app with Date, Time, Action, Content, Counterpart and a link to the screenshot, Needs review and
+Captured events. It uses current revisions only, keeps each device's own order, and writes every
+value as text so content cannot run as a formula.
 
 ## Later
 

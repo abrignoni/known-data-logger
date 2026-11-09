@@ -57,6 +57,8 @@ class CaptureService : AccessibilityService() {
     private var shotAuto = true
     private var shotTap = false
     private var pkgs: Set<String> = emptySet()
+    /** Fields seen as password fields this session; they stay withheld even if shown as plain text. */
+    private val secretKeys = HashSet<String>()
 
     /** Called when the session is started or stopped from the app; re-reads settings, apps and rules. */
     fun syncSession() {
@@ -66,6 +68,7 @@ class CaptureService : AccessibilityService() {
         shotTap = repo.flag(Repo.KEY_SHOT_TAP, false)
         pkgs = repo.capturePackages()
         rules = repo.loadRules()
+        secretKeys.clear()
         if (active) showMark() else { flushText(); removeMark() }
     }
 
@@ -75,6 +78,8 @@ class CaptureService : AccessibilityService() {
         if (!::repo.isInitialized || !active) return
         val pkg = event.packageName?.toString() ?: return
         if (!wanted(pkg)) return
+        // Nothing is recorded while the phone is locked: the lock screen is where PINs are typed.
+        if (getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true) return
         when (event.eventType) {
             AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> onText(event, pkg)
             AccessibilityEvent.TYPE_VIEW_FOCUSED -> flushText()
@@ -83,11 +88,29 @@ class CaptureService : AccessibilityService() {
         }
     }
 
+    /** Password by flag or by input type, including "show password" and number passwords. */
+    private fun isSecret(event: AccessibilityEvent?, node: AccessibilityNodeInfo?): Boolean {
+        if (event?.isPassword == true || node?.isPassword == true) return true
+        val t = node?.inputType ?: return false
+        val cls = t and android.text.InputType.TYPE_MASK_CLASS
+        val variation = t and android.text.InputType.TYPE_MASK_VARIATION
+        return (cls == android.text.InputType.TYPE_CLASS_TEXT && variation in setOf(
+            android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD,
+            android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
+            android.text.InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD)) ||
+            (cls == android.text.InputType.TYPE_CLASS_NUMBER && variation == android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD)
+    }
+
     private fun onText(event: AccessibilityEvent, pkg: String) {
         val src = event.source
-        if (event.isPassword || src?.isPassword == true) return
         val viewId = src?.viewIdResourceName
-        val key = "$pkg|${viewId ?: event.className}|${src?.hashCode() ?: 0}"
+        val stableKey = "$pkg|${viewId ?: event.className}"
+        if (stableKey in secretKeys || isSecret(event, src)) {
+            secretKeys += stableKey
+            text.discard()
+            return
+        }
+        val key = "$stableKey|${src?.hashCode() ?: 0}"
         val before = event.beforeText?.toString()
         if (Rules.isBulkClear(before, event.addedCount, event.removedCount)) {
             // The field went from text to empty in one change: record what was there, then the clear.
@@ -99,15 +122,24 @@ class CaptureService : AccessibilityService() {
         }
         // An empty field reports its hint as its text; record it as empty.
         val value = if (src?.isShowingHintText == true) "" else event.text?.joinToString("")
-        text.update(pkg, viewId, key, value, false)?.let { writeTyped(it) }
+        text.update(pkg, viewId, key, value, false, repo.stamp())?.let { writeTyped(it) }
     }
 
     private fun flushText() { text.flush()?.let { writeTyped(it) } }
 
-    private fun writeTyped(t: Triple<String, String?, String>) {
-        repo.log(Draft(appPackage = t.first, action = AutoAction.TYPED_TEXT, content = t.third,
-            detail = t.second?.let { "view $it" }, source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT)
+    /** Typed text is stamped at its last keystroke, not when the field was left. */
+    private fun writeTyped(t: Typed) {
+        val d = Draft(appPackage = t.pkg, action = AutoAction.TYPED_TEXT, content = t.text,
+            detail = t.viewId?.let { "view $it" }, source = Source.AUTO_EVENT)
+        if (t.stamp != null) repo.log(d, stamp = t.stamp, kind = Kind.AUTO_EVENT, detect = false)
+        else repo.log(d, kind = Kind.AUTO_EVENT)
     }
+
+    /** True when the field holding input focus in the active window is a password field. */
+    private fun passwordFieldFocused(): Boolean = try {
+        val f = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        f != null && (isSecret(null, f) || "${f.packageName}|${f.viewIdResourceName ?: f.className}" in secretKeys)
+    } catch (e: Exception) { false }
 
     /** Text, else content description, of the node or its first described children. */
     private fun labelOf(event: AccessibilityEvent, src: AccessibilityNodeInfo?): String? {
@@ -125,10 +157,17 @@ class CaptureService : AccessibilityService() {
     }
 
     private fun onTap(event: AccessibilityEvent, pkg: String) {
+        if (passwordFieldFocused()) {
+            // A keypad built from buttons can spell a PIN through tap labels: record only that a tap happened.
+            flushText()
+            repo.log(Draft(appPackage = pkg, action = AutoAction.TAP, detail = "label withheld: a password field had focus",
+                source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT)
+            return
+        }
         val src = event.source
         val viewId = src?.viewIdResourceName
         val label = labelOf(event, src)
-        val typedBefore = text.currentOrLast()
+        val typedBefore = text.currentOrLast(pkg)
         flushText()
         val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.TAP, content = label,
             detail = listOfNotNull(viewId?.let { "view $it" }, event.className?.let { "class $it" }).joinToString(", "),
@@ -151,6 +190,7 @@ class CaptureService : AccessibilityService() {
         val title = event.text?.joinToString(" ")?.takeIf { it.isNotBlank() } ?: event.className?.toString() ?: ""
         val key = pkg to title
         if (key == lastScreen) return
+        if (lastScreen?.first != pkg) text.forgetLast()
         lastScreen = key
         flushText()
         repo.log(Draft(appPackage = pkg, action = AutoAction.SCREEN, content = title,
@@ -169,6 +209,8 @@ class CaptureService : AccessibilityService() {
     // ---- Screenshots ----
 
     private fun screenshot(entryId: String) {
+        // A pending row first, so a capture lost to a stopped service still shows up.
+        repo.recordShot(Shot(entryId, null, null, "pending", System.currentTimeMillis()))
         if (Build.VERSION.SDK_INT < 30) {
             repo.recordShot(Shot(entryId, null, null, "unsupported", System.currentTimeMillis()))
             return
@@ -190,7 +232,8 @@ class CaptureService : AccessibilityService() {
                     val blank = isBlank(bmp)
                     val name = "$entryId.png"
                     val f = File(repo.screensDir(), name)
-                    f.outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                    val written = f.outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                    if (!written) { f.delete(); error("PNG write failed") }
                     Shot(entryId, name, sha256Hex(f.readBytes()), if (blank) "blank" else "ok", System.currentTimeMillis())
                 } catch (e: Exception) {
                     Shot(entryId, null, null, "failed:${e.javaClass.simpleName}", System.currentTimeMillis())

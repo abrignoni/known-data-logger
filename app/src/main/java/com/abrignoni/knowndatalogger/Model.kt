@@ -192,11 +192,15 @@ data class Rule(
     val verifiedWith: String?,
     val event: String = RuleEvent.TAP,
 ) {
+    /** Compiled once; an invalid pattern is rejected when the rules file is parsed. */
+    private val regex: Regex? by lazy { labelRegex?.let { Regex(it, RegexOption.IGNORE_CASE) } }
+
     fun matches(pkg: String, event: String, viewId: String?, label: String?): Boolean {
         if (pkg != this.pkg || event != this.event) return false
         if (this.viewId == null && labelRegex == null) return false
         if (this.viewId != null && this.viewId != viewId) return false
-        if (labelRegex != null && (label == null || !Regex(labelRegex, RegexOption.IGNORE_CASE).containsMatchIn(label))) return false
+        val re = regex
+        if (re != null && (label == null || !re.containsMatchIn(label))) return false
         return true
     }
 }
@@ -217,6 +221,9 @@ object Rules {
     }
 }
 
+/** One typed value, stamped at its last change (not when it was flushed). */
+data class Typed(val pkg: String, val viewId: String?, val text: String, val stamp: Stamp?)
+
 /**
  * Holds typed text until the field is done: the next tap, screen change, focus change or session
  * stop flushes it as one typed_text event. Password fields never enter the buffer.
@@ -226,27 +233,35 @@ class TextBuffer {
     private var text: String? = null
     private var pkg: String? = null
     private var viewId: String? = null
-    var lastFlushed: String? = null
-        private set
+    private var stamp: Stamp? = null
+    private var lastFlushed: Typed? = null
 
-    fun update(pkg: String, viewId: String?, fieldKey: String, value: String?, isPassword: Boolean): Triple<String, String?, String>? {
+    fun update(pkg: String, viewId: String?, fieldKey: String, value: String?, isPassword: Boolean, at: Stamp? = null): Typed? {
         if (isPassword) return null
         val flushed = if (key != null && key != fieldKey) flush() else null
-        key = fieldKey; this.pkg = pkg; this.viewId = viewId; text = value
+        key = fieldKey; this.pkg = pkg; this.viewId = viewId; text = value; stamp = at
         return flushed
     }
 
-    /** Returns (package, view id, text) for a non-empty pending value, then clears it. */
-    fun flush(): Triple<String, String?, String>? {
-        val t = text; val p = pkg; val v = viewId
-        key = null; text = null; pkg = null; viewId = null
+    /** Returns the pending non-empty value, then clears it. */
+    fun flush(): Typed? {
+        val t = text; val p = pkg; val v = viewId; val st = stamp
+        key = null; text = null; pkg = null; viewId = null; stamp = null
         if (t.isNullOrEmpty() || p == null) return null
-        lastFlushed = t
-        return Triple(p, v, t)
+        return Typed(p, v, t, st).also { lastFlushed = it }
     }
 
-    /** Text currently in the buffer, else the last flushed value. Used for rule content. */
-    fun currentOrLast(): String? = text?.takeIf { it.isNotEmpty() } ?: lastFlushed
+    /** Drops anything pending without recording it (used when a field turns out to be a password). */
+    fun discard() { key = null; text = null; pkg = null; viewId = null; stamp = null }
+
+    /** Forget the last flushed value, so it cannot be attached to a later action elsewhere. */
+    fun forgetLast() { lastFlushed = null }
+
+    /** Text pending, else the last flushed value, only if it came from the same package. */
+    fun currentOrLast(pkg: String): String? {
+        if (this.pkg == pkg) text?.takeIf { it.isNotEmpty() }?.let { return it }
+        return lastFlushed?.takeIf { it.pkg == pkg }?.text
+    }
 }
 
 object Csv {

@@ -83,6 +83,28 @@ class DocTest(unittest.TestCase):
         e = md.load_export(d)
         self.assertTrue(any(k == "actions.jsonl sha256" and "MISMATCH" in v for k, v in e["checks"]))
 
+    def test_order_follows_device_clock_not_wall_clock(self):
+        rows = [row(1, "x", "first", utc_ms=1794146500000, elapsed_ms=10),   # clock set forward before it
+                row(2, "y", "second", utc_ms=1794146400000, elapsed_ms=20)]
+        d = make_export(self.tmp, rows)
+        out = os.path.join(self.tmp, "o.xlsx")
+        md.build([md.load_export(d)], out)
+        chat = list(load_workbook(out)["Chat"].iter_rows(min_row=2, values_only=True))
+        self.assertEqual(["first", "second"], [r[4] for r in chat])
+
+    def test_mark_label_gets_mark_screenshot_and_control_chars_survive(self):
+        rows = [row(1, "a", "mark", kind="auto_event", source="mark"),
+                row(2, "lab", "sent_media", refers_to="a", source="mark", content="bell\x07here")]
+        d = make_export(self.tmp, rows)
+        out = os.path.join(self.tmp, "o.xlsx")
+        md.build([md.load_export(d)], out)
+        wb = load_workbook(out)
+        chat = list(wb["Chat"].iter_rows(min_row=2, values_only=True))
+        self.assertTrue(chat[0][13].endswith("s1.png"))
+        self.assertEqual("bell[U+0007]here", chat[0][5])
+        ev = list(wb["Captured events"].iter_rows(min_row=2, values_only=True))
+        self.assertTrue(ev[0][8].endswith("s1.png"))
+
     def test_sheet_names_are_valid_and_unique(self):
         used = set()
         self.assertEqual("a_b", md.sheet_name("a/b", used))

@@ -84,27 +84,49 @@ class CaptureLogicTest {
         assertEquals("v", r[0].viewId); assertNull(r[0].labelRegex); assertEquals("last_typed", r[0].content); assertEquals(RuleEvent.FIELD_CLEARED, r[0].event)
     }
 
-    @Test fun textBufferKeepsFinalValueAndSkipsPasswords() {
+    @Test fun textBufferKeepsFinalValueStampAndSkipsPasswords() {
         val b = TextBuffer()
-        assertNull(b.update("p", "f", "k1", "h", false))
-        assertNull(b.update("p", "f", "k1", "hello", false))
-        assertNull(b.update("p", "pw", "k2-ignored", "secret", true))
-        assertEquals("hello", b.currentOrLast())
-        assertEquals(Triple("p", "f", "hello"), b.flush())
+        val s1 = s.copy(elapsedMs = 500); val s2 = s.copy(elapsedMs = 900)
+        assertNull(b.update("p", "f", "k1", "h", false, s1))
+        assertNull(b.update("p", "f", "k1", "hello", false, s2))
+        assertNull(b.update("p", "pw", "k2-ignored", "secret", true, s2))
+        assertEquals("hello", b.currentOrLast("p"))
+        assertEquals(Typed("p", "f", "hello", s2), b.flush())
         assertNull(b.flush())
-        assertEquals("hello", b.currentOrLast())
+        assertEquals("hello", b.currentOrLast("p"))
+    }
+
+    @Test fun lastTypedOnlyFromSamePackageAndForgettable() {
+        val b = TextBuffer()
+        b.update("chat", "f", "k1", "hi there", false); b.flush()
+        assertNull(b.currentOrLast("camera"))
+        assertEquals("hi there", b.currentOrLast("chat"))
+        b.forgetLast()
+        assertNull(b.currentOrLast("chat"))
+    }
+
+    @Test fun discardDropsPendingText() {
+        val b = TextBuffer()
+        b.update("p", "f", "k1", "1234", false)
+        b.discard()
+        assertNull(b.flush())
     }
 
     @Test fun textBufferFlushesPreviousFieldOnSwitch() {
         val b = TextBuffer()
         b.update("p", "a", "k1", "first", false)
-        assertEquals(Triple("p", "a", "first"), b.update("p", "b", "k2", "s", false))
+        assertEquals("first", b.update("p", "b", "k2", "s", false)?.text)
     }
 
     @Test fun emptyTextIsNotFlushed() {
         val b = TextBuffer()
         b.update("p", "a", "k1", "", false)
         assertNull(b.flush())
+    }
+
+    @Test fun invalidRegexRuleIsDropped() {
+        val r = parseRules("""{"rules":[{"id":"bad","package":"p","label_regex":"([","action":"x"},{"id":"ok","package":"p","label_regex":"send","action":"y"}]}""")
+        assertEquals(listOf("ok"), r.map { it.id })
     }
 
     @Test fun detectFromNullLastIsEmpty() {

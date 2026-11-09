@@ -316,28 +316,21 @@ class Repo private constructor(private val context: Context) {
     fun exportTo(treeUri: Uri): String {
         val s = stamp()
         val name = exportFolderName(s)
+        // The export row comes first so the export lists itself; a failure is logged after it.
         log(Draft(action = "export", detail = "folder $name"), s, kind = Kind.EXPORT)
+        try {
+            return writeExport(treeUri, name, s)
+        } catch (e: Exception) {
+            log(Draft(action = "export_failed", detail = "folder $name: ${e.javaClass.simpleName}", source = Source.SYSTEM),
+                kind = Kind.SYSTEM_EVENT)
+            throw e
+        }
+    }
+
+    /** Screenshots are copied and hashed one at a time; manifest.json is written last. */
+    private fun writeExport(treeUri: Uri, name: String, s: Stamp): String {
         val rows = db.entries()
         val shots = db.shots()
-        val jsonlBytes = jsonl(rows, shots).toByteArray(Charsets.UTF_8)
-        val csvBytes = Csv.document(rows, shots).toByteArray(Charsets.UTF_8)
-        // Re-hash each screenshot as it is exported and compare with the hash taken at capture.
-        val shotFiles = shots.values.filter { it.file != null }.mapNotNull { sh ->
-            val f = File(screensDir(), sh.file!!)
-            if (!f.exists()) null else Triple(sh, f.readBytes(), f)
-        }
-        val shotList = JSONArray(shots.values.sortedBy { it.utcMs }.map { sh ->
-            val bytes = shotFiles.firstOrNull { it.first.entryId == sh.entryId }?.second
-            val now = bytes?.let { sha256Hex(it) }
-            JSONObject().apply {
-                put("entry_id", sh.entryId); put("file", sh.file ?: JSONObject.NULL); put("status", sh.status)
-                put("sha256_at_capture", sh.sha256 ?: JSONObject.NULL); put("sha256_at_export", now ?: JSONObject.NULL)
-                put("hash_match", if (sh.sha256 != null && now != null) sh.sha256 == now else JSONObject.NULL)
-            }
-        })
-        val manifestBytes = manifest(rows, jsonlBytes, s).apply { put("screenshots", shotList) }
-            .toString(2).toByteArray(Charsets.UTF_8)
-
         val parent = DocumentsContract.buildDocumentUriUsingTree(treeUri, DocumentsContract.getTreeDocumentId(treeUri))
         val dir = DocumentsContract.createDocument(resolver, parent, DocumentsContract.Document.MIME_TYPE_DIR, name)
             ?: error("Could not create the export folder")
@@ -345,18 +338,49 @@ class Repo private constructor(private val context: Context) {
             val doc = DocumentsContract.createDocument(resolver, dir, mime, file) ?: error("Could not create $file")
             resolver.openOutputStream(doc, "w")!!.use { it.write(bytes) }
         }
-        put("manifest.json", "application/json", manifestBytes)
-        put("actions.jsonl", "application/octet-stream", jsonlBytes)
-        put("actions.csv", "text/csv", csvBytes)
-        if (shotFiles.isNotEmpty()) {
-            val screens = DocumentsContract.createDocument(resolver, dir, DocumentsContract.Document.MIME_TYPE_DIR, "screens")
-                ?: error("Could not create screens folder")
-            shotFiles.forEach { (sh, bytes, _) ->
-                val doc = DocumentsContract.createDocument(resolver, screens, "image/png", sh.file!!.removeSuffix(".png"))
-                    ?: error("Could not create ${sh.file}")
-                resolver.openOutputStream(doc, "w")!!.use { it.write(bytes) }
+
+        val exportHash = HashMap<String, String>()
+        var screens: Uri? = null
+        shots.values.sortedBy { it.utcMs }.forEach { sh ->
+            val f = sh.file?.let { File(screensDir(), it) } ?: return@forEach
+            if (!f.exists()) return@forEach
+            if (screens == null) {
+                screens = DocumentsContract.createDocument(resolver, dir, DocumentsContract.Document.MIME_TYPE_DIR, "screens")
+                    ?: error("Could not create screens folder")
             }
+            val doc = DocumentsContract.createDocument(resolver, screens!!, "image/png", f.name.removeSuffix(".png"))
+                ?: error("Could not create ${f.name}")
+            val md = java.security.MessageDigest.getInstance("SHA-256")
+            resolver.openOutputStream(doc, "w")!!.use { out ->
+                f.inputStream().use { inp ->
+                    val buf = ByteArray(64 * 1024)
+                    while (true) {
+                        val n = inp.read(buf); if (n < 0) break
+                        md.update(buf, 0, n); out.write(buf, 0, n)
+                    }
+                }
+            }
+            exportHash[sh.entryId] = md.digest().joinToString("") { "%02x".format(it) }
         }
+
+        val jsonlBytes = jsonl(rows, shots).toByteArray(Charsets.UTF_8)
+        put("actions.jsonl", "application/octet-stream", jsonlBytes)
+        put("actions.csv", "text/csv", Csv.document(rows, shots).toByteArray(Charsets.UTF_8))
+        val shotList = JSONArray(shots.values.sortedBy { it.utcMs }.map { sh ->
+            val now = exportHash[sh.entryId]
+            JSONObject().apply {
+                put("entry_id", sh.entryId); put("file", sh.file ?: JSONObject.NULL); put("status", sh.status)
+                put("sha256_at_capture", sh.sha256 ?: JSONObject.NULL); put("sha256_at_export", now ?: JSONObject.NULL)
+                // A file that was recorded but is missing now counts as a mismatch, not as unknown.
+                put("hash_match", when {
+                    sh.sha256 == null -> JSONObject.NULL
+                    now == null -> false
+                    else -> sh.sha256 == now
+                })
+            }
+        })
+        put("manifest.json", "application/json",
+            manifest(rows, jsonlBytes, s).apply { put("screenshots", shotList) }.toString(2).toByteArray(Charsets.UTF_8))
         return name
     }
 }

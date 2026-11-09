@@ -47,14 +47,14 @@ fun Entry.toJson(shot: Shot? = null): JSONObject = JSONObject().apply {
 /** Parses a rules file: {"version": 1, "rules": [{"id", "package", "view_id", "label_regex", "action", "content", "event", "verified_with"}]}. */
 fun parseRules(text: String): List<Rule> {
     val arr = JSONObject(text).getJSONArray("rules")
-    return (0 until arr.length()).map { i ->
+    return (0 until arr.length()).mapNotNull { i ->
         val o = arr.getJSONObject(i)
         fun opt(k: String): String? = if (o.isNull(k) || !o.has(k)) null else o.getString(k)
         Rule(
             id = o.getString("id"), pkg = o.getString("package"), viewId = opt("view_id"),
             labelRegex = opt("label_regex"), action = o.getString("action"), content = opt("content"),
             verifiedWith = opt("verified_with"), event = opt("event") ?: RuleEvent.TAP,
-        )
+        ).takeIf { r -> r.labelRegex == null || runCatching { Regex(r.labelRegex) }.isSuccess }
     }
 }
 
