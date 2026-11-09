@@ -167,7 +167,14 @@ The APK is in `app/build/outputs/apk/debug/`. Install with `adb install`.
 
 ## Status
 
-Version 0.3.0, Android only. Tested on an Android 15 emulator, not yet on a physical phone. iOS and a
-checker script that reads the export against LEAPP output are planned.
+Version 0.3.0, Android only. Tested on an Android 15 emulator and on a Pixel 7a with Android 17
+(8 November 2026), installed with `adb` into a separate user profile on that phone. On the Pixel:
+- installing with `adb install --user` and turning the service on did not ask for "Allow
+  restricted settings" (an APK installed from a file was not tried)
+- sends in Google Messages (October 2026 build), an incoming call, a missed call, a MARK with its
+  screenshot, an export, the hash chain (41 rows) and the spreadsheet all worked
+- incoming texts showed only "New message" on the phone itself in that profile, and the log
+  recorded the same; message content depends on the profile's notification settings
+- iOS and a checker script that reads the export against LEAPP output are planned.
 
 Author: Alexis Brignoni
