@@ -363,8 +363,9 @@ An inferred action is a guess until someone accepts it.
 ![Check this entry, with the recipient added](manual/check-change-inferred.png)
 
 In the demo, the send rule knew the text of the message but not who it went to. Rules do not fill
-in the counterpart, so it was added with **Change**. Actions inferred by a rule also leave the
-direction empty, and the edit sheet has no direction field.
+in the counterpart, so it was added with **Change**. In 0.3.0, actions inferred by a rule also leave
+the direction empty, and the edit sheet has no direction field. Builds made from the repository after
+0.3.0 write `out` for them, as they do for a hand-logged send.
 
 | Accept all, with Undo | After Undo |
 |---|---|
@@ -674,10 +675,10 @@ a **Device and system** sheet.
 - **Captured events**: every raw event (screens, taps, typed text, cleared fields, notifications,
   marks) with its screenshot link.
 
-In 0.3.0 some rows reach no sheet at all: the export rows, device snapshots, and the
-`app_version_changed_since_last_seen` and `app_data_cleared` rows. The script's Scenario list
-looks for a different name for the version row and does not list the others. They are in
-`actions.csv` and `actions.jsonl`.
+In the 0.3.0 script some rows reach no sheet at all: the export rows, device snapshots, and the
+`app_version_changed_since_last_seen` and `app_data_cleared` rows. Its Scenario list looks for a
+different name for the version row and does not list the others. They are in `actions.csv` and
+`actions.jsonl`. The script in the repository after 0.3.0 lists all of them on the Scenario sheet.
 
 ## 10. The hash chain
 
@@ -738,8 +739,9 @@ noted hash catches it:
 
 ![Last row cut: only the noted hash is missing](manual/sheet-scenario-missing.png)
 
-In 0.3.0 the script prints no warning for a missing noted hash, and it exits with 0 in every case.
-Read the **noted hash** line on the Scenario sheet.
+The 0.3.0 script prints no warning for a missing noted hash, and it exits with 0 in every case, so
+read the **noted hash** line on the Scenario sheet. The script in the repository after 0.3.0 prints a
+`WARNING` for it too, and exits with 1 when any check fails.
 
 ## 11. What KDL does not do
 

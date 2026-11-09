@@ -109,6 +109,15 @@ class ModelTest {
         assertFalse(entry("z", 0, stamp(1, 1), kind = Kind.EXPORT, action = "").needsDetail)
     }
 
+    @Test fun directionFollowsTheAction() {
+        assertEquals("in", directionFor("received_message"))
+        assertEquals("in", directionFor("missed_call"))
+        assertEquals("out", directionFor("sent_message"))   // what the Google Messages rule infers
+        assertEquals("out", directionFor("took_photo"))     // what the AOSP Camera rule infers
+        assertEquals("out", directionFor(" viewed_message ")) // typed actions are trimmed
+        assertEquals(null, directionFor("  "))
+    }
+
     @Test fun sha256KnownVector() {
         assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", sha256Hex("abc".toByteArray()))
     }

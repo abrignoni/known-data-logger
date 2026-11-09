@@ -380,7 +380,7 @@ private fun LogSheet(repo: Repo, key: String, stamp: Stamp, onDone: () -> Unit) 
     var quality by remember { mutableStateOf(TimeQuality.EXACT) }
     var more by remember { mutableStateOf(false) }
     var confirmReset by remember { mutableStateOf(false) }
-    val direction = when (action) { "received_message", "incoming_call", "missed_call", "received_media" -> "in"; "" -> null; else -> "out" }
+    val direction = directionFor(action)
 
     fun draft() = Draft(appPackage = app, action = action.trim(), content = content, counterpart = counterpart,
         direction = direction, conversationId = conversation, timeQuality = quality,

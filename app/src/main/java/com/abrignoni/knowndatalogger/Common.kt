@@ -134,7 +134,7 @@ internal fun EditDialog(repo: Repo, e: Entry, shot: Shot?, onDone: () -> Unit) {
         if (labellingMark || rawEvent) {
             if (action.isBlank()) { toast(ctx, "Pick or type an action first"); return }
             repo.log(Draft(appPackage = e.appPackage, action = action.trim(), content = content, counterpart = counterpart,
-                conversationId = conversation, timeQuality = quality, expectedArtifacts = expectedList(), detail = note,
+                direction = directionFor(action), conversationId = conversation, timeQuality = quality, expectedArtifacts = expectedList(), detail = note,
                 refersTo = e.entryId, source = if (labellingMark) Source.MARK else Source.MANUAL), stamp = e.stamp, detect = false)
             val src = teachSource
             if (teach && src != null) {
@@ -162,7 +162,8 @@ internal fun EditDialog(repo: Repo, e: Entry, shot: Shot?, onDone: () -> Unit) {
         } else {
             repo.revise(e, Draft(
                 appPackage = e.appPackage, action = action.trim(), content = content, counterpart = counterpart,
-                direction = e.direction, conversationId = conversation, timeQuality = quality,
+                // Rows inferred before directions were set on rule matches have none; fill it from the action.
+                direction = e.direction ?: directionFor(action), conversationId = conversation, timeQuality = quality,
                 expectedArtifacts = expectedList(), detail = note,
             ))
         }
