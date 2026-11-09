@@ -252,7 +252,7 @@ class Repo private constructor(private val context: Context) {
         return saved
     }
 
-    /** The newest row's hash, shown on the Export screen so the tester can note it. */
+    /** The newest row's hash, shown on the Setup tab ("Latest row hash") so the tester can note it. */
     fun lastRowHash(): String? { ensureChain(); return lastHash?.ifEmpty { null } }
 
     fun liveFile(): File = File(context.getExternalFilesDir(null) ?: context.filesDir, "actions-live.jsonl")

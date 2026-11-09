@@ -74,8 +74,8 @@ group summaries are ignored, and the same notification re-posted within 60 secon
 Tried on an Android 15 emulator (8 November 2026) with an SMS and a call sent from the emulator
 console.
 
-Notifications can carry one-time codes. By default ("Withhold codes in notifications" on the
-Capture tab), any run of 4 to 8 digits in text that mentions a code, OTP, PIN or verification is
+Notifications can carry one-time codes. By default ("Hide verification codes" on the
+Setup tab), any run of 4 to 8 digits in text that mentions a code, OTP, PIN or verification is
 replaced with `[code withheld]`, in notifications, screen titles and tap labels. On the emulator,
 an SMS code was absent from the database file and the live copy afterwards. Codes in other wording
 are not caught, so keep real accounts off test phones.
@@ -116,13 +116,15 @@ last one the log accounted for is flagged once.
 
 Every row carries `prev_hash` and `row_hash`: a SHA-256 over the row's fields and the previous
 row's hash. Changing, removing or reordering a row breaks every hash after it, and
-`make_documentation.py` checks the whole chain. The Export screen shows the newest row's hash;
+`make_documentation.py` checks the whole chain. The Setup tab shows the newest row's hash ("Latest
+row hash");
 write it in your documentation, because someone who rewrites the whole chain can only be caught
 against a copy of a hash kept somewhere else. Check it later with
 `make_documentation.py ... --expect-hash <hash>`: the Scenario sheet says whether it is still in the
 chain and where. The generator also warns when its own chain check and the app's (recorded in the
-manifest at export) disagree. Rows written before 0.3 are hashed the first time the upgraded app
-writes a row or shows the Export screen, and a `hash_chain_backfilled` row says so.
+manifest at export) disagree. Every failed check, a missing noted hash included, prints a `WARNING`
+line and makes the script exit with status 1. Rows written before 0.3 are hashed the first time the upgraded app
+writes a row or opens the Setup tab, and a `hash_chain_backfilled` row says so.
 
 For full video, record from a Mac over USB with `scrcpy --record` so nothing is written to the
 phone, and line it up with the log using the network time column.
