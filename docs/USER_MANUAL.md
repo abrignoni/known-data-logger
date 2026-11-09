@@ -183,7 +183,7 @@ Both go into every row of the log and into the export folder's name.
 
 ### Step 2: Pick apps
 
-![Pick apps with Camera, Messages and Phone ticked](manual/firstrun-2-pick-apps.png)
+![Pick apps with Camera and Messages ticked and a dash in Check all](manual/firstrun-2-pick-apps.png)
 
 Tick the apps under test. The list shows apps with a launcher icon, without KDL itself. Capture
 records only the apps you tick, plus System UI and Settings, which are always captured. **Check
