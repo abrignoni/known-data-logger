@@ -1,0 +1,113 @@
+{
+  "note": "Copied byte for byte from the upstream commit named per file. Fix upstream and copy again; test_kdl_vendor.py re-hashes these files.",
+  "vendored": [
+    {
+      "path": "sqlite_wal.py",
+      "upstream": "https://github.com/abrignoni/sqlite-wal",
+      "upstream_file": "sqlite_wal/__init__.py",
+      "commit": "8f9a00db3ee31c51d9197dfbb4f92a2f97d4f7f3",
+      "licence": "MIT",
+      "licence_file": "LICENSE-sqlite-wal",
+      "sha256": "20d1c3789795c25d442316adcc2b151e4464339de86ff71d015f35e39e79fbff"
+    },
+    {
+      "path": "mmkv_parser.py",
+      "upstream": "https://github.com/abrignoni/mmkv-parser",
+      "upstream_file": "mmkv_parser/__init__.py",
+      "commit": "05deada3d8f93000c85f4bc399b6c6f463c13e68",
+      "licence": "MIT",
+      "licence_file": "LICENSE-mmkv-parser",
+      "sha256": "094c95f38b5759d579bc2bb223dcc329f0aea5ffb7a122ef4af8fb5f6baf5af1"
+    },
+    {
+      "path": "ccl/__init__.py",
+      "upstream": "https://github.com/abrignoni/DLEAPP",
+      "upstream_file": "scripts/vendor/ccl/__init__.py",
+      "commit": "4d1d07f1a4d28c0437579b8a0ea513a29041d929",
+      "licence": "MIT",
+      "licence_file": "LICENSE-ccl_chromium_reader",
+      "note": "DLEAPP's vendored copy of cclgroupltd/ccl_chromium_reader. Its per-file upstream pins are in DLEAPP scripts/vendor/vendored.json; ccl_leveldb.py and ccl_chromium_indexeddb.py carry DLEAPP's local changes.",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "ccl/ccl_blink_value_deserializer.py",
+      "upstream": "https://github.com/abrignoni/DLEAPP",
+      "upstream_file": "scripts/vendor/ccl/ccl_blink_value_deserializer.py",
+      "commit": "4d1d07f1a4d28c0437579b8a0ea513a29041d929",
+      "licence": "MIT",
+      "licence_file": "LICENSE-ccl_chromium_reader",
+      "note": "DLEAPP's vendored copy of cclgroupltd/ccl_chromium_reader. Its per-file upstream pins are in DLEAPP scripts/vendor/vendored.json; ccl_leveldb.py and ccl_chromium_indexeddb.py carry DLEAPP's local changes.",
+      "sha256": "8ea1dff48e1fc176a6d43312e6255c6d7fc6fa6f9341c682fc2c21c8dca54093"
+    },
+    {
+      "path": "ccl/ccl_chromium_indexeddb.py",
+      "upstream": "https://github.com/abrignoni/DLEAPP",
+      "upstream_file": "scripts/vendor/ccl/ccl_chromium_indexeddb.py",
+      "commit": "4d1d07f1a4d28c0437579b8a0ea513a29041d929",
+      "licence": "MIT",
+      "licence_file": "LICENSE-ccl_chromium_reader",
+      "note": "DLEAPP's vendored copy of cclgroupltd/ccl_chromium_reader. Its per-file upstream pins are in DLEAPP scripts/vendor/vendored.json; ccl_leveldb.py and ccl_chromium_indexeddb.py carry DLEAPP's local changes.",
+      "sha256": "4450361eedadec1882c83d66c08626f4a4239317d15bc291de27c8e5904643ca"
+    },
+    {
+      "path": "ccl/ccl_leveldb.py",
+      "upstream": "https://github.com/abrignoni/DLEAPP",
+      "upstream_file": "scripts/vendor/ccl/ccl_leveldb.py",
+      "commit": "4d1d07f1a4d28c0437579b8a0ea513a29041d929",
+      "licence": "MIT",
+      "licence_file": "LICENSE-ccl_chromium_reader",
+      "note": "DLEAPP's vendored copy of cclgroupltd/ccl_chromium_reader. Its per-file upstream pins are in DLEAPP scripts/vendor/vendored.json; ccl_leveldb.py and ccl_chromium_indexeddb.py carry DLEAPP's local changes.",
+      "sha256": "79aa5a5c27c7e56d6780a553298f9b8d9f7e49a5bb74667cc42704cdfece418f"
+    },
+    {
+      "path": "ccl/ccl_simplesnappy.py",
+      "upstream": "https://github.com/abrignoni/DLEAPP",
+      "upstream_file": "scripts/vendor/ccl/ccl_simplesnappy.py",
+      "commit": "4d1d07f1a4d28c0437579b8a0ea513a29041d929",
+      "licence": "MIT",
+      "licence_file": "LICENSE-ccl_chromium_reader",
+      "note": "DLEAPP's vendored copy of cclgroupltd/ccl_chromium_reader. Its per-file upstream pins are in DLEAPP scripts/vendor/vendored.json; ccl_leveldb.py and ccl_chromium_indexeddb.py carry DLEAPP's local changes.",
+      "sha256": "74bbf5c1e8ebdaf09ad9bfd98a7a335d57dc4ac648cc9aede59932c40ddc4170"
+    },
+    {
+      "path": "ccl/ccl_v8_value_deserializer.py",
+      "upstream": "https://github.com/abrignoni/DLEAPP",
+      "upstream_file": "scripts/vendor/ccl/ccl_v8_value_deserializer.py",
+      "commit": "4d1d07f1a4d28c0437579b8a0ea513a29041d929",
+      "licence": "MIT",
+      "licence_file": "LICENSE-ccl_chromium_reader",
+      "note": "DLEAPP's vendored copy of cclgroupltd/ccl_chromium_reader. Its per-file upstream pins are in DLEAPP scripts/vendor/vendored.json; ccl_leveldb.py and ccl_chromium_indexeddb.py carry DLEAPP's local changes.",
+      "sha256": "73f6c91c6573a8ab355f4770d04c288cd9a88797754c72353a22b382efb02d66"
+    },
+    {
+      "path": "ccl/common.py",
+      "upstream": "https://github.com/abrignoni/DLEAPP",
+      "upstream_file": "scripts/vendor/ccl/common.py",
+      "commit": "4d1d07f1a4d28c0437579b8a0ea513a29041d929",
+      "licence": "MIT",
+      "licence_file": "LICENSE-ccl_chromium_reader",
+      "note": "DLEAPP's vendored copy of cclgroupltd/ccl_chromium_reader. Its per-file upstream pins are in DLEAPP scripts/vendor/vendored.json; ccl_leveldb.py and ccl_chromium_indexeddb.py carry DLEAPP's local changes.",
+      "sha256": "40f1a29e9d67867b27e6b43fcb7fafef99c48fc7b47b7eef85ff92fdfd9c3407"
+    },
+    {
+      "path": "ccl/profile_folder_protocols.py",
+      "upstream": "https://github.com/abrignoni/DLEAPP",
+      "upstream_file": "scripts/vendor/ccl/profile_folder_protocols.py",
+      "commit": "4d1d07f1a4d28c0437579b8a0ea513a29041d929",
+      "licence": "MIT",
+      "licence_file": "LICENSE-ccl_chromium_reader",
+      "note": "DLEAPP's vendored copy of cclgroupltd/ccl_chromium_reader. Its per-file upstream pins are in DLEAPP scripts/vendor/vendored.json; ccl_leveldb.py and ccl_chromium_indexeddb.py carry DLEAPP's local changes.",
+      "sha256": "db53a14e618f033369aff3122f76063097e24cfa7ae69e67f42d833e2054df21"
+    },
+    {
+      "path": "ccl/structures.py",
+      "upstream": "https://github.com/abrignoni/DLEAPP",
+      "upstream_file": "scripts/vendor/ccl/structures.py",
+      "commit": "4d1d07f1a4d28c0437579b8a0ea513a29041d929",
+      "licence": "MIT",
+      "licence_file": "LICENSE-ccl_chromium_reader",
+      "note": "DLEAPP's vendored copy of cclgroupltd/ccl_chromium_reader. Its per-file upstream pins are in DLEAPP scripts/vendor/vendored.json; ccl_leveldb.py and ccl_chromium_indexeddb.py carry DLEAPP's local changes.",
+      "sha256": "b72b124bedb12d0b7cf8a3886c57cb362559c66db26d80a41edc036ec3d251e8"
+    }
+  ]
+}
