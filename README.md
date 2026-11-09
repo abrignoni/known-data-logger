@@ -188,6 +188,12 @@ builder's own `~/.gradle/gradle.properties` (never in the repo): `KDL_RELEASE_ST
 the build produces `app-release-unsigned.apk`. Updates only install over a copy signed with the same
 key, so keep the keystore and its password backed up.
 
+The package name `com.abrignoni.knowndatalogger` is registered with Google's Android developer
+verification (Android Developer Console, 9 November 2026) for the release key with SHA-256
+certificate fingerprint `AB:95:75:15:93:8E:78:24:7C:AA:26:A3:74:7E:7E:42:9B:4A:6B:D7:66:85:4A:8F:DF:3A:A8:92:9B:B5:0F:AF`.
+APKs signed with that key stay installable on certified Android devices when verification is
+enforced. Debug builds are signed with a different key and are meant for `adb` installs.
+
 ## Status
 
 Version 0.3.0, Android only. Tested on an Android 15 emulator and on a Pixel 7a with Android 17
