@@ -32,6 +32,8 @@ class CaptureService : AccessibilityService() {
     private var rules: List<Rule> = emptyList()
     private var mark: View? = null
     private var lastScreen: Pair<String, String>? = null
+    /** Last app seen in the foreground, ignoring System UI (status bar and shade events come between app and mark). */
+    private var lastApp: String? = null
 
     override fun onServiceConnected() {
         repo = Repo.get(this)
@@ -269,6 +271,7 @@ class CaptureService : AccessibilityService() {
         if (key == lastScreen) return
         if (lastScreen?.first != pkg) text.forgetLast()
         lastScreen = key
+        if (pkg != SYSTEM_UI) lastApp = pkg
         flushText()
         repo.log(Draft(appPackage = pkg, action = AutoAction.SCREEN, content = title,
             detail = event.className?.let { "class $it" }, source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT)
@@ -312,7 +315,7 @@ class CaptureService : AccessibilityService() {
     private fun onMark() {
         flushText()
         // The mark carries the app that was last seen in the foreground, so its label lands on that app.
-        val row = repo.log(Draft(appPackage = lastScreen?.first, action = AutoAction.MARK, source = Source.MARK),
+        val row = repo.log(Draft(appPackage = lastApp ?: lastScreen?.first, action = AutoAction.MARK, source = Source.MARK),
             kind = Kind.AUTO_EVENT).last()
         screenshot(row.entryId)
     }
@@ -415,6 +418,8 @@ class CaptureService : AccessibilityService() {
     }
 
     companion object {
+        const val SYSTEM_UI = "com.android.systemui"
+
         /** The running service, if enabled, so the app can start or stop a session. */
         @Volatile var instance: CaptureService? = null
     }
