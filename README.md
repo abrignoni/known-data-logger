@@ -180,6 +180,14 @@ python3 -m unittest discover -s tools
 
 The APK is in `app/build/outputs/apk/debug/`. Install with `adb install`.
 
+### Release builds
+
+`./gradlew assembleRelease` signs with the release key when these four settings are in the
+builder's own `~/.gradle/gradle.properties` (never in the repo): `KDL_RELEASE_STORE_FILE`,
+`KDL_RELEASE_STORE_PASSWORD`, `KDL_RELEASE_KEY_ALIAS` and `KDL_RELEASE_KEY_PASSWORD`. Without them
+the build produces `app-release-unsigned.apk`. Updates only install over a copy signed with the same
+key, so keep the keystore and its password backed up.
+
 ## Status
 
 Version 0.3.0, Android only. Tested on an Android 15 emulator and on a Pixel 7a with Android 17

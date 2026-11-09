@@ -17,9 +17,30 @@ android {
         versionName = "0.3.0"
     }
 
+    // Release signing reads the keystore from the builder's own ~/.gradle/gradle.properties, never
+    // from the repo. Without those four settings a release build comes out unsigned
+    // (app-release-unsigned.apk), never signed with the debug key.
+    val storeFile = providers.gradleProperty("KDL_RELEASE_STORE_FILE").orNull
+    val storePassword = providers.gradleProperty("KDL_RELEASE_STORE_PASSWORD").orNull
+    val keyAlias = providers.gradleProperty("KDL_RELEASE_KEY_ALIAS").orNull
+    val keyPassword = providers.gradleProperty("KDL_RELEASE_KEY_PASSWORD").orNull
+    val canSign = listOf(storeFile, storePassword, keyAlias, keyPassword).all { !it.isNullOrBlank() }
+    signingConfigs {
+        if (canSign) create("release") {
+            this.storeFile = file(storeFile!!)
+            this.storePassword = storePassword
+            this.keyAlias = keyAlias
+            this.keyPassword = keyPassword
+            enableV1Signing = false
+            enableV2Signing = true
+            enableV3Signing = true
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (canSign) signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
