@@ -89,6 +89,41 @@ def pending_review(cur):
     return out
 
 
+def capture_pauses(cur):
+    """Pairs each capture_service_disconnected with the next capture_service_connected, in device order.
+
+    Returns (pauses, unexplained): pauses are (start_row, end_row or None, seconds or None);
+    seconds is None when the pause spans a reboot (elapsed time restarts). start_row carries
+    _in_session: whether a capture session was running when the pause began (only then can a
+    pause hide actions). unexplained counts
+    reconnects with no recorded disconnect before them, other than the first connect and the
+    first connect after each reboot (the process was stopped without the system telling the app).
+    """
+    pauses, start, unexplained, seen_boot = [], None, 0, set()
+    session = False
+    for r in cur:
+        if r["action"] == "capture_session_start":
+            session = True
+        elif r["action"] == "capture_session_stop":
+            session = False
+        elif r["action"] == "capture_service_disconnected":
+            if start is None:
+                start = dict(r, _in_session=session)
+        elif r["action"] == "capture_service_connected":
+            if start is not None:
+                secs = None
+                if start["boot_count"] == r["boot_count"]:
+                    secs = round((r["elapsed_ms"] - start["elapsed_ms"]) / 1000, 1)
+                pauses.append((start, r, secs))
+                start = None
+            elif r["boot_count"] in seen_boot:
+                unexplained += 1
+            seen_boot.add(r["boot_count"])
+    if start is not None:
+        pauses.append((start, None, None))
+    return pauses, unexplained
+
+
 def local_time(r):
     off = timedelta(minutes=r["tz_offset_min"])
     t = datetime.fromtimestamp(r["utc_ms"] / 1000, tz=timezone.utc).astimezone(timezone(off))
@@ -167,9 +202,31 @@ def build(exports, out_path):
                   ("Profile snapshots", len(m.get("profiles") or []))]
         for name, result in e["checks"]:
             lines.append((f"Check: {name}", result))
-        for r in current(e["rows"]):
+        cur = current(e["rows"])
+        pauses, unexplained = capture_pauses(cur)
+        timed = [p[2] for p in pauses if p[2] is not None]
+        open_ended = sum(1 for p in pauses if p[1] is None)
+        across_boot = sum(1 for p in pauses if p[1] is not None and p[2] is None)
+        in_session = [p for p in pauses if p[0]["_in_session"]]
+        timed_in = [p[2] for p in in_session if p[2] is not None]
+        summary = f"{len(in_session)} pause(s) during a capture session"
+        if timed_in:
+            summary += f" ({sum(timed_in):.1f} s in total, longest {max(timed_in):.1f} s)"
+        summary += f"; {len(pauses)} in all"
+        if timed:
+            summary += f" ({sum(timed):.1f} s, longest {max(timed):.1f} s)"
+        notes = []
+        if open_ended:
+            notes.append(f"{open_ended} not reconnected")
+        if across_boot:
+            notes.append(f"{across_boot} across a reboot")
+        if unexplained:
+            notes.append(f"{unexplained} reconnect(s) with no recorded disconnect")
+        if notes:
+            summary += "; " + ", ".join(notes)
+        lines.append(("Capture pauses", summary + (" (listed on the Capture pauses sheet)" if pauses or unexplained else "")))
+        for r in cur:
             if r["kind"] == "clock_change" or r["action"] in ("boot_detected", "capture_session_start", "capture_session_stop",
-                                                              "capture_service_disconnected", "capture_service_connected",
                                                               "export_failed"):
                 d, t, off = local_time(r)
                 lines.append((f"{d} {t} {off}", f"{r['action']}: {r.get('detail') or ''}".strip(": ")))
@@ -226,6 +283,22 @@ def build(exports, out_path):
                 c = ws.cell(row=i, column=col)
                 c.hyperlink = target
                 c.font = Font(color="0563C1", underline="single")
+
+    pause_rows = []
+    for e in exports:
+        dev = e["manifest"].get("device_label", "")
+        for start, end, secs in capture_pauses(current(e["rows"]))[0]:
+            d, t, off = local_time(start)
+            end_t = local_time(end)[1] if end else None
+            note = None
+            if end is None:
+                note = "no reconnect recorded before the export"
+            elif secs is None:
+                note = "spans a reboot; length unknown"
+            pause_rows.append([dev, d, t, end_t, off, secs, "yes" if start["_in_session"] else "no", note])
+    ws = wb.create_sheet(sheet_name("Capture pauses", used))
+    write_table(ws, ["Device", "Date", "Paused at", "Resumed at", "UTC offset", "Length (s)", "During a session", "Note"],
+                pause_rows)
 
     ws = wb.create_sheet(sheet_name("Needs review", used))
     write_table(ws, ["Device", "Date", "Time", "UTC offset", "Action", "Source", "Why", "Content", "Entry id"], review_rows)

@@ -101,7 +101,9 @@ python3 tools/make_documentation.py kdl_scenario_phoneA_... kdl_scenario_phoneB_
 ```
 
 Give it every phone's export for one scenario. It writes a Scenario sheet (devices, detected clock
-changes, reboots and capture pauses, hash checks), an Apps sheet, one sheet per app with each
+changes and reboots, hash checks, and one summary line of capture pauses: how many happened during
+a capture session, which is when a pause can hide actions, and how long they lasted), a Capture
+pauses sheet with each pause's start, end and length, an Apps sheet, one sheet per app with each
 action and a link to its screenshot (a label made from a mark links the mark's screenshot), a
 Needs review sheet and a Captured events sheet. Rows are grouped by device in each device's own
 order (boot count, then time since boot), which stays right across clock changes. Needs

@@ -105,6 +105,38 @@ class DocTest(unittest.TestCase):
         ev = list(wb["Captured events"].iter_rows(min_row=2, values_only=True))
         self.assertTrue(ev[0][8].endswith("s1.png"))
 
+    def test_capture_pauses_are_paired_and_summarized(self):
+        sys_row = dict(kind="system_event", source="system", app_package=None)
+        rows = [row(1, "c1", "capture_service_connected", elapsed_ms=100, **sys_row),
+                row(10, "s1", "capture_session_start", elapsed_ms=500, **sys_row),
+                row(2, "d1", "capture_service_disconnected", elapsed_ms=1000, **sys_row),
+                row(3, "c2", "capture_service_connected", elapsed_ms=2500, **sys_row),
+                row(11, "s2", "capture_session_stop", elapsed_ms=2800, **sys_row),
+                row(4, "d2", "capture_service_disconnected", elapsed_ms=3000, **sys_row),
+                row(5, "c3", "capture_service_connected", elapsed_ms=3500, **sys_row),
+                row(6, "c4", "capture_service_connected", elapsed_ms=4000, **sys_row),   # killed, no disconnect
+                row(7, "d3", "capture_service_disconnected", elapsed_ms=5000, **sys_row),
+                row(8, "c5", "capture_service_connected", elapsed_ms=50, boot_count=3, **sys_row),  # after reboot
+                row(9, "d4", "capture_service_disconnected", elapsed_ms=90, boot_count=3, **sys_row)]
+        pauses, unexplained = md.capture_pauses(md.current(rows))
+        self.assertEqual([1.5, 0.5, None, None], [p[2] for p in pauses])
+        self.assertIsNone(pauses[3][1])
+        self.assertEqual(1, unexplained)
+        self.assertEqual([True, False, False, False], [p[0]["_in_session"] for p in pauses])
+        d = make_export(self.tmp, rows)
+        out = os.path.join(self.tmp, "p.xlsx")
+        md.build([md.load_export(d)], out)
+        wb = load_workbook(out)
+        summary = [r[1] for r in wb["Scenario"].iter_rows(values_only=True) if r[0] == "Capture pauses"][0]
+        self.assertTrue(summary.startswith("1 pause(s) during a capture session (1.5 s in total, longest 1.5 s); "
+                                           "4 in all (2.0 s, longest 1.5 s)"), summary)
+        self.assertIn("1 not reconnected", summary)
+        self.assertIn("1 across a reboot", summary)
+        self.assertIn("1 reconnect(s) with no recorded disconnect", summary)
+        scen = [str(r[1] or "") for r in wb["Scenario"].iter_rows(values_only=True)]
+        self.assertFalse(any(v.startswith("capture_service") for v in scen))
+        self.assertEqual(4, wb["Capture pauses"].max_row - 1)
+
     def test_sheet_names_are_valid_and_unique(self):
         used = set()
         self.assertEqual("a_b", md.sheet_name("a/b", used))
