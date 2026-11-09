@@ -62,7 +62,12 @@ class CaptureService : AccessibilityService() {
     private var pkgs: Set<String> = emptySet()
     /** Fields seen as password fields this session; they stay withheld even if shown as plain text. */
     private val secretKeys = HashSet<String>()
-    /** Recent notifications (key to elapsed ms), so a re-post within 60 s is logged once. */
+    /**
+     * Recent notifications (key to elapsed ms), so a re-post of the same notification within 60 s is
+     * logged once. The key includes the notification's own post time (Notification.when): two
+     * messages whose shown text is identical (for example "New message" when content is hidden)
+     * are still two notifications.
+     */
     private val seenNotifications = LinkedHashMap<String, Long>()
     private var maskCodes = true
     /** Version of each captured app when the session started or last changed. */
@@ -294,7 +299,7 @@ class CaptureService : AccessibilityService() {
         val callType = if (Build.VERSION.SDK_INT >= 31 && extras.containsKey(android.app.Notification.EXTRA_CALL_TYPE))
             extras.getInt(android.app.Notification.EXTRA_CALL_TYPE) else null
         val now = android.os.SystemClock.elapsedRealtime()
-        val key = "$pkg|$title|$body|$category|$callType"
+        val key = "$pkg|$title|$body|$category|$callType|${n.`when`}"
         val last = seenNotifications[key]
         if (last != null && now - last < 60_000) return
         seenNotifications.remove(key); seenNotifications[key] = now
