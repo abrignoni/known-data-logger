@@ -263,12 +263,13 @@ enforced. Debug builds are signed with a different key and are meant for `adb` i
 it also builds the signed APK in the `release` environment (owner approval, `v*` tags only, the
 keystore and passwords stored as that environment's secrets), checks the version against the tag
 and the signer against the fingerprint above, and creates a draft release with `KDL-<version>.apk`
-and `SHA256SUMS`. Version 0.3.0 was built and signed on the author's computer; the signed path of
-the workflow has not run yet.
+and `SHA256SUMS`. Version 0.3.0 was built and signed on the author's computer; later versions are
+built and signed by this workflow.
 
 ## Status
 
-Version 0.3.0, Android only. Tested on an Android 15 emulator and on a Pixel 7a with Android 17
+Version 0.3.1, Android only. Tested, with 0.3.0 and earlier builds, on an Android 15 emulator and
+on a Pixel 7a with Android 17
 (8 November 2026), installed with `adb` into a separate user profile on that phone. On the Pixel:
 - installing with `adb install --user` and turning the service on did not ask for "Allow
   restricted settings"; installing the same APK from the Files app did (Android recorded it as a
