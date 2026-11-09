@@ -58,11 +58,13 @@ class Db(context: Context) : SQLiteOpenHelper(context, NAME, null, SCHEMA_VERSIO
         )
         db.execSQL("CREATE INDEX entries_entry_id ON entries(entry_id)")
         upgradeTo2(db)
+        upgradeTo3(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         // Migrations only add; they never drop or rewrite data.
         if (oldVersion < 2) upgradeTo2(db)
+        if (oldVersion < 3) upgradeTo3(db)
     }
 
     /** Schema 2: row source, review flag, screenshots. Existing rows become manual and reviewed. */
@@ -74,6 +76,17 @@ class Db(context: Context) : SQLiteOpenHelper(context, NAME, null, SCHEMA_VERSIO
                 entry_id TEXT PRIMARY KEY, file TEXT, sha256 TEXT, status TEXT NOT NULL,
                 utc_ms INTEGER NOT NULL)"""
         )
+    }
+
+    /** Schema 3: hash chain columns. Rows written before it are hashed by Repo on first use. */
+    private fun upgradeTo3(db: SQLiteDatabase) {
+        db.execSQL("ALTER TABLE entries ADD COLUMN prev_hash TEXT")
+        db.execSQL("ALTER TABLE entries ADD COLUMN row_hash TEXT")
+    }
+
+    fun setHash(seq: Long, prev: String, row: String) {
+        writableDatabase.update("entries", ContentValues().apply { put("prev_hash", prev); put("row_hash", row) },
+            "seq=?", arrayOf(seq.toString()))
     }
 
     fun insert(e: Entry): Long {
@@ -121,6 +134,7 @@ class Db(context: Context) : SQLiteOpenHelper(context, NAME, null, SCHEMA_VERSIO
             direction = str("direction"), conversationId = str("conversation_id"), refersTo = str("refers_to"),
             expectedArtifacts = (0 until arts.length()).map { arts.getString(it) }, detail = str("detail"),
             source = str("source") ?: Source.MANUAL, reviewed = (long("reviewed") ?: 1L) != 0L,
+            prevHash = str("prev_hash"), rowHash = str("row_hash"),
         )
     }
 

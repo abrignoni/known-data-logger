@@ -15,6 +15,7 @@ Requires openpyxl.
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
 import sys
@@ -34,6 +35,40 @@ ACTION_COLUMNS = [
 ]
 
 
+# Packages the logger always captures, which are not in the apps-under-test list.
+BUILTIN_LABELS = {"com.android.settings": "Settings", "com.android.systemui": "System UI"}
+
+CHAIN_FIELDS = [
+    "account", "action", "app_package", "app_version", "boot_count", "content", "conversation_id", "counterpart",
+    "detail", "device_label", "direction", "edited_utc_ms", "elapsed_ms", "entry_id", "expected_artifacts",
+    "gnss_time_ms", "kind", "network_time_ms", "prev_hash", "profile_id", "refers_to", "revision_n", "reviewed",
+    "scenario_id", "seq", "source", "time_quality", "tz_id", "tz_offset_min", "utc_ms",
+]
+
+
+def chain_canonical(r):
+    """The exact text the app hashes for a row (see Chain in Model.kt)."""
+    d = {k: r.get(k) for k in CHAIN_FIELDS}
+    w = r.get("window_s")
+    d["window_ms"] = None if w is None else int(math.floor(w * 1000 + 0.5))  # Java Math.round
+    return json.dumps(d, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
+def verify_chain(rows):
+    """Returns (status, first_bad_seq). Exports from before 0.3 carry no hashes."""
+    ordered = sorted(rows, key=lambda r: r["seq"])
+    if not ordered or all(r.get("row_hash") is None for r in ordered):
+        return "not present (export from before 0.3)", None
+    prev = ""
+    for r in ordered:
+        if r.get("prev_hash") != prev:
+            return f"BROKEN at seq {r['seq']}: previous-hash link does not match", r["seq"]
+        if hashlib.sha256(chain_canonical(r).encode("ascii")).hexdigest() != r.get("row_hash"):
+            return f"BROKEN at seq {r['seq']}: row content does not match its hash", r["seq"]
+        prev = r["row_hash"]
+    return f"intact, {len(ordered)} rows, last hash {prev}", None
+
+
 def load_export(folder):
     """Reads one export. Returns a dict with the manifest, all rows and check results."""
     with open(os.path.join(folder, "manifest.json"), encoding="utf-8") as f:
@@ -45,6 +80,13 @@ def load_export(folder):
     want = manifest.get("files", {}).get("actions.jsonl", {}).get("sha256")
     got = hashlib.sha256(raw).hexdigest()
     checks.append(("actions.jsonl sha256", "match" if want == got else f"MISMATCH (manifest {want}, file {got})"))
+    status, _ = verify_chain(rows)
+    hc = manifest.get("hash_chain") or {}
+    if hc and rows and status.startswith("intact"):
+        last = max(rows, key=lambda r: r["seq"])
+        if hc.get("last_row_hash") != last.get("row_hash") or hc.get("rows") != len(rows):
+            status = "MISMATCH with manifest: rows were added or removed after the manifest was written"
+    checks.append(("hash chain", status))
     shots = {}
     for s in manifest.get("screenshots", []):
         # Only the base name is used, so a manifest cannot point outside screens/.
@@ -186,6 +228,9 @@ def build(exports, out_path):
     ws.title = sheet_name("Scenario", used)
 
     scenario_ids = sorted({e["manifest"].get("scenario_id", "") for e in exports})
+    labels_by_pkg = dict(BUILTIN_LABELS)
+    labels_by_pkg.update({a["package"]: a.get("label") or a["package"]
+                          for e in exports for a in e["manifest"].get("apps_under_test", [])})
     lines = [("Scenario", ", ".join(scenario_ids)), ("Generated (UTC)", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))]
     if len(scenario_ids) > 1:
         lines.append(("Warning", "exports come from different scenario ids"))
@@ -226,10 +271,14 @@ def build(exports, out_path):
             summary += "; " + ", ".join(notes)
         lines.append(("Capture pauses", summary + (" (listed on the Capture pauses sheet)" if pauses or unexplained else "")))
         for r in cur:
-            if r["kind"] == "clock_change" or r["action"] in ("boot_detected", "capture_session_start", "capture_session_stop",
-                                                              "export_failed"):
+            if r["kind"] == "clock_change" or r["action"] in (
+                    "boot_detected", "capture_session_start", "capture_session_stop", "export_failed",
+                    "app_installed", "app_updated", "app_removed", "app_version_changed_since_added",
+                    "rule_taught", "rule_removed", "hash_chain_backfilled"):
                 d, t, off = local_time(r)
-                lines.append((f"{d} {t} {off}", f"{r['action']}: {r.get('detail') or ''}".strip(": ")))
+                app = labels_by_pkg.get(r.get("app_package"), r.get("app_package"))
+                text = f"{r['action']}{' (' + app + ')' if app else ''}: {r.get('detail') or ''}".strip(": ")
+                lines.append((f"{d} {t} {off}", text))
     for i, (k, v) in enumerate(lines, 1):
         ws.cell(row=i, column=1, value=k).font = Font(bold=bool(k) and not k[:1].isdigit())
         text_cell(ws, i, 2, v)
@@ -239,7 +288,7 @@ def build(exports, out_path):
     # Apps under test
     ws = wb.create_sheet(sheet_name("Apps", used))
     app_rows = []
-    labels = {}
+    labels = dict(BUILTIN_LABELS)
     for e in exports:
         for a in e["manifest"].get("apps_under_test", []):
             labels.setdefault(a["package"], a.get("label") or a["package"])
@@ -326,7 +375,7 @@ def main(argv=None):
     print("Sheets: " + ", ".join(info["sheets"]))
     for e in exports:
         for name, result in e["checks"]:
-            if "MISMATCH" in result or "missing" in result:
+            if "MISMATCH" in result or "missing" in result or "BROKEN" in result:
                 print(f"WARNING {os.path.basename(e['folder'])}: {name}: {result}")
 
 

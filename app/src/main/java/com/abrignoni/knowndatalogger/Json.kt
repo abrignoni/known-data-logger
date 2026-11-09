@@ -39,6 +39,8 @@ fun Entry.toJson(shot: Shot? = null): JSONObject = JSONObject().apply {
     put("detail", detail.orNull())
     put("source", source)
     put("reviewed", reviewed)
+    put("prev_hash", prevHash.orNull())
+    put("row_hash", rowHash.orNull())
     put("screenshot", shot?.let {
         JSONObject().apply { put("file", it.file.orNull()); put("sha256", it.sha256.orNull()); put("status", it.status) }
     }.orNull())
@@ -63,3 +65,16 @@ fun jsonl(rows: List<Entry>, shots: Map<String, Shot> = emptyMap()): String =
     rows.sortedBy { it.seq }.joinToString("") {
         it.toJson(if (it.revisionN == 0) shots[it.entryId] else null).toString() + "\n"
     }
+
+/** Writes rules in the same format parseRules reads. */
+fun rulesToJson(rules: List<Rule>): String = JSONObject().apply {
+    put("version", 1)
+    put("rules", JSONArray(rules.map { r ->
+        JSONObject().apply {
+            put("id", r.id); put("package", r.pkg); put("event", r.event)
+            put("view_id", r.viewId ?: JSONObject.NULL); put("label_regex", r.labelRegex ?: JSONObject.NULL)
+            put("action", r.action); put("content", r.content ?: JSONObject.NULL)
+            put("verified_with", r.verifiedWith ?: JSONObject.NULL)
+        }
+    }))
+}.toString(2)

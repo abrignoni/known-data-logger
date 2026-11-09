@@ -137,6 +137,45 @@ class DocTest(unittest.TestCase):
         self.assertFalse(any(v.startswith("capture_service") for v in scen))
         self.assertEqual(4, wb["Capture pauses"].max_row - 1)
 
+    def test_chain_vector_matches_kotlin(self):
+        r = {"account": None, "action": "sent_message", "app_package": "com.example.chat", "app_version": "1.2",
+             "boot_count": 3, "content": "H\u00e9 \"q\" \\ line\nnext \U0001F600 bell\u0007", "conversation_id": None,
+             "counterpart": "phone B", "detail": None, "device_label": "phoneA", "direction": "out",
+             "edited_utc_ms": 1700000000500, "elapsed_ms": 123456, "entry_id": "e1", "expected_artifacts": ["aleapp:x", "y"],
+             "gnss_time_ms": None, "kind": "action", "network_time_ms": 1700000000000, "prev_hash": "abc", "profile_id": 1,
+             "refers_to": None, "revision_n": 0, "reviewed": True, "scenario_id": "sc", "seq": 7, "source": "manual",
+             "time_quality": "exact", "tz_id": "America/New_York", "tz_offset_min": -300, "utc_ms": 1700000000123,
+             "window_s": 5.894}
+        # Same vector as ChainTest.canonicalMatchesPython in the app.
+        self.assertEqual("02e5c1e190e0fd352d836bf5a0a315324f18cc18ac257edaf52dafb273bab7e1",
+                         hashlib.sha256(md.chain_canonical(r).encode("ascii")).hexdigest())
+
+    def _chained(self, rows):
+        prev = ""
+        for r in sorted(rows, key=lambda x: x["seq"]):
+            r["prev_hash"] = prev
+            r["row_hash"] = hashlib.sha256(md.chain_canonical(r).encode("ascii")).hexdigest()
+            prev = r["row_hash"]
+        return rows
+
+    def test_verify_chain(self):
+        rows = self._chained([row(i, f"e{i}", "a", content=f"c{i}") for i in range(1, 6)])
+        self.assertTrue(md.verify_chain(rows)[0].startswith("intact, 5 rows"))
+        edited = [dict(r) for r in rows]; edited[2]["content"] = "changed"
+        self.assertEqual(3, md.verify_chain(edited)[1])
+        removed = [dict(r) for r in rows if r["seq"] != 2]
+        self.assertEqual(3, md.verify_chain(removed)[1])
+        self.assertTrue(md.verify_chain([row(1, "x", "a")])[0].startswith("not present"))
+
+    def test_chain_check_catches_rows_cut_from_the_end(self):
+        rows = self._chained([row(i, f"e{i}", "a") for i in range(1, 4)])
+        d = make_export(self.tmp, rows[:2])
+        mpath = os.path.join(d, "manifest.json")
+        m = json.load(open(mpath)); m["hash_chain"] = {"rows": 3, "last_row_hash": rows[2]["row_hash"]}
+        json.dump(m, open(mpath, "w"))
+        checks = dict(md.load_export(d)["checks"])
+        self.assertIn("MISMATCH with manifest", checks["hash chain"])
+
     def test_sheet_names_are_valid_and_unique(self):
         used = set()
         self.assertEqual("a_b", md.sheet_name("a/b", used))

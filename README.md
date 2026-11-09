@@ -43,9 +43,17 @@ What is captured, only in the apps under test plus System UI and Settings unless
 - a field cleared in one step, which is how apps built with Jetpack Compose show a send: they
   report no tap event for their buttons (seen with Google Messages)
 
+Incoming messages and calls come from notifications. Notifications posted by the apps under test
+are recorded with their title (usually the sender or number) and text, even while the phone is
+locked. Notifications in the message, call and missed call categories also become
+`received_message`, `incoming_call` and `missed_call` for review. Tested on the emulator with an
+SMS and a call sent from the emulator console.
+
 Auto-label rules turn events into actions, for example a cleared message field in Google Messages
-becomes `sent_message` with the text as content. Rules ship in `app/src/main/assets/rules/` and can
-be overridden with a `rules.json` pushed to the app's external files folder. Each shipped rule says
+becomes `sent_message` with the text as content. Rules ship in `app/src/main/assets/rules/`. You can
+teach new ones in the app: label a captured tap, cleared field or mark in Timeline and tick "Make a
+rule". Taught rules are saved in `rules.json` in the app's external files folder, where you can
+pull them to share or push someone else's. Each shipped rule says
 which app version it was checked against. Auto labels stay "to review" until someone accepts them.
 
 Screenshots use the accessibility service's own capture (Android 11 and later): no extra
@@ -65,6 +73,18 @@ Known limits:
   on the phone after an export.
 - Some apps behave differently when an accessibility service is on.
 - Rules break when an app changes its screens or runs in another language. Review catches it.
+
+Apps under test that are installed, updated or removed during a session are logged with their
+versions. At session start, any app whose version differs from when it was added is flagged.
+
+## Hash chain (0.3)
+
+Every row carries `prev_hash` and `row_hash`: a SHA-256 over the row's fields and the previous
+row's hash. Changing, removing or reordering a row breaks every hash after it, and
+`make_documentation.py` checks the whole chain. The Export screen shows the newest row's hash;
+write it in your documentation, because someone who rewrites the whole chain can only be caught
+against a copy of that last hash kept somewhere else. Rows written before 0.3 are hashed when the
+app is upgraded, and a `hash_chain_backfilled` row says so.
 
 For full video, record from a Mac over USB with `scrcpy --record` so nothing is written to the
 phone, and line it up with the log using the network time column.
@@ -127,7 +147,7 @@ The APK is in `app/build/outputs/apk/debug/`. Install with `adb install`.
 
 ## Status
 
-Version 0.2.0, Android only. Tested on an Android 15 emulator, not yet on a physical phone. iOS and a
+Version 0.3.0, Android only. Tested on an Android 15 emulator, not yet on a physical phone. iOS and a
 checker script that reads the export against LEAPP output are planned.
 
 Author: Alexis Brignoni

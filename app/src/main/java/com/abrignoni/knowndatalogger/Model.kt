@@ -6,7 +6,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
-const val SCHEMA_VERSION = 2
+const val SCHEMA_VERSION = 3
 
 /** Allowed values for Entry.kind. */
 object Kind {
@@ -37,7 +37,34 @@ object AutoAction {
     const val MARK = "mark"
     /** A text field emptied in one step (all text removed by a single change), the usual sign of a send. */
     const val FIELD_CLEARED = "field_cleared"
+    /** A notification posted by an app under test (incoming message, call, missed call, other). */
+    const val NOTIFICATION = "notification"
 }
+
+/** Actions inferred from a notification's category (Notification.CATEGORY_*). Others stay raw events. */
+object NotificationMap {
+    fun actionFor(category: String?): String? = when (category) {
+        "msg" -> "received_message"
+        "call" -> "incoming_call"
+        "missed_call" -> "missed_call"
+        else -> null
+    }
+}
+
+/** View id recorded in a raw tap or field_cleared row's detail ("view <id>, class <name>"). */
+fun viewIdOf(e: Entry): String? = e.detail?.let { Regex("""(?:^|, )view ([^,]+)""").find(it)?.groupValues?.get(1) }
+
+/**
+ * The captured event a mark most likely points at: the newest tap or cleared field in the same
+ * app, in the same boot, at most 30 seconds before the mark.
+ */
+fun sourceEventFor(mark: Entry, rows: List<Entry>): Entry? =
+    Timeline.current(rows).filter {
+        it.kind == Kind.AUTO_EVENT && it.action in setOf(AutoAction.TAP, AutoAction.FIELD_CLEARED) &&
+            it.appPackage != null && it.appPackage == mark.appPackage &&
+            it.stamp.bootCount == mark.stamp.bootCount &&
+            it.stamp.elapsedMs <= mark.stamp.elapsedMs && mark.stamp.elapsedMs - it.stamp.elapsedMs <= 30_000
+    }.maxWithOrNull(Timeline.ORDER)
 
 /** Events a rule can match. Compose apps report no tap events, so their sends match FIELD_CLEARED. */
 object RuleEvent {
@@ -101,6 +128,9 @@ data class Entry(
     val source: String = Source.MANUAL,
     /** False only for auto-labelled actions nobody has accepted yet. */
     val reviewed: Boolean = true,
+    /** Hash chain (schema 3): row_hash of the previous row by seq, and this row's own hash. */
+    val prevHash: String? = null,
+    val rowHash: String? = null,
 ) {
     val isMark: Boolean get() = kind == Kind.AUTO_EVENT && action == AutoAction.MARK
 
@@ -277,7 +307,7 @@ object Csv {
         "detail", "refers_to", "expected_artifacts", "account", "app_version", "device_label", "scenario_id",
         "tz_id", "tz_offset_min", "network_time_utc", "boot_count", "elapsed_ms", "utc_ms", "boot_wall_ms",
         "network_time_ms", "gnss_time_ms", "edited_utc_ms",
-        "entry_id", "revision_n", "seq", "profile_id", "screenshot_sha256",
+        "entry_id", "revision_n", "seq", "profile_id", "screenshot_sha256", "prev_hash", "row_hash",
     )
 
     fun field(v: Any?): String {
@@ -312,7 +342,7 @@ object Csv {
         "boot_wall_ms" to e.stamp.bootWallMs, "network_time_ms" to e.stamp.networkTimeMs,
         "gnss_time_ms" to e.stamp.gnssTimeMs, "edited_utc_ms" to e.editedUtcMs,
         "entry_id" to e.entryId, "revision_n" to e.revisionN, "seq" to e.seq, "profile_id" to e.profileId,
-        "screenshot_sha256" to shot?.sha256,
+        "screenshot_sha256" to shot?.sha256, "prev_hash" to e.prevHash, "row_hash" to e.rowHash,
     )
 
     fun row(e: Entry, isCurrent: Boolean, shot: Shot? = null): String {
@@ -355,3 +385,81 @@ val ACTION_TEMPLATES = listOf(
 const val FACTORY_RESET = "factory_reset"
 
 fun templateLabel(key: String): String = key.replace('_', ' ')
+
+
+/**
+ * Tamper evidence for the log. Each row's hash covers its own fields plus the previous row's
+ * hash, in seq order, so editing, removing or reordering a row breaks every hash after it.
+ *
+ * The hashed text is a canonical JSON object that tools/make_documentation.py rebuilds byte for
+ * byte: keys sorted, no spaces, ASCII only (other characters as lowercase \uXXXX escapes, as
+ * Python's json.dumps(sort_keys=True, separators=(",", ":"), ensure_ascii=True) writes them).
+ * window_s is hashed as window_ms (whole milliseconds) so no decimal formatting is involved;
+ * boot_wall_ms is derived and the screenshot is attached later, so neither is hashed.
+ */
+object Chain {
+    const val GENESIS = ""
+
+    fun fields(e: Entry, prevHash: String): Map<String, Any?> = mapOf(
+        "account" to e.account, "action" to e.action, "app_package" to e.appPackage, "app_version" to e.appVersion,
+        "boot_count" to e.stamp.bootCount, "content" to e.content, "conversation_id" to e.conversationId,
+        "counterpart" to e.counterpart, "detail" to e.detail, "device_label" to e.deviceLabel,
+        "direction" to e.direction, "edited_utc_ms" to e.editedUtcMs, "elapsed_ms" to e.stamp.elapsedMs,
+        "entry_id" to e.entryId, "expected_artifacts" to e.expectedArtifacts, "gnss_time_ms" to e.stamp.gnssTimeMs,
+        "kind" to e.kind, "network_time_ms" to e.stamp.networkTimeMs, "prev_hash" to prevHash,
+        "profile_id" to e.profileId, "refers_to" to e.refersTo, "revision_n" to e.revisionN,
+        "reviewed" to e.reviewed, "scenario_id" to e.scenarioId, "seq" to e.seq, "source" to e.source,
+        "time_quality" to e.timeQuality, "tz_id" to e.stamp.tzId, "tz_offset_min" to e.stamp.tzOffsetMin,
+        "utc_ms" to e.stamp.utcMs, "window_ms" to e.windowS?.let { Math.round(it * 1000) },
+    )
+
+    fun canonical(e: Entry, prevHash: String): String {
+        val sb = StringBuilder("{")
+        fields(e, prevHash).toSortedMap().entries.forEachIndexed { i, (k, v) ->
+            if (i > 0) sb.append(',')
+            str(sb, k); sb.append(':'); value(sb, v)
+        }
+        return sb.append('}').toString()
+    }
+
+    fun rowHash(e: Entry, prevHash: String): String = sha256Hex(canonical(e, prevHash).toByteArray(Charsets.US_ASCII))
+
+    private fun value(sb: StringBuilder, v: Any?) {
+        when (v) {
+            null -> sb.append("null")
+            is String -> str(sb, v)
+            is Boolean -> sb.append(if (v) "true" else "false")
+            is Int, is Long -> sb.append(v.toString())
+            is List<*> -> { sb.append('['); v.forEachIndexed { i, x -> if (i > 0) sb.append(','); value(sb, x) }; sb.append(']') }
+            else -> error("unhashable ${v::class}")
+        }
+    }
+
+    private fun str(sb: StringBuilder, s: String) {
+        sb.append('"')
+        for (c in s) {
+            when {
+                c == '"' -> sb.append("\\\"")
+                c == '\\' -> sb.append("\\\\")
+                c == '\n' -> sb.append("\\n")
+                c == '\r' -> sb.append("\\r")
+                c == '\t' -> sb.append("\\t")
+                c == '\b' -> sb.append("\\b")
+                c == '\u000C' -> sb.append("\\f")
+                c.code < 0x20 || c.code > 0x7f -> sb.append("\\u%04x".format(c.code))
+                else -> sb.append(c)
+            }
+        }
+        sb.append('"')
+    }
+
+    /** Checks a run of rows in seq order. Returns the seq of the first bad row, or null. */
+    fun firstBreak(rows: List<Entry>): Long? {
+        var prev = GENESIS
+        for (r in rows.sortedBy { it.seq }) {
+            if (r.prevHash != prev || r.rowHash != rowHash(r, prev)) return r.seq
+            prev = r.rowHash
+        }
+        return null
+    }
+}

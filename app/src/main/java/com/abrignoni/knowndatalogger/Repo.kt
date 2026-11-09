@@ -68,16 +68,33 @@ class Repo private constructor(private val context: Context) {
     /** Packages the capture service records: apps under test plus system UI and Settings. */
     fun capturePackages(): Set<String> = db.apps().map { it.pkg }.toSet() + DEFAULT_CAPTURE_PACKAGES
 
-    /** Bundled rules, overridden rule by rule by an optional rules.json pushed to the app's external folder. */
-    fun loadRules(): List<Rule> {
-        val bundled = try {
-            parseRules(context.assets.open("rules/default.json").bufferedReader().use { it.readText() })
-        } catch (e: Exception) { emptyList() }
-        val override = try {
-            File(context.getExternalFilesDir(null) ?: context.filesDir, "rules.json").takeIf { it.exists() }
-                ?.let { parseRules(it.readText()) } ?: emptyList()
-        } catch (e: Exception) { emptyList() }
-        return Rules.merge(bundled, override)
+    /** rules.json in the app's external folder: rules pushed with adb and rules taught in the app. */
+    fun rulesFile(): File = File(context.getExternalFilesDir(null) ?: context.filesDir, "rules.json")
+
+    private fun bundledRules(): List<Rule> = try {
+        parseRules(context.assets.open("rules/default.json").bufferedReader().use { it.readText() })
+    } catch (e: Exception) { emptyList() }
+
+    fun localRules(): List<Rule> = try {
+        rulesFile().takeIf { it.exists() }?.let { parseRules(it.readText()) } ?: emptyList()
+    } catch (e: Exception) { emptyList() }
+
+    /** Bundled rules, overridden rule by rule by the local rules.json. */
+    fun loadRules(): List<Rule> = Rules.merge(bundledRules(), localRules())
+
+    /** Rule ids that come from the local file rather than the APK. */
+    fun localRuleIds(): Set<String> = localRules().map { it.id }.toSet()
+
+    /** Saves a rule taught in the app into rules.json and logs that it was added. */
+    fun saveTaughtRule(rule: Rule) {
+        rulesFile().writeText(rulesToJson(Rules.merge(localRules(), listOf(rule))))
+        log(Draft(appPackage = rule.pkg, action = "rule_taught", source = Source.SYSTEM,
+            detail = "${rule.id}: ${rule.event} ${rule.viewId ?: rule.labelRegex} -> ${rule.action}"), kind = Kind.SYSTEM_EVENT)
+    }
+
+    fun removeLocalRule(id: String) {
+        rulesFile().writeText(rulesToJson(localRules().filter { it.id != id }))
+        log(Draft(action = "rule_removed", source = Source.SYSTEM, detail = id), kind = Kind.SYSTEM_EVENT)
     }
 
     fun screensDir(): File = File(context.filesDir, "screens").apply { mkdirs() }
@@ -112,10 +129,57 @@ class Repo private constructor(private val context: Context) {
 
     private fun accountFor(pkg: String?): String? = pkg?.let { p -> db.apps().firstOrNull { it.pkg == p }?.account }
 
-    /** Inserts a row and appends it to the live JSONL file that survives an app crash. */
+    /** row_hash of the newest row, the link the next row hashes over. */
+    private var lastHash: String? = null
+
+    /**
+     * Rows written before schema 3 have no hash. They are hashed once, in seq order, and a system
+     * row records that their hashes were made at upgrade time, not when they were written.
+     */
+    @Synchronized
+    private fun ensureChain() {
+        if (lastHash != null) return
+        val rows = db.entries()
+        val firstMissing = rows.indexOfFirst { it.rowHash == null }
+        if (firstMissing < 0) { lastHash = rows.lastOrNull()?.rowHash ?: Chain.GENESIS; return }
+        var prev = if (firstMissing == 0) Chain.GENESIS else rows[firstMissing - 1].rowHash!!
+        val w = db.writableDatabase
+        w.beginTransaction()
+        try {
+            for (r in rows.drop(firstMissing)) {
+                val h = Chain.rowHash(r, prev)
+                db.setHash(r.seq, prev, h)
+                prev = h
+            }
+            w.setTransactionSuccessful()
+        } finally { w.endTransaction() }
+        lastHash = prev
+        val s = stamp()
+        write(base(Kind.SYSTEM_EVENT, s).copy(action = "hash_chain_backfilled", source = Source.SYSTEM,
+            detail = "rows ${rows[firstMissing].seq} to ${rows.last().seq} were hashed when the app was upgraded, not when they were written"))
+    }
+
+    /**
+     * Inserts a row with its place in the hash chain, then appends it to the live JSONL file that
+     * survives an app crash. Synchronized: the capture service, the screens and the export thread
+     * all write, and the chain needs one writer at a time.
+     */
+    @Synchronized
     private fun write(e: Entry): Entry {
-        val seq = db.insert(e)
-        val saved = e.copy(seq = seq)
+        ensureChain()
+        val w = db.writableDatabase
+        val saved: Entry
+        w.beginTransaction()
+        try {
+            val seq = db.insert(e)
+            val prev = lastHash ?: Chain.GENESIS
+            val withSeq = e.copy(seq = seq, prevHash = prev)
+            val h = Chain.rowHash(withSeq, prev)
+            db.setHash(seq, prev, h)
+            w.setTransactionSuccessful()
+            saved = withSeq.copy(rowHash = h)
+        } finally { w.endTransaction() }
+        lastHash = saved.rowHash
         try {
             liveFile().appendText(saved.toJson().toString() + "\n")
         } catch (ignored: Exception) {
@@ -123,6 +187,9 @@ class Repo private constructor(private val context: Context) {
         }
         return saved
     }
+
+    /** The newest row's hash, shown on the Export screen so the tester can note it. */
+    fun lastRowHash(): String? { ensureChain(); return lastHash?.ifEmpty { null } }
 
     fun liveFile(): File = File(context.getExternalFilesDir(null) ?: context.filesDir, "actions-live.jsonl")
 
@@ -281,6 +348,14 @@ class Repo private constructor(private val context: Context) {
             put("device_label", deviceLabel)
             put("profiles", JSONArray(db.profiles().map { profileJson(it) }))
             put("apps_under_test", JSONArray(db.apps().map { appJson(it) }))
+            val local = localRuleIds()
+            put("rules", JSONArray(loadRules().map { r ->
+                JSONObject().apply {
+                    put("id", r.id); put("package", r.pkg); put("event", r.event); put("view_id", r.viewId ?: JSONObject.NULL)
+                    put("label_regex", r.labelRegex ?: JSONObject.NULL); put("action", r.action)
+                    put("origin", if (r.id in local) "local" else "bundled"); put("verified_with", r.verifiedWith ?: JSONObject.NULL)
+                }
+            }))
             put("tolerances_s", JSONObject().apply {
                 put("exact", Tolerance.EXACT_S)
                 put("before_after", Tolerance.BEFORE_AFTER_S)
@@ -299,6 +374,13 @@ class Repo private constructor(private val context: Context) {
                 put("actions.jsonl", JSONObject().apply {
                     put("sha256", sha256Hex(jsonlBytes)); put("rows", rows.size)
                 })
+            })
+            // The last link of the chain; a copy kept elsewhere shows whether rows were cut off the end.
+            put("hash_chain", JSONObject().apply {
+                put("rows", rows.size)
+                put("last_seq", rows.maxOfOrNull { it.seq } ?: JSONObject.NULL)
+                put("last_row_hash", rows.maxByOrNull { it.seq }?.rowHash ?: JSONObject.NULL)
+                put("first_break_seq", Chain.firstBreak(rows) ?: JSONObject.NULL)
             })
         }
     }

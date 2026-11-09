@@ -1,4 +1,4 @@
-# kl.db layout (schema 2)
+# kl.db layout (schema 3)
 
 Path on the device: `/data/data/com.abrignoni.knowndatalogger/databases/kl.db`.
 `PRAGMA user_version` holds the schema number. Journal mode is DELETE (no `-wal`).
@@ -56,6 +56,8 @@ Every row the app writes, including revisions, tombstones and system rows. Colum
 Schema 2 added `source` (`manual`, `auto_event`, `auto_rule`, `mark`, `system`) and `reviewed`
 (0 only for auto-labelled actions nobody has accepted). Rows from schema 1 read as manual and
 reviewed.
+
+Schema 3 added `prev_hash` and `row_hash`, the hash chain described in SPEC.md.
 
 The current version of an entry is the row with the highest `revision_n` for its `entry_id`.
 If that row has `kind = 'tombstone'`, the entry was removed. Order by

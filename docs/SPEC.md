@@ -1,6 +1,6 @@
-# Known-data logger: spec, revision 5 (2026-11-08)
+# Known-data logger: spec, revision 6 (2026-11-08)
 
-Revision 2 folded in an independent review (2026-11-08). Revision 3 matches version 0.1.0 as built. Revision 4 added the plan for version 0.2; revision 5 matches 0.2.0 as built. API claims below were checked
+Revision 2 folded in an independent review (2026-11-08). Revision 3 matches version 0.1.0 as built. Revision 4 added the plan for version 0.2; revision 5 matched 0.2.0; revision 6 adds 0.3.0. API claims below were checked
 against the Android SDK 36 stubs where marked "(stubs)".
 
 A small app installed on a test device. The researcher records each action as they do it.
@@ -217,6 +217,28 @@ B) and writes an `.xlsx`: Scenario (devices, detected changes, hash checks), App
 app with Date, Time, Action, Content, Counterpart and a link to the screenshot, Needs review and
 Captured events. It uses current revisions only, keeps each device's own order, and writes every
 value as text so content cannot run as a formula.
+
+## Version 0.3
+
+- Notifications (`typeNotificationStateChanged`) from captured apps are recorded as `notification`
+  events with title as counterpart, text as content, direction `in`, and category. Categories
+  `msg`, `call` and `missed_call` add unreviewed `received_message`, `incoming_call` and
+  `missed_call` actions. Notifications are recorded while the phone is locked; nothing else is.
+  Repeats of the same notification (same package, title, text, category) within the last 50 are
+  skipped.
+- Teach mode: labelling a captured tap or field_cleared event, or a mark whose source event is
+  found (the newest tap or cleared field in the same app, same boot, at most 30 s before), can
+  save a rule to the local `rules.json`. A rule from an event without a view id matches the exact
+  label. Taught and removed rules are logged; the manifest lists every rule in effect with its
+  origin (bundled or local).
+- During a session, a runtime receiver logs `app_installed`, `app_updated` and `app_removed` for
+  captured apps with old and new versions; at session start, `app_version_changed_since_added`
+  flags apps whose version differs from when they were added.
+- Hash chain, schema 3: `prev_hash` and `row_hash` on every row. The hash is SHA-256 over a
+  canonical JSON of the row (keys sorted, no spaces, ASCII with \uXXXX escapes, window as whole
+  milliseconds, without boot_wall_ms and screenshot) including prev_hash, in seq order from an
+  empty first link. The manifest records the row count, last seq, last hash and the first break.
+  Rows written before schema 3 are hashed at upgrade and a `hash_chain_backfilled` row says so.
 
 ## Later
 

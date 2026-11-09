@@ -45,6 +45,7 @@ class CaptureService : AccessibilityService() {
         flushText()
         repo.log(Draft(action = "capture_service_disconnected", source = Source.SYSTEM), kind = Kind.SYSTEM_EVENT)
         removeMark()
+        stopPackageWatch()
         instance = null
         return super.onUnbind(intent)
     }
@@ -59,6 +60,11 @@ class CaptureService : AccessibilityService() {
     private var pkgs: Set<String> = emptySet()
     /** Fields seen as password fields this session; they stay withheld even if shown as plain text. */
     private val secretKeys = HashSet<String>()
+    /** Recent notifications, so an app re-posting the same one is logged once. */
+    private val seenNotifications = ArrayDeque<String>()
+    /** Version of each captured app when the session started or last changed. */
+    private val versions = HashMap<String, String?>()
+    private var packageReceiver: android.content.BroadcastReceiver? = null
 
     /** Called when the session is started or stopped from the app; re-reads settings, apps and rules. */
     fun syncSession() {
@@ -69,7 +75,61 @@ class CaptureService : AccessibilityService() {
         pkgs = repo.capturePackages()
         rules = repo.loadRules()
         secretKeys.clear()
-        if (active) showMark() else { flushText(); removeMark() }
+        if (active) { showMark(); startPackageWatch() } else { flushText(); removeMark(); stopPackageWatch() }
+    }
+
+    fun reloadRules() { rules = repo.loadRules() }
+
+    // ---- App changes during a session ----
+
+    /** Records versions at session start and logs any app under test that changed since it was added. */
+    private fun startPackageWatch() {
+        versions.clear()
+        val added = repo.db.apps().associate { it.pkg to it.versionName }
+        for (p in pkgs) {
+            val now = repo.appVersion(p)
+            versions[p] = now
+            val then = added[p]
+            if (p in added && then != now) {
+                repo.log(Draft(appPackage = p, action = "app_version_changed_since_added", source = Source.SYSTEM,
+                    detail = "version ${then ?: "unknown"} when added, ${now ?: "not installed"} now"), kind = Kind.SYSTEM_EVENT)
+            }
+        }
+        if (packageReceiver != null) return
+        val r = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: android.content.Context, i: android.content.Intent) = onPackageChange(i)
+        }
+        val f = android.content.IntentFilter().apply {
+            addAction(android.content.Intent.ACTION_PACKAGE_ADDED)
+            addAction(android.content.Intent.ACTION_PACKAGE_REPLACED)
+            addAction(android.content.Intent.ACTION_PACKAGE_REMOVED)
+            addDataScheme("package")
+        }
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(r, f, android.content.Context.RECEIVER_NOT_EXPORTED)
+        else @Suppress("UnspecifiedRegisterReceiverFlag") registerReceiver(r, f)
+        packageReceiver = r
+    }
+
+    private fun stopPackageWatch() {
+        packageReceiver?.let { runCatching { unregisterReceiver(it) } }
+        packageReceiver = null
+    }
+
+    private fun onPackageChange(i: android.content.Intent) {
+        val p = i.data?.schemeSpecificPart ?: return
+        if (!active || !wanted(p)) return
+        val replacing = i.getBooleanExtra(android.content.Intent.EXTRA_REPLACING, false)
+        val old = versions[p]
+        val now = repo.appVersion(p)
+        val action = when (i.action) {
+            android.content.Intent.ACTION_PACKAGE_REPLACED -> "app_updated"
+            android.content.Intent.ACTION_PACKAGE_ADDED -> if (replacing) return else "app_installed"
+            android.content.Intent.ACTION_PACKAGE_REMOVED -> if (replacing) return else "app_removed"
+            else -> return
+        }
+        versions[p] = now
+        repo.log(Draft(appPackage = p, action = action, source = Source.SYSTEM,
+            detail = "version ${old ?: "none"} to ${now ?: "none"}"), kind = Kind.SYSTEM_EVENT)
     }
 
     private fun wanted(pkg: String): Boolean = pkg != packageName && (allApps || pkg in pkgs)
@@ -78,7 +138,9 @@ class CaptureService : AccessibilityService() {
         if (!::repo.isInitialized || !active) return
         val pkg = event.packageName?.toString() ?: return
         if (!wanted(pkg)) return
-        // Nothing is recorded while the phone is locked: the lock screen is where PINs are typed.
+        // Incoming notifications are recorded even while locked: that is when messages usually arrive.
+        if (event.eventType == AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED) { onNotification(event, pkg); return }
+        // Nothing else is recorded while the phone is locked: the lock screen is where PINs are typed.
         if (getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true) return
         when (event.eventType) {
             AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> onText(event, pkg)
@@ -195,6 +257,30 @@ class CaptureService : AccessibilityService() {
         flushText()
         repo.log(Draft(appPackage = pkg, action = AutoAction.SCREEN, content = title,
             detail = event.className?.let { "class $it" }, source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT)
+    }
+
+    /**
+     * A notification posted by a captured app. The raw event keeps the title and text; message, call
+     * and missed-call categories also get an auto-labelled action for review.
+     */
+    private fun onNotification(event: AccessibilityEvent, pkg: String) {
+        val n = event.parcelableData as? android.app.Notification
+        val extras = n?.extras
+        val title = extras?.getCharSequence(android.app.Notification.EXTRA_TITLE)?.toString()
+        val body = (extras?.getCharSequence(android.app.Notification.EXTRA_BIG_TEXT)
+            ?: extras?.getCharSequence(android.app.Notification.EXTRA_TEXT))?.toString()
+            ?: event.text?.joinToString(" ")?.takeIf { it.isNotBlank() }
+        val category = n?.category
+        val key = "$pkg|$title|$body|$category"
+        if (key in seenNotifications) return
+        seenNotifications.addLast(key)
+        if (seenNotifications.size > 50) seenNotifications.removeFirst()
+        val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.NOTIFICATION, content = body, counterpart = title,
+            direction = "in", detail = "category ${category ?: "none"}", source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
+        val action = NotificationMap.actionFor(category) ?: return
+        repo.log(Draft(appPackage = pkg, action = action, content = body, counterpart = title, direction = "in",
+            refersTo = raw.entryId, detail = "auto: notification category $category", source = Source.AUTO_RULE,
+            reviewed = false), stamp = raw.stamp, detect = false)
     }
 
     /** Mark button tap: stamp the moment, then screenshot it. */

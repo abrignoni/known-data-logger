@@ -324,17 +324,28 @@ fun CaptureScreen(repo: Repo, bump: () -> Unit) {
         if (!ready) Text("Set the scenario id and device label first.", color = MaterialTheme.colorScheme.error)
 
         Section("Options (applied at session start)")
-        Row { Checkbox(shotAuto, { shotAuto = it; repo.setFlag(Repo.KEY_SHOT_AUTO, it) }); Text("Screenshot each auto-labelled action", Modifier.padding(top = 12.dp)) }
-        Row { Checkbox(shotTap, { shotTap = it; repo.setFlag(Repo.KEY_SHOT_TAP, it) }); Text("Screenshot every tap", Modifier.padding(top = 12.dp)) }
-        Row { Checkbox(allApps, { allApps = it; repo.setFlag(Repo.KEY_ALL_APPS, it) }); Text("Capture all apps, not only apps under test", Modifier.padding(top = 12.dp)) }
+        Row(Modifier.fillMaxWidth().clickable { shotAuto = !shotAuto; repo.setFlag(Repo.KEY_SHOT_AUTO, shotAuto) }) { Checkbox(shotAuto, { shotAuto = it; repo.setFlag(Repo.KEY_SHOT_AUTO, it) }); Text("Screenshot each auto-labelled action", Modifier.padding(top = 12.dp)) }
+        Row(Modifier.fillMaxWidth().clickable { shotTap = !shotTap; repo.setFlag(Repo.KEY_SHOT_TAP, shotTap) }) { Checkbox(shotTap, { shotTap = it; repo.setFlag(Repo.KEY_SHOT_TAP, it) }); Text("Screenshot every tap", Modifier.padding(top = 12.dp)) }
+        Row(Modifier.fillMaxWidth().clickable { allApps = !allApps; repo.setFlag(Repo.KEY_ALL_APPS, allApps) }) { Checkbox(allApps, { allApps = it; repo.setFlag(Repo.KEY_ALL_APPS, it) }); Text("Capture all apps, not only apps under test", Modifier.padding(top = 12.dp)) }
         Text("The MARK button always takes a screenshot." +
             (if (android.os.Build.VERSION.SDK_INT < 30) " Screenshots need Android 11 or later; this phone will log them as unsupported." else ""),
             style = MaterialTheme.typography.bodySmall)
         Text("Captured apps: " + (if (allApps) "all" else repo.capturePackages().sorted().joinToString(", ")), style = MaterialTheme.typography.bodySmall)
 
         Section("Auto-label rules (${rules.size})")
-        rules.forEach { r -> Text("${r.id}: ${r.pkg} -> ${r.action}", style = MaterialTheme.typography.bodySmall) }
-        Text("Override or add rules with a rules.json in the app's external files folder (adb push).", style = MaterialTheme.typography.bodySmall)
+        val local = remember { repo.localRuleIds() }
+        rules.forEach { r ->
+            Row(Modifier.fillMaxWidth()) {
+                Text("${r.id}: ${r.event} in ${r.pkg} -> ${r.action}" + if (r.id in local) " (local)" else " (bundled)",
+                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f).padding(top = 12.dp))
+                if (r.id in local) TextButton(onClick = {
+                    repo.removeLocalRule(r.id); CaptureService.instance?.reloadRules(); bump()
+                }) { Text("Remove") }
+            }
+        }
+        Text("Teach a rule from Timeline: label a captured tap, cleared field or mark and tick Make a rule. " +
+            "Local rules live in rules.json in the app's external files folder (adb pull to share, adb push to load).",
+            style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -428,6 +439,16 @@ private fun EditDialog(repo: Repo, e: Entry, shot: Shot?, onDone: () -> Unit) {
     var quality by remember { mutableStateOf(e.timeQuality) }
     var expected by remember { mutableStateOf(e.expectedArtifacts.joinToString(", ")) }
     fun expectedList() = expected.split(',', ' ').map { it.trim() }.filter { it.isNotEmpty() }
+    // Teach mode: the captured tap or cleared field this label can become a rule from.
+    val teachSource = remember(e.entryId) {
+        when {
+            rawEvent && e.action in setOf(AutoAction.TAP, AutoAction.FIELD_CLEARED) && e.appPackage != null -> e
+            labellingMark -> sourceEventFor(e, repo.db.entries())
+            else -> null
+        }?.takeIf { viewIdOf(it) != null || !it.content.isNullOrBlank() }
+    }
+    var teach by remember { mutableStateOf(false) }
+    var teachUseTyped by remember { mutableStateOf(teachSource?.action == AutoAction.FIELD_CLEARED) }
     AlertDialog(
         onDismissRequest = onDone,
         title = { Text((if (labellingMark) "Label mark " else if (rawEvent) "Label event " else "Edit ") + hhmmss(e.stamp)) },
@@ -451,6 +472,12 @@ private fun EditDialog(repo: Repo, e: Entry, shot: Shot?, onDone: () -> Unit) {
                 Row { TimeQuality.ALL.forEach { q -> FilterChip(selected = quality == q, onClick = { quality = q }, label = { Text(q) }) } }
                 OutlinedTextField(expected, { expected = it }, label = { Text("Expected artifacts") })
                 OutlinedTextField(note, { note = it }, label = { Text("Note") }, supportingText = { Text(NO_SECRETS) })
+                teachSource?.let { src ->
+                    val what = if (src.action == AutoAction.FIELD_CLEARED) "field cleared" else "tap"
+                    val target = viewIdOf(src) ?: "label \"${src.content}\""
+                    Row(Modifier.fillMaxWidth().clickable { teach = !teach }) { Checkbox(teach, { teach = it }); Text("Make a rule: $what on $target in ${src.appPackage}", Modifier.padding(top = 12.dp)) }
+                    if (teach) Row(Modifier.fillMaxWidth().clickable { teachUseTyped = !teachUseTyped }) { Checkbox(teachUseTyped, { teachUseTyped = it }); Text("Use the text typed before it as content", Modifier.padding(top = 12.dp)) }
+                }
                 if (!labellingMark && !rawEvent) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = {
                         repo.log(Draft(appPackage = e.appPackage, action = "deleted_item", refersTo = e.entryId, counterpart = e.counterpart, conversationId = e.conversationId))
@@ -476,6 +503,24 @@ private fun EditDialog(repo: Repo, e: Entry, shot: Shot?, onDone: () -> Unit) {
                         repo.log(Draft(appPackage = e.appPackage, action = action.trim(), content = content, counterpart = counterpart,
                             conversationId = conversation, timeQuality = quality, expectedArtifacts = expectedList(), detail = note,
                             refersTo = e.entryId, source = if (labellingMark) Source.MARK else Source.MANUAL), stamp = e.stamp, detect = false)
+                        val src = teachSource
+                        if (teach && src != null) {
+                            val vid = viewIdOf(src)
+                            val pkgV = repo.appVersion(src.appPackage)
+                            repo.saveTaughtRule(Rule(
+                                id = "taught_${src.appPackage}_${action.trim()}_${src.stamp.utcMs}".replace(Regex("[^A-Za-z0-9_.]"), "_"),
+                                pkg = src.appPackage!!,
+                                viewId = vid,
+                                labelRegex = if (vid == null) "^" + Regex.escape(src.content!!) + "$" else null,
+                                action = action.trim(),
+                                content = if (teachUseTyped) "last_typed" else null,
+                                verifiedWith = "taught on ${repo.deviceLabel} (${android.os.Build.MODEL}), app version ${pkgV ?: "unknown"}, " +
+                                    Csv.utcIso(System.currentTimeMillis()),
+                                event = if (src.action == AutoAction.FIELD_CLEARED) RuleEvent.FIELD_CLEARED else RuleEvent.TAP,
+                            ))
+                            CaptureService.instance?.reloadRules()
+                            toast(ctx, "Rule saved")
+                        }
                     } else {
                         repo.revise(e, Draft(
                             appPackage = e.appPackage, action = action.trim(), content = content, counterpart = counterpart,
@@ -519,6 +564,12 @@ fun ExportScreen(repo: Repo, bump: () -> Unit) {
         Text("Writes a new folder with manifest.json, actions.jsonl and actions.csv. The export is logged as its own entry.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 8.dp))
         Button(onClick = { picker.launch(null) }, modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("Export to folder") }
         lastExport?.let { Text("Last export: $it", modifier = Modifier.padding(top = 8.dp)) }
+        repo.lastRowHash()?.let {
+            Section("Hash chain")
+            Text("Newest row hash. Note it in your documentation: it shows later whether rows were removed from the end.",
+                style = MaterialTheme.typography.bodySmall)
+            Text(it, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+        }
         Section("Live copy")
         Text(
             "Every entry is also appended to\n${repo.liveFile().absolutePath}\n" +
