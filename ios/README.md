@@ -22,8 +22,10 @@ Each test:
 4. **Review** screen, To label: each mark shows its screenshot and app. Pick the action, type the
    text that matters (content, counterpart), Save; the next mark opens. A label's time is the
    mark's, with time quality "after" (the mark comes right after the act).
-5. Review lists the apps used that have no version yet (iOS cannot read other apps' versions).
-6. Export, at the bottom of Review.
+5. App versions: iOS cannot read another app's version. For built-in Apple apps KDL fills it in
+   (below). For any other app, the label form asks for its version once (optional); a row saved
+   after that carries it. Review lists apps still missing a version. Export does not need versions.
+6. Export, at the bottom of Review. Saved labels stay under Everything, where they can be changed.
 
 ## What it does
 
@@ -47,6 +49,14 @@ Each test:
 - App names shown for bundle ids come from a small built-in table of Apple apps (display only;
   the log keeps the bundle id). Four of those ids were seen on the test phone; the rest are not
   checked on a device.
+- Versions of built-in Apple apps (those in the table) are added to the app list the first time
+  capture sees them. Safari gets the iOS version: Apple's Safari 26.6 Release Notes say "Safari 26.6
+  is available for iOS 26.6"
+  ([source](https://developer.apple.com/documentation/safari-release-notes/safari-26_6-release-notes));
+  that pairing was checked for 26.6 only. No Apple source gives the other built-in apps' versions,
+  so they are recorded as "built into iOS <version>". Apple apps that update through the App Store
+  (Pages, iMovie) are not in the table and are asked for like any other app. Entries the tester
+  made are never changed.
 
 ## Screen capture
 

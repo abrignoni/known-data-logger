@@ -33,4 +33,17 @@ enum AppNames {
     ]
 
     static let fallbackSuggestions = ["sent_message", "visited_url", "took_photo", "deleted_item"]
+
+    static let safari = "com.apple.mobilesafari"
+
+    /// The version KDL records for a built-in Apple app (one in `names`), or nil for any other app,
+    /// including Apple apps that update through the App Store (Pages, iMovie): the tester types those.
+    /// Safari: Apple's Safari 26.6 Release Notes say "Safari 26.6 is available for iOS 26.6"
+    /// (https://developer.apple.com/documentation/safari-release-notes/safari-26_6-release-notes),
+    /// so Safari is recorded with the iOS version. No Apple source gives the version of the other
+    /// built-in apps, so they are recorded as "built into iOS <version>", a fact rather than a number.
+    static func appleVersion(_ pkg: String, iOS: String) -> String? {
+        guard names[pkg] != nil, pkg != KDL.bundleId else { return nil }
+        return pkg == safari ? iOS : "built into iOS \(iOS)"
+    }
 }

@@ -9,6 +9,8 @@ struct ReviewView: View {
     /// The form to open once the current one closes (the next item to label).
     @State private var queued: EntryMode?
     @State private var appsSheet = false
+    /// Shown for a few seconds after a save that leaves nothing else to label.
+    @State private var savedNote = false
 
     var body: some View {
         NavigationStack {
@@ -28,8 +30,16 @@ struct ReviewView: View {
                     .foregroundStyle(.orange)
                 }
 
+                if savedNote {
+                    Label("Saved. It is under Everything, where you can change it.", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                }
+
                 if filter == 0 {
-                    if model.pending.isEmpty { Text("Nothing to label.").foregroundStyle(.secondary) }
+                    if model.pending.isEmpty {
+                        Text(model.current.isEmpty ? "Nothing logged yet." : "All labelled. To change one, open Everything.")
+                            .foregroundStyle(.secondary)
+                    }
                     ForEach(model.pending, id: \.seq) { e in
                         Button { open(e) } label: { EntryRow(entry: e, revisions: 1) }.foregroundStyle(.primary)
                     }
@@ -49,10 +59,18 @@ struct ReviewView: View {
             .sheet(item: $sheet, onDismiss: {
                 if let q = queued { queued = nil; DispatchQueue.main.async { sheet = q } }
             }) { mode in
-                EntrySheet(mode: mode, onSaved: { queued = model.nextToLabel() })
+                EntrySheet(mode: mode, onSaved: {
+                    queued = model.nextToLabel()
+                    if queued == nil { showSavedNote() }
+                })
             }
             .sheet(isPresented: $appsSheet) { AppsUsedSheet() }
         }
+    }
+
+    private func showSavedNote() {
+        savedNote = true
+        Task { try? await Task.sleep(for: .seconds(4)); savedNote = false }
     }
 
     private var revisions: [String: Int] { Dictionary(grouping: model.rows, by: \.entryId).mapValues { $0.count } }

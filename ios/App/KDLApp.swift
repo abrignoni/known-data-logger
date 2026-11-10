@@ -126,7 +126,26 @@ final class AppModel: ObservableObject {
     func refresh() {
         rows = store?.entries() ?? []
         shots = store?.shots() ?? [:]
+        addAppleApps()
         objectWillChange.send()
+    }
+
+    /// Apple apps the capture saw are added to the app list with their version (see
+    /// AppNames.appleVersion), so the tester never types them. Entries the tester made are left alone.
+    private func addAppleApps() {
+        guard let store else { return }
+        let listed = Set(store.apps().map(\.pkg))
+        let iOS = UIDevice.current.systemVersion
+        for pkg in appsUsed where !listed.contains(pkg) {
+            guard let v = AppNames.appleVersion(pkg, iOS: iOS) else { continue }
+            try? store.upsertApp(AppUnderTest(pkg: pkg, label: AppNames.names[pkg] ?? pkg, versionName: v,
+                                              addedUtcMs: Clocks.stamp().utcMs))
+        }
+    }
+
+    /// The version on file for an app, if any.
+    func version(of pkg: String) -> String? {
+        apps.first { $0.pkg == pkg }?.versionName.flatMap { $0.isEmpty ? nil : $0 }
     }
 
     /// Runs a write, shows any error, refreshes the screens and the widgets.
@@ -178,6 +197,12 @@ final class AppModel: ObservableObject {
                         release: d.systemVersion, incremental: Clocks.sysctlString("kern.osversion"),
                         kernel: Clocks.sysctlString("kern.osrelease"), carrier: carrier, notes: notes)
         run("Device snapshot") { try $0.addProfile(p) }
+    }
+
+    /// Records a version typed in the label form, keeping the app's name and account.
+    func setVersion(_ v: String, for pkg: String) {
+        let a = apps.first { $0.pkg == pkg }
+        saveApp(pkg: pkg, name: a?.label ?? AppNames.names[pkg] ?? pkg, version: v, account: a?.account ?? "")
     }
 
     func saveApp(pkg: String, name: String, version: String, account: String) {

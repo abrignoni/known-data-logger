@@ -44,6 +44,8 @@ struct EntrySheet: View {
     @State private var confirmReset = false
     @State private var confirmRemove = false
     @State private var zoom = false
+    /// Version for an app with none on file, asked here once (optional).
+    @State private var newVersion = ""
     @State private var loaded = false
 
     private var title: String {
@@ -112,8 +114,17 @@ struct EntrySheet: View {
                         Text("None (device or system)").tag("")
                         ForEach(appChoices, id: \.self) { Text(model.appName($0) ?? $0).tag($0) }
                     }
+                    if askVersion {
+                        TextField("\(model.appName(app) ?? app) version (optional)", text: $newVersion)
+                            .keyboardType(.numbersAndPunctuation)
+                    }
                 } header: { Text("Action") } footer: {
-                    if needsAction && action.trimmingCharacters(in: .whitespaces).isEmpty { Text("Pick or type an action to save.") }
+                    VStack(alignment: .leading, spacing: 4) {
+                        if needsAction && action.trimmingCharacters(in: .whitespaces).isEmpty { Text("Pick or type an action to save.") }
+                        if askVersion {
+                            Text("Asked once per app. Find it in Settings > General > iPhone Storage > the app, or on its App Store page. Leave it empty if you do not know; you can add it later in Review.")
+                        }
+                    }
                 }
 
                 Section {
@@ -215,7 +226,15 @@ struct EntrySheet: View {
                      detail: note)
     }
 
+    /// An app with no version on file, other than a built-in Apple app (KDL fills those in).
+    private var askVersion: Bool {
+        !app.isEmpty && AppNames.appleVersion(app, iOS: "") == nil && model.version(of: app) == nil
+    }
+
     private func save() {
+        // The version goes on file first, so the row saved below carries it.
+        let v = newVersion.trimmingCharacters(in: .whitespacesAndNewlines)
+        if askVersion && !v.isEmpty { model.setVersion(v, for: app) }
         let d = draft()
         switch mode {
         case .new(_, let s): model.log(d, at: s)
