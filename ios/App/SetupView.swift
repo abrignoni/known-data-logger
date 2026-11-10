@@ -145,11 +145,10 @@ struct BackTapCard: View {
     var body: some View {
         Section {
             VStack(alignment: .leading, spacing: 8) {
-                Text("1. Open Settings > Accessibility > Touch > Back Tap > Double Tap.")
-                Text("2. Under Shortcuts, pick Mark.")
-                Text("If Mark is not listed: open Shortcuts > Library > All Shortcuts, tap +, search KDL, tap Mark, then tap < to save it. Then go back to step 1.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                Text("1. Open Shortcuts > Library > All Shortcuts. Tap +, tap Search Actions, type KDL, tap Mark, then tap < to save it. Leave Show When Run on: it shows the Marked banner.")
+                Text("2. Open Settings > Accessibility > Touch > Back Tap > Double Tap. Under Shortcuts, pick Mark.")
                 Text("3. Come back here and check it.")
+                Text("Deleting the Mark shortcut turns Back Tap off.").font(.footnote).foregroundStyle(.secondary)
             }
             .font(.subheadline)
             if model.backTapCheckSince != nil {

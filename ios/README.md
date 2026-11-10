@@ -9,8 +9,15 @@ export the same way.
 
 ## Workflow
 
-Once per phone: Setup (scenario id, device label, device snapshot), and a Shortcut that runs KDL's
-Mark set as Settings > Accessibility > Touch > Back Tap > Double Tap.
+Once per phone: Setup (scenario id, device label, device snapshot), and Back Tap. Back Tap lists only
+the tester's own shortcuts, not the Mark shortcut KDL provides (checked on the test phone), so the
+tester first makes a shortcut in Shortcuts > Library > All Shortcuts (+, KDL, Mark; leave Show When
+Run on, it shows the banner), then picks it in Settings > Accessibility > Touch > Back Tap > Double
+Tap. Deleting that shortcut turned Back Tap off. The Setup card gives these steps and a live check
+that turns green when a double tap reaches KDL; the check mark is removed with a tombstone.
+
+While a session runs, every app that comes to the front is logged by bundle id, including apps that
+are not under test (seen on the test phone), so a tester opens only the apps under test.
 
 Each test:
 

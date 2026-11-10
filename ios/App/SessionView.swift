@@ -44,7 +44,7 @@ struct SessionView: View {
                 } footer: {
                     Text(model.sessionActive
                          ? "After each action, double-tap the back of the phone to mark it. Stop with the round button or the red indicator."
-                         : "While a session runs, each mark saves a screenshot and every app switch is logged.")
+                         : "While a session runs, each mark saves a screenshot and every app that comes to the front is logged, so open only the apps under test.")
                 }
 
                 Section {
