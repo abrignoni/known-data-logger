@@ -1,0 +1,1 @@
+Logs what you do on a test phone, so forensic tools can be checked against it
