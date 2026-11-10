@@ -61,6 +61,35 @@ final class AppModel: ObservableObject {
         }
         windowStart = store?.stamp(forKey: "window_start")
         refresh()
+        // A mark from Back Tap, Shortcuts, a widget or a control is written by another process; this
+        // notification (posted after every mark) lets the screens update and the Back Tap check finish.
+        let me = Unmanaged.passUnretained(self).toOpaque()
+        CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), me, { _, observer, _, _, _ in
+            guard let observer else { return }
+            let model = Unmanaged<AppModel>.fromOpaque(observer).takeUnretainedValue()
+            Task { @MainActor in model.markArrived() }
+        }, KDL.markNotification as CFString, nil, .deliverImmediately)
+    }
+
+    // MARK: Back Tap check
+
+    /// When the tester is checking Back Tap: marks stamped at or after this time count as the check.
+    @Published var backTapCheckSince: Int64?
+
+    /// When a double tap last reached KDL during the check, if ever.
+    var backTapWorked: Date? { store?.setting("back_tap_checked_utc_ms").flatMap(Int64.init).map { Date(ms: $0) } }
+
+    func startBackTapCheck() { backTapCheckSince = Clocks.stamp().utcMs }
+
+    /// A test mark proves Back Tap reaches KDL. It is not an action of the test, so it is removed
+    /// with a tombstone right away; both rows stay in the log.
+    func markArrived() {
+        refresh()
+        guard let since = backTapCheckSince,
+              let m = current.last(where: { $0.isMark && $0.stamp.utcMs >= since }) else { return }
+        backTapCheckSince = nil
+        try? store?.putSetting("back_tap_checked_utc_ms", String(m.stamp.utcMs))
+        run("Back Tap check") { try $0.tombstone(m) }
     }
 
     var current: [Entry] { Timeline.current(rows) }

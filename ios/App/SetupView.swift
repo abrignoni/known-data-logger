@@ -26,6 +26,8 @@ struct SetupView: View {
                         .onChange(of: device) { _, v in model.store?.deviceLabel = v }
                 } header: { Text("Scenario and device") }
 
+                BackTapCard()
+
                 Section {
                     if let p = model.store?.profiles().last {
                         LabeledContent("Model", value: p.model ?? "")
@@ -132,6 +134,39 @@ struct AddAppSheet: View {
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty && bundleId.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
+        }
+    }
+}
+
+/// One-time phone setup for marking without covering the screen, with a live check.
+struct BackTapCard: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("1. Open Settings > Accessibility > Touch > Back Tap > Double Tap.")
+                Text("2. Under Shortcuts, pick Mark.")
+                Text("If Mark is not listed: open Shortcuts > Library > All Shortcuts, tap +, search KDL, tap Mark, then tap < to save it. Then go back to step 1.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                Text("3. Come back here and check it.")
+            }
+            .font(.subheadline)
+            if model.backTapCheckSince != nil {
+                HStack {
+                    ProgressView()
+                    Text("Double-tap the back of the phone now.").foregroundStyle(.orange)
+                }
+                Button("Cancel the check") { model.backTapCheckSince = nil }
+            } else {
+                Button(model.backTapWorked == nil ? "Check Back Tap" : "Check again") { model.startBackTapCheck() }
+            }
+            if let ok = model.backTapWorked, model.backTapCheckSince == nil {
+                Label("Back Tap works (checked \(ok.formatted(date: .abbreviated, time: .shortened)))", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            }
+        } header: { Text("Back Tap") } footer: {
+            Text("Marking with a double tap on the back leaves the screen as it is, so the screenshot shows the app. The check mark is removed right away; it stays in the log as a mark and its removal.")
         }
     }
 }
