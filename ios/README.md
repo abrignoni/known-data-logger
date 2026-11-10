@@ -45,7 +45,10 @@ Each test:
   recognition, language correction off) and lists the lines under Content, web addresses first.
   Tapping one fills Content; press and hold to use it as Counterpart. Nothing is filled without a
   tap. On the Mac, the same recognition read the test phone's screenshots in about 0.1 s each after
-  a first run of 51 s; speed on the phone is not measured yet.
+  a first run of 51 s. On the iPhone 13 the suggestions appeared with no wait the tester could see
+  (not timed), the Safari address came first and the note's text came through exactly. On the
+  Settings > About screenshot the Mac run read "iOS" as "¡OS", so a suggestion is checked against
+  the picture before saving.
 - **Setup** (gear on Session; opens by itself until the scenario id and device label are set):
   scenario and device, device snapshots, apps (optional; name, version, account), and
   Diagnostics (clocks, latest row hash).
