@@ -24,7 +24,8 @@ Each test:
    mark's, with time quality "after" (the mark comes right after the act).
 5. App versions: iOS cannot read another app's version. For built-in Apple apps KDL fills it in
    (below). For any other app, the label form asks for its version once (optional); a row saved
-   after that carries it. Review lists apps still missing a version. Export does not need versions.
+   after that carries it. Review always lists the apps used (tap to check or fix a version or
+   name) and says how many still miss a version. Export does not need versions.
 6. Export, at the bottom of Review. Saved labels stay under Everything, where they can be changed.
 
 ## What it does

@@ -22,12 +22,14 @@ struct ReviewView: View {
                 .pickerStyle(.segmented)
                 .listRowBackground(Color.clear)
 
-                if !model.appsMissingVersion.isEmpty {
+                if !model.appsUsed.isEmpty {
+                    // Always shown, so a version or name can be checked or fixed while reviewing.
+                    let used = model.appsUsed.count, missing = model.appsMissingVersion.count
                     Button { appsSheet = true } label: {
-                        Label("\(model.appsUsed.count) app\(model.appsUsed.count == 1 ? "" : "s") used, \(model.appsMissingVersion.count) missing a version",
-                              systemImage: "app.badge")
+                        Label("\(used) app\(used == 1 ? "" : "s") used" + (missing > 0 ? ", \(missing) missing a version" : ""),
+                              systemImage: missing > 0 ? "app.badge" : "square.grid.2x2")
                     }
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(missing > 0 ? Color.orange : Color.secondary)
                 }
 
                 if savedNote {
