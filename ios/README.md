@@ -142,7 +142,13 @@ of the right screen (checked by eye on the phone), hash match at export. Frames 
 pixels (the screen is 1170 x 2532), each within 29 ms of its mark. Peak memory footprint 17 MB. Four
 app switches logged (Notes, Safari, Settings, KDL). Back Tap missed some double taps; those made no
 row, and nothing on screen said so. That led to the "Marked" banner, the app on the mark, and the
-separate capture start and stop rows, which have not been tried on the phone yet.
+separate capture start and stop rows.
+
+Re-test with those changes: one Back Tap mark in Safari and one in Notes. The banner showed after
+each, on the first try. Neither screenshot shows the banner (checked by eye), and each frame was
+within 47 ms of its mark. Both marks carried the right bundle id, so the labels landed on the
+Safari and Notes sheets with their screenshots linked, and the start and stop rows were listed on
+the Scenario sheet. `make_documentation.py` exited 0.
 
 ## Not built yet
 
