@@ -98,11 +98,14 @@ an iOS export (exit 0, no warnings).
 On one iPhone 13 with iOS 26.6, 9 November 2026, development build, made-up content: setup and a
 profile snapshot, an app under test, Start and Stop session, a hand-logged action, Mark and Stamp in
 the app, Mark from the Lock Screen Live Activity (iOS asked once to allow Live Activities), the
-Control Center control, labelling a mark, an edit, a removal, and an export. The export (13 rows)
-passed `make_documentation.py` (sha256 match, chain intact, exit 0, no warnings) and the Swift
-verifier gave the same last hash. Across the session, `utc_ms - elapsed_ms` stayed within 7 ms.
-The marks from the Live Activity and the control both landed; the export does not say which
-surface wrote which row.
+Control Center control, labelling a mark, an edit, a removal, and an export. The export (13 rows,
+built as 1.0 before the version number was fixed) passed `make_documentation.py` (sha256 match,
+chain intact, exit 0, no warnings) and the Swift verifier gave the same last hash. Across the
+session, `utc_ms - elapsed_ms` stayed within 7 ms. It holds four mark rows: one from the in-app
+button and three logged while the Lock Screen and Control Center steps were done. A row does not
+say which surface wrote it, so which tap made which row, and whether every tap was logged, is not
+established. After reinstalling as 0.1.0, a second export held the same 13 rows byte for byte plus
+its own export row, and its last hash matched the one shown on the Setup tab.
 
 Not tried on the phone: the Home Screen widget, the share sheet, the Shortcuts actions, a restart,
 a clock or time zone change.
