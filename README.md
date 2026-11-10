@@ -285,7 +285,10 @@ on a Pixel 7a with Android 17
   recorded as two notifications and two `received_message` entries
 - the app icon's one-colour layer showed correctly with the launcher's themed (Minimal) icon style,
   which this launcher applies to the home screen only
-- iOS is planned.
+
+The iOS version is in its own repository,
+[known-data-logger-ios](https://github.com/abrignoni/known-data-logger-ios). It writes the same export
+format and hash chain, so the tools in this repository read its exports too.
 
 ## License
 

@@ -263,7 +263,8 @@ tolerances. Details and limits are in the README.
 
 ## Later
 
-- iOS build.
+- iOS build: in its own repository, [known-data-logger-ios](https://github.com/abrignoni/known-data-logger-ios),
+  with the same export format and hash chain.
 - An ALEAPP module for the logger's own database.
 - Template packs per app; a look at the Demmel playbook format.
 
