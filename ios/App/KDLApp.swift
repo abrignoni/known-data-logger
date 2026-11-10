@@ -131,16 +131,25 @@ final class AppModel: ObservableObject {
     }
 
     /// Apple apps the capture saw are added to the app list with their version (see
-    /// AppNames.appleVersion), so the tester never types them. Entries the tester made are left alone.
+    /// AppNames.appleVersion), so the tester never types them. Each app is added once at most
+    /// (remembered in the "apps_auto_added" setting), so one the tester deletes stays deleted, and
+    /// entries the tester made are left alone.
     private func addAppleApps() {
         guard let store else { return }
         let listed = Set(store.apps().map(\.pkg))
+        var done = Set((store.setting("apps_auto_added") ?? "").split(separator: " ").map(String.init))
+        // An app already on the list (typed by the tester) counts as handled, so deleting it later sticks.
+        var changed = !listed.isSubset(of: done)
+        done.formUnion(listed)
         let iOS = UIDevice.current.systemVersion
-        for pkg in appsUsed where !listed.contains(pkg) {
+        for pkg in appsUsed where !listed.contains(pkg) && !done.contains(pkg) {
             guard let v = AppNames.appleVersion(pkg, iOS: iOS) else { continue }
             try? store.upsertApp(AppUnderTest(pkg: pkg, label: AppNames.names[pkg] ?? pkg, versionName: v,
                                               addedUtcMs: Clocks.stamp().utcMs))
+            done.insert(pkg)
+            changed = true
         }
+        if changed { try? store.putSetting("apps_auto_added", done.sorted().joined(separator: " ")) }
     }
 
     /// The version on file for an app, if any.

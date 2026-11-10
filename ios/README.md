@@ -56,7 +56,8 @@ Each test:
   that pairing was checked for 26.6 only. No Apple source gives the other built-in apps' versions,
   so they are recorded as "built into iOS <version>". Apple apps that update through the App Store
   (Pages, iMovie) are not in the table and are asked for like any other app. Entries the tester
-  made are never changed.
+  made are never changed, and each app is added this way once at most, so one the tester deletes stays
+  deleted.
 
 ## Screen capture
 
