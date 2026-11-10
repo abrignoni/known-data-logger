@@ -3,7 +3,8 @@ import SwiftUI
 
 struct TimelineScreen: View {
     @EnvironmentObject var model: AppModel
-    @State private var filter = 0
+    /// Opens on Everything: on iOS every row is one the tester logged. To check stays one tap away.
+    @State private var filter = 1
     @State private var sheet: EntryMode?
 
     private var revisions: [String: Int] {
@@ -14,8 +15,8 @@ struct TimelineScreen: View {
         NavigationStack {
             List {
                 Picker("Show", selection: $filter) {
-                    Text("To check (\(model.pending.count))").tag(0)
                     Text("Everything").tag(1)
+                    Text("To check (\(model.pending.count))").tag(0)
                 }
                 .pickerStyle(.segmented)
                 .listRowBackground(Color.clear)

@@ -19,7 +19,7 @@ app. `tools/make_documentation.py` and the other tools read an iOS export the sa
 - Shortcuts: Mark, Stamp now, and Log action (action, app, content, counterpart, note). Log action
   works from a personal automation on the App trigger, which does not tell the shortcut which app
   fired (Phase 0), so set Action and App in each automation.
-- Timeline: To check (unlabelled marks and stamped entries) and Everything. Labelling a mark adds an
+- Timeline: Everything (where it opens) and To check (unlabelled marks and stamped entries). Labelling a mark adds an
   action row at the mark's time that refers to it. Edits add a revision; removing adds a tombstone.
 - Export everything: writes `kdl_<scenario>_<device>_<UTC time>/` with `manifest.json`,
   `actions.jsonl` and `actions.csv` to On My iPhone > KDL > Exports in the Files app, and offers the
