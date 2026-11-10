@@ -20,6 +20,10 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>KDLAppGroup</key>
+	<string>$(KDL_APP_GROUP)</string>
+	<key>KDLAppId</key>
+	<string>$(KDL_APP_ID)</string>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionPointIdentifier</key>

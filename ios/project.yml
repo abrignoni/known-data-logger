@@ -1,16 +1,17 @@
 # XcodeGen spec for the iOS app. Generate the project with `xcodegen generate` in this folder.
 name: KDL
 options:
-  bundleIdPrefix: com.abrignoni
   deploymentTarget:
     iOS: "17.0"
 packages:
   KDLCore:
     path: KDLCore
+configFiles:
+  Debug: Config/Signing.xcconfig
+  Release: Config/Signing.xcconfig
 settings:
   base:
     CODE_SIGN_STYLE: Automatic
-    DEVELOPMENT_TEAM: 33DUL485L9
     SWIFT_VERSION: "5.0"
     MARKETING_VERSION: "0.2.0"
     CURRENT_PROJECT_VERSION: "1"
@@ -28,6 +29,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: KDL
+        KDLAppId: $(KDL_APP_ID)
+        KDLAppGroup: $(KDL_APP_GROUP)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
@@ -38,10 +41,10 @@ targets:
     entitlements:
       path: App/KDL.entitlements
       properties:
-        com.apple.security.application-groups: [group.com.abrignoni.knowndatalogger]
+        com.apple.security.application-groups: [$(KDL_APP_GROUP)]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.abrignoni.knowndatalogger
+        PRODUCT_BUNDLE_IDENTIFIER: $(KDL_APP_ID)
         PRODUCT_NAME: KDL
   KDLBroadcast:
     type: app-extension
@@ -56,6 +59,8 @@ targets:
       path: Broadcast/Info.plist
       properties:
         CFBundleDisplayName: KDL Screen
+        KDLAppId: $(KDL_APP_ID)
+        KDLAppGroup: $(KDL_APP_GROUP)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
@@ -65,10 +70,10 @@ targets:
     entitlements:
       path: Broadcast/KDLBroadcast.entitlements
       properties:
-        com.apple.security.application-groups: [group.com.abrignoni.knowndatalogger]
+        com.apple.security.application-groups: [$(KDL_APP_GROUP)]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.abrignoni.knowndatalogger.broadcast
+        PRODUCT_BUNDLE_IDENTIFIER: $(KDL_APP_ID).broadcast
   KDLWidgets:
     type: app-extension
     platform: iOS
@@ -81,6 +86,8 @@ targets:
       path: Widgets/Info.plist
       properties:
         CFBundleDisplayName: KDL Widgets
+        KDLAppId: $(KDL_APP_ID)
+        KDLAppGroup: $(KDL_APP_GROUP)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
@@ -88,7 +95,7 @@ targets:
     entitlements:
       path: Widgets/KDLWidgets.entitlements
       properties:
-        com.apple.security.application-groups: [group.com.abrignoni.knowndatalogger]
+        com.apple.security.application-groups: [$(KDL_APP_GROUP)]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.abrignoni.knowndatalogger.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: $(KDL_APP_ID).widgets

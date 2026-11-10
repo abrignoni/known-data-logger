@@ -6,8 +6,16 @@ import WidgetKit
 
 /// Shared by the app, its App Intents and the widget extension.
 enum KDL {
-    static let appGroup = "group.com.abrignoni.knowndatalogger"
-    static let bundleId = "com.abrignoni.knowndatalogger"
+    /// The ids come from the build settings (Config/Signing.xcconfig), through the KDLAppGroup and
+    /// KDLAppId keys every target's Info.plist carries, so a tester who builds with their own Apple ID
+    /// changes them in one place.
+    static let appGroup = info("KDLAppGroup") ?? "group.com.abrignoni.knowndatalogger"
+    static let bundleId = info("KDLAppId") ?? "com.abrignoni.knowndatalogger"
+    static let broadcastId = bundleId + ".broadcast"
+
+    private static func info(_ key: String) -> String? {
+        (Bundle.main.object(forInfoDictionaryKey: key) as? String).flatMap { $0.isEmpty || $0.contains("$(") ? nil : $0 }
+    }
     static let noSecrets = "No passwords or passcodes here. Exports get shared."
 
     /// The App Group container, where kl.db lives so the widget and controls can write to it.
@@ -24,7 +32,8 @@ enum KDL {
     static var screensDir: URL { dataDir.appendingPathComponent("screens", isDirectory: true) }
 
     /// Posted after every mark, so a running screen broadcast saves its latest frame for it.
-    static let markNotification = "com.abrignoni.knowndatalogger.mark"
+    /// Named after the app id, so two KDL builds on one phone do not hear each other's marks.
+    static let markNotification = bundleId + ".mark"
 
     static func postMark() {
         CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),

@@ -131,32 +131,54 @@ reviewed; this has to be settled before any TestFlight or App Store build.
 ## Where it keeps the log
 
 `kl.db`, with the Android app's schema 3 (`docs/DATABASE.md`), in the App Group container
-`group.com.abrignoni.knowndatalogger`, under `Library/KDL/`, so the widget and controls can write
+`group.<prefix>.knowndatalogger`, under `Library/KDL/`, so the widget and controls can write
 to it. Journal mode is DELETE. Each write runs in one `BEGIN IMMEDIATE` transaction that reads the
 newest hash and inserts the row, so the app and its extensions never hash over the same previous
 row. `actions-live.jsonl` beside it gets every row as it is written. Exports go to the app's own
 Documents folder; `xcrun devicectl device copy from` can read that folder but not the App Group.
 
-Bundle ids: `com.abrignoni.knowndatalogger` (app) and `com.abrignoni.knowndatalogger.widgets`.
+Ids, from `Config/Signing.xcconfig`: `<prefix>.knowndatalogger` (app), `.widgets` and `.broadcast`
+(extensions), and the App Group `group.<prefix>.knowndatalogger`. This repository's prefix is
+`com.abrignoni`; a self-built copy uses the tester's own.
 
-## Build
+## Build it yourself
 
-Needs Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+KDL for iOS is not on the App Store or TestFlight. Each tester builds it from this repository with
+their own Apple ID. A free Apple ID works; the build then stops opening after 7 days and has to be
+built again.
+
+You need a Mac with Xcode, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install
+xcodegen`), an iPhone on iOS 17 or later (screen capture was tested on iOS 26.6), and a USB cable.
+
+1. Clone the repository and open a terminal in its `ios` folder.
+2. Copy `Config/Local.example.xcconfig` to `Config/Local.xcconfig` and set your own
+   `KDL_ID_PREFIX` (for example `com.yourname`) and `DEVELOPMENT_TEAM`. App ids are unique across
+   Apple accounts, so the prefix cannot be `com.abrignoni`. `Local.xcconfig` is ignored by git.
+3. Run `xcodegen generate`, then open `KDL.xcodeproj` in Xcode.
+4. In Xcode > Settings > Accounts, add your Apple ID if it is not there.
+5. On the iPhone, turn on Settings > Privacy & Security > Developer Mode (the phone restarts), and
+   connect it to the Mac.
+6. In Xcode, pick your iPhone as the run destination and press Run. Xcode registers the three ids
+   (app, widgets, screen capture) and the App Group under your Apple ID.
+7. The first time, the iPhone refuses to open KDL until you trust the developer: Settings >
+   General > VPN & Device Management > your Apple ID under Developer App > Trust.
+8. Open KDL. Setup opens by itself: fill in the scenario id and device label, take a device
+   snapshot, and follow the Back Tap card (it turns green when Back Tap reaches KDL).
+
+From the command line, step 6 is:
 
 ```bash
-cd ios && xcodegen generate
+xcodebuild -project KDL.xcodeproj -scheme KDL -destination 'id=<iPhone UDID>' -allowProvisioningUpdates build
 ```
 
-```bash
-export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-```
+Each part of the app reads its ids from the build settings, so changing the prefix in
+`Local.xcconfig` is enough; the export's `logger.package` is then your own app id. With a free
+Apple ID, Apple limits how many new app ids an account can register in a week; KDL uses three.
 
-```bash
-xcodebuild -project ios/KDL.xcodeproj -scheme KDL -destination 'id=<UDID>' -allowProvisioningUpdates build
-```
-
-The team in `project.yml` is a free personal team, so a build runs for 7 days. A first install
-needs Settings > General > VPN & Device Management > Developer App > Trust.
+Apple's rule for boot-time information (reason 35F9.1) forbids sending it off the device in apps
+that go through App Review. KDL exports time since boot (`elapsed_ms`) and the boot time
+(`boot_wall_ms`), the same as the Android app. That is fine for builds made this way, which are not
+reviewed, but anyone who ships KDL through the App Store or TestFlight has to change it first.
 
 ## Tests
 

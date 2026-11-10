@@ -70,6 +70,7 @@
 /* Begin PBXFileReference section */
 		0D5757D09DD9185F1901A992 /* KDLBroadcast.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = KDLBroadcast.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		1D13B926D88D73FBCC53BCEB /* KDLApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KDLApp.swift; sourceTree = "<group>"; };
+		25A195CDE9C9E5037C188DC5 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		2BBC1C12B96F8244A9754596 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		32A789FF18EB14632CDE032E /* KDL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KDL.swift; sourceTree = "<group>"; };
 		35EE95DB43768310B4B4BAF8 /* ReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewView.swift; sourceTree = "<group>"; };
@@ -174,6 +175,7 @@
 			children = (
 				6C374657C1E0AFD6F094DEB5 /* App */,
 				52F371E8D3E66342CB75EB7E /* Broadcast */,
+				A9F11FB5139B055EE6CAC5D2 /* Config */,
 				8331CAEDF20796060DD4FF43 /* Packages */,
 				B85BE0CC6AF43D91743118A0 /* Shared */,
 				0E8F8675E543CC5E084A18BF /* Widgets */,
@@ -198,6 +200,14 @@
 				AA6F1FABF3833A2A54E9949D /* KDLWidgets.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A9F11FB5139B055EE6CAC5D2 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				25A195CDE9C9E5037C188DC5 /* Signing.xcconfig */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		B85BE0CC6AF43D91743118A0 /* Shared */ = {
@@ -423,7 +433,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.abrignoni.knowndatalogger;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(KDL_APP_ID)";
 				PRODUCT_NAME = KDL;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -440,7 +450,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.abrignoni.knowndatalogger.broadcast;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(KDL_APP_ID).broadcast";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -456,7 +466,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.abrignoni.knowndatalogger.broadcast;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(KDL_APP_ID).broadcast";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -464,6 +474,7 @@
 		};
 		5415437F81E0228E03BF00DD /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 25A195CDE9C9E5037C188DC5 /* Signing.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -499,7 +510,6 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = 33DUL485L9;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -540,7 +550,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.abrignoni.knowndatalogger.widgets;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(KDL_APP_ID).widgets";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -548,6 +558,7 @@
 		};
 		DA6A46BC59694DE02DD3C332 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 25A195CDE9C9E5037C188DC5 /* Signing.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -583,7 +594,6 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = 33DUL485L9;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -617,7 +627,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.abrignoni.knowndatalogger.widgets;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(KDL_APP_ID).widgets";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -634,7 +644,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.abrignoni.knowndatalogger;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(KDL_APP_ID)";
 				PRODUCT_NAME = KDL;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";

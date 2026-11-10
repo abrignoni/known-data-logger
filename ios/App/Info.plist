@@ -22,6 +22,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>KDLAppGroup</key>
+	<string>$(KDL_APP_GROUP)</string>
+	<key>KDLAppId</key>
+	<string>$(KDL_APP_ID)</string>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>UIFileSharingEnabled</key>

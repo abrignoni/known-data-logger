@@ -1,0 +1,9 @@
+// Copy this file to Local.xcconfig (same folder) and fill in both values.
+//
+// KDL_ID_PREFIX: a reverse-domain prefix of your own, for example com.yourname. Apple ids are
+// unique across all accounts, so it cannot be com.abrignoni.
+// DEVELOPMENT_TEAM: your team id. With a free Apple ID: Xcode > Settings > Accounts, select your
+// Apple ID; the team id is in the team list (Personal Team), or leave this empty and pick the team
+// in Xcode under Signing & Capabilities for each of the three targets.
+KDL_ID_PREFIX = com.yourname
+DEVELOPMENT_TEAM = ABCDE12345

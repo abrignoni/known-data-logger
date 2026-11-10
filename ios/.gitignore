@@ -3,3 +3,4 @@ KDLCore/.swiftpm/
 *.xcodeproj/xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
 build/
+Config/Local.xcconfig
