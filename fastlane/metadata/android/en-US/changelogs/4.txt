@@ -1,0 +1,1 @@
+Check all on the first-run app list and Add all apps in Setup. Actions inferred by a rule or a label now get a direction, the same as a hand-logged send. Manual fixes.

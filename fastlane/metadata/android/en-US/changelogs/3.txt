@@ -1,0 +1,1 @@
+First public release. Automatic capture through an accessibility service, MARK screenshots, notifications as received messages and calls, hand logging, review, rules, a SHA-256 hash chain and export.

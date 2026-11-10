@@ -1,0 +1,20 @@
+KDL (Known-data logger) is for test phones used to validate digital forensic tools. Start a session, use the phone as you normally would, and KDL writes down what you did and when. At the end you export the log, and a script in the source repository turns it into a spreadsheet that goes in the documentation folder next to the extraction. Anyone checking a parser can then compare each action against the tool's output.
+
+<b>Test phones only.</b> KDL records typed text and screens in the apps you pick. Never install it on an evidence device or on a phone with real accounts.
+
+What it records during a session, through an accessibility service you turn on yourself:
+
+<ul>
+<li>screen changes, taps (label and view id) and typed text as the field's final value, in the apps under test plus System UI and Settings, or in all apps if you choose</li>
+<li>notifications from the apps under test, which become received messages, incoming calls and missed calls for you to review</li>
+<li>a screenshot each time you tap the floating MARK button, and optionally for inferred actions or every tap (Android 11 and later)</li>
+<li>apps under test that are installed, updated, removed or cleared during the session</li>
+</ul>
+
+It never records the content of password fields. By default, a run of 4 to 8 digits in text that mentions a code, OTP, PIN or verification is withheld; codes in other wording are not caught. While the phone is locked, taps, typed text and screens are not recorded.
+
+Every entry carries the device clock, time zone, time since boot and boot count, so the order stays right when you change the clock or reboot as a test step. Edits never overwrite: each one is a new revision, and every row is part of a SHA-256 hash chain that shows whether rows were changed or removed.
+
+You can also log actions by hand, label marks, accept or change inferred actions, and teach new rules.
+
+KDL asks for no permissions and has no network access. Everything stays on the phone until you export it to a folder you pick. The user manual and the documentation scripts are in the source repository.
