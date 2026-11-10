@@ -34,7 +34,6 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
-        NSSupportsLiveActivities: true
         ITSAppUsesNonExemptEncryption: false
     entitlements:
       path: App/KDL.entitlements

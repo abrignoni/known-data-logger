@@ -15,39 +15,27 @@ struct LogView: View {
         NavigationStack {
             List {
                 Section {
-                    if model.sessionActive, let start = model.sessionStart {
-                        HStack {
-                            Image(systemName: "record.circle").foregroundStyle(.red)
-                            Text("Session").font(.headline)
-                            Spacer()
-                            Text(start, style: .timer).monospacedDigit()
-                        }
-                        Button(role: .destructive) { model.stopSession() } label: {
-                            Label("Stop session", systemImage: "stop.fill")
-                        }
-                    } else {
-                        Button { model.startSession() } label: { Label("Start session", systemImage: "record.circle") }
-                            .disabled(model.store?.scenarioId.isEmpty ?? true)
-                        if model.store?.scenarioId.isEmpty ?? true {
-                            Text("Set a scenario id and device label on Setup first.").font(.footnote).foregroundStyle(.secondary)
-                        }
-                    }
-                } footer: {
-                    Text("A session frames the test. Logging works with or without one; the Lock Screen shows Mark and Stamp while it runs.")
-                }
-
-                Section {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Screen capture").font(.headline)
-                            Text(model.broadcastOn ? "On: each Mark saves a screenshot" : "Off")
-                                .font(.subheadline).foregroundStyle(model.broadcastOn ? .red : .secondary)
+                            if model.sessionActive, let start = model.sessionStart {
+                                Text("Session running").font(.headline)
+                                Text(start, style: .timer).font(.subheadline.monospacedDigit()).foregroundStyle(.red)
+                                Text("Each Mark saves a screenshot").font(.subheadline).foregroundStyle(.secondary)
+                            } else {
+                                Text("Start a session").font(.headline)
+                                Text("Round button, KDL Screen, Start Broadcast").font(.subheadline).foregroundStyle(.secondary)
+                            }
                         }
                         Spacer()
                         BroadcastPicker().frame(width: 44, height: 44)
                     }
+                    if model.store?.scenarioId.isEmpty ?? true {
+                        Text("Set a scenario id and device label on Setup first.").font(.footnote).foregroundStyle(.orange)
+                    }
+                } header: {
+                    Text("Session")
                 } footer: {
-                    Text("Tap the round button, pick KDL Screen, then Start Broadcast. While it runs, every Mark saves a screenshot and each app switch is logged. Stop it with the same button or the red indicator at the top of the screen.")
+                    Text("Starting screen capture starts the session and stopping it ends the session. While it runs, every Mark saves a screenshot and each app switch is logged. Stop it with the round button or the red indicator at the top of the screen. Mark with Back Tap so nothing covers the screen.")
                 }
 
                 Section {

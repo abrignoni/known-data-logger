@@ -6,12 +6,13 @@ import UniformTypeIdentifiers
 import VideoToolbox
 
 /// The screen broadcast the tester starts from KDL. It keeps only the latest video frame, and when a
-/// mark is logged anywhere (app, widget, control, Live Activity, Shortcuts) it saves that frame as a
+/// mark is logged anywhere (app, widget, control, Shortcuts, Back Tap) it saves that frame as a
 /// PNG for the mark, with its SHA-256. It also logs each app switch ReplayKit reports.
 ///
-/// Rows it writes: screen_capture_started / screen_capture_stopped (system rows; a start with no stop
-/// means iOS ended the extension without telling it), and an auto_event "screen" row per app switch
-/// with the bundle id in app_package.
+/// Starting the broadcast starts the session (capture_session_start) and ending it stops the session
+/// (capture_session_stop, with counts and timings). If iOS ends the extension without telling it, the
+/// app logs the stop the next time it opens. Each app switch is an auto_event "screen" row with the
+/// bundle id in app_package.
 final class SampleHandler: RPBroadcastSampleHandler {
     private let lock = NSLock()
     private var latest: CVPixelBuffer?
@@ -33,9 +34,7 @@ final class SampleHandler: RPBroadcastSampleHandler {
     override func broadcastStarted(withSetupInfo setupInfo: [String: NSObject]?) {
         startedAtMs = Clocks.stamp().utcMs
         try? FileManager.default.createDirectory(at: KDL.screensDir, withIntermediateDirectories: true)
-        try? store?.putSetting("broadcast_active", "1")
-        _ = try? store?.log(Draft(action: "screen_capture_started", detail: "screen broadcast started", source: Source.system),
-                            kind: Kind.systemEvent)
+        try? store?.startSession(detail: "screen capture started")
         let observer = Unmanaged.passUnretained(self).toOpaque()
         CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), observer, { _, observer, _, _, _ in
             guard let observer else { return }
@@ -47,10 +46,9 @@ final class SampleHandler: RPBroadcastSampleHandler {
     override func broadcastFinished() {
         CFNotificationCenterRemoveEveryObserver(CFNotificationCenterGetDarwinNotifyCenter(), Unmanaged.passUnretained(self).toOpaque())
         work.sync {}  // let a screenshot in progress finish
-        try? store?.putSetting("broadcast_active", "0")
-        let detail = "screen broadcast stopped; \(saved) screenshot(s) saved, \(failed) failed, \(switches) app switch(es); " +
+        let detail = "screen capture stopped; \(saved) screenshot(s) saved, \(failed) failed, \(switches) app switch(es); " +
             "largest gap between a mark and its frame \(maxFrameGapMs) ms; peak memory footprint \(peakFootprint / 1_048_576) MB"
-        _ = try? store?.log(Draft(action: "screen_capture_stopped", detail: detail, source: Source.system), kind: Kind.systemEvent)
+        try? store?.stopSession(detail: detail)
         KDL.reloadSurfaces()
     }
 

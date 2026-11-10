@@ -367,7 +367,7 @@ public final class Store: @unchecked Sendable {
     /// The app the screen broadcast last reported in front, while a broadcast is running; else nil.
     /// A mark carries it, as the Android mark carries the app last seen in the foreground.
     public func foregroundApp() -> String? {
-        guard setting("broadcast_active") == "1" else { return nil }
+        guard sessionActive else { return nil }
         lock.lock(); defer { lock.unlock() }
         let r = try? query("SELECT app_package FROM entries WHERE kind = ? AND action = ? AND revision_n = 0 ORDER BY seq DESC LIMIT 1",
                            [.text(Kind.autoEvent), .text(AutoAction.screen)]).first
@@ -518,24 +518,25 @@ public final class Store: @unchecked Sendable {
 
     // MARK: sessions
 
-    /// A session is the stretch of a test the tester is logging. On iOS nothing is captured
-    /// automatically yet, so it only frames the hand-logged rows (and drives the Live Activity).
+    /// A session is the stretch of a test while screen capture runs: the broadcast extension starts
+    /// it when the broadcast starts and stops it when the broadcast ends. Hand logging works with or
+    /// without one.
     public var sessionActive: Bool { setting("capture_session_active") == "1" }
 
     public func sessionStart() -> Stamp? { stamp(forKey: "session_start") }
 
-    public func startSession() throws {
+    public func startSession(detail: String = "screen capture started") throws {
         let s = Clocks.stamp()
         let apps = self.apps().map(\.pkg).sorted().joined(separator: " ")
         try putSetting("capture_session_active", "1")
         try putStamp(s, forKey: "session_start")
-        try log(Draft(action: "capture_session_start", detail: "apps: " + (apps.isEmpty ? "none listed" : apps) + "; hand logging only",
+        try log(Draft(action: "capture_session_start", detail: "\(detail); apps under test: " + (apps.isEmpty ? "none listed" : apps),
                       source: Source.system), stamp: s, kind: Kind.systemEvent)
     }
 
-    public func stopSession() throws {
+    public func stopSession(detail: String? = nil) throws {
         try putSetting("capture_session_active", "0")
-        try log(Draft(action: "capture_session_stop", source: Source.system), kind: Kind.systemEvent)
+        try log(Draft(action: "capture_session_stop", detail: detail, source: Source.system), kind: Kind.systemEvent)
     }
 
     // MARK: live copy

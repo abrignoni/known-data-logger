@@ -147,7 +147,7 @@ final class ForegroundTests: XCTestCase {
         let s = try Store(url: dir.appendingPathComponent("kl.db"))
         try s.log(Draft(appPackage: "com.apple.mobilenotes", action: AutoAction.screen, source: Source.autoEvent), kind: Kind.autoEvent)
         XCTAssertNil(try s.mark().appPackage, "no broadcast running, so the app in front is not known")
-        try s.putSetting("broadcast_active", "1")
+        try s.startSession()
         try s.log(Draft(appPackage: "com.apple.mobilesafari", action: AutoAction.screen, source: Source.autoEvent), kind: Kind.autoEvent)
         XCTAssertEqual("com.apple.mobilesafari", try s.mark().appPackage)
     }

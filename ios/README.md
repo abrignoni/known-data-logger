@@ -10,12 +10,12 @@ the other tools read an iOS export the same way.
 
 - Scenario id and device label, a device profile snapshot, and a list of apps under test. iOS does
   not let KDL read another app's version, so the tester types it.
-- Sessions: Start and Stop rows that frame a test. While a session runs, the Lock Screen shows a
-  Live Activity with a timer and Mark and Stamp buttons.
+- Sessions: starting screen capture starts the session and stopping it ends the session (see
+  Screen capture). There is no separate session button.
 - Hand logging from the Log tab: one tap on a common action opens a form with the time already
   stamped. Other, Repeat, and Start timing / Done for calls and recordings.
 - Mark (stamps "this is the action") and Stamp now (stamps an action to describe later), from the
-  app, a Home Screen widget, the Live Activity, or Control Center and Lock Screen controls
+  app, a Home Screen widget, Back Tap or Shortcuts, or Control Center and Lock Screen controls
   (iOS 18; also the Action button on phones that have one). These run without opening KDL.
 - Shortcuts: Mark, Stamp now, and Log action (action, app, content, counterpart, note). Log action
   works from a personal automation on the App trigger, which does not tell the shortcut which app
@@ -41,9 +41,11 @@ red indicator while it runs.
   id in `app_package`. ReplayKit does not report the Home Screen.
 - While capture runs, a Mark carries the bundle id of the app last reported in front, so a label
   made from it lands on that app's sheet in the spreadsheet.
-- Start and stop are `screen_capture_started` and `screen_capture_stopped` rows. The stop row gives
-  the number of screenshots, failures and app switches, the largest gap between a mark and its frame,
-  and the extension's peak memory footprint. A start with no stop means iOS ended the extension.
+- Starting the broadcast logs `capture_session_start` and stopping it logs `capture_session_stop`,
+  whose detail gives the number of screenshots, failures and app switches, the largest gap between
+  a mark and its frame, and the extension's peak memory footprint. If iOS ends the extension without
+  telling it, the app logs the stop the next time it is opened and the screen is not being captured
+  (`UIScreen.isCaptured`); that path has not been exercised.
 - Marking from Control Center or the Lock Screen puts that overlay in the screenshot. Back Tap
   (Settings > Accessibility > Touch > Back Tap, set to a Shortcut that runs KDL's Mark) leaves the
   screen alone. Run from Shortcuts or Back Tap, Mark shows a "Marked" banner with the time.
@@ -123,7 +125,7 @@ an iOS export (exit 0, no warnings).
 
 On one iPhone 13 with iOS 26.6, 9 November 2026, development build, made-up content: setup and a
 profile snapshot, an app under test, Start and Stop session, a hand-logged action, Mark and Stamp in
-the app, Mark from the Lock Screen Live Activity (iOS asked once to allow Live Activities), the
+the app, Mark from the Lock Screen Live Activity (removed in 0.2.0; iOS asked once to allow it), the
 Control Center control, labelling a mark, an edit, a removal, and an export. The export (13 rows,
 built as 1.0 before the version number was fixed) passed `make_documentation.py` (sha256 match,
 chain intact, exit 0, no warnings) and the Swift verifier gave the same last hash. Across the
@@ -154,5 +156,5 @@ the Scenario sheet. `make_documentation.py` exited 0.
 
 - Screen capture on iOS 27 (ScreenCaptureKit).
 - An ordering fix in the tools for boot_count -1 exports.
-- The marks do not record which surface they came from (app, widget, control, Live Activity).
+- The marks do not record which surface they came from (app, widget, control, Back Tap).
 - An iLEAPP module for KDL's own database, and a map of the traces KDL leaves on the phone.

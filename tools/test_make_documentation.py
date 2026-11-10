@@ -191,16 +191,12 @@ class DocTest(unittest.TestCase):
             row(9, "p", "profile_snapshot", kind="system_event", app_package=None, detail="profile id 2"),
             row(10, "x", "export", kind="export", app_package=None, detail="folder kdl_sc_phoneA_x"),
             row(11, "o", "app_version_changed_since_added", kind="system_event", source="system", detail="old name"),
-            row(12, "s", "screen_capture_started", kind="system_event", source="system", app_package=None,
-                detail="screen broadcast started"),
-            row(13, "t", "screen_capture_stopped", kind="system_event", source="system", app_package=None,
-                detail="3 screenshot(s) saved"),
         ]
         d = make_export(self.tmp, rows)
         out = os.path.join(self.tmp, "doc.xlsx")
         md.build([md.load_export(d)], out)
         listed = [str(v) for _, v in load_workbook(out)["Scenario"].iter_rows(values_only=True) if v]
-        for action in ("screen_capture_started", "screen_capture_stopped", "app_version_changed_since_last_seen", "app_data_cleared", "profile_snapshot", "export",
+        for action in ("app_version_changed_since_last_seen", "app_data_cleared", "profile_snapshot", "export",
                        "app_version_changed_since_added"):
             self.assertTrue(any(v.startswith(action + " ") or v.startswith(action + ":") for v in listed), action)
 

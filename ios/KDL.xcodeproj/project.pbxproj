@@ -10,7 +10,6 @@
 		0A1D50D70EB45958BE8AE167 /* KDLCore in Frameworks */ = {isa = PBXBuildFile; productRef = 8375C145A20EB9B6F7BAA0C0 /* KDLCore */; };
 		0FC23B1C09DB6312D504E176 /* KDLBroadcast.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0D5757D09DD9185F1901A992 /* KDLBroadcast.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		19FD28521AE1892EFFE5C56E /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64E428C722EE30DD2ED39383 /* SetupView.swift */; };
-		1BFF4817D3A36DB3C4726C62 /* SessionActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86DABE6D9593BC2EB8898784 /* SessionActivity.swift */; };
 		1CA2A5EC8C715AEBE3890A5D /* EntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C0BE1ACD3367187AE35DC51 /* EntrySheet.swift */; };
 		278ECE87E2ED52E3D51D8979 /* Intents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F886F435EB02747C2C0E087 /* Intents.swift */; };
 		41B8B24C85349AEE91E424B4 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 52850D1EF62D7BA04EC32E4F /* PrivacyInfo.xcprivacy */; };
@@ -28,7 +27,6 @@
 		9F5182DB64C3CAAAD907CA92 /* KDLApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D13B926D88D73FBCC53BCEB /* KDLApp.swift */; };
 		A283557DEE2334DB0E4C12F5 /* ReplayKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CF699C1CA7F77699D5A7AB53 /* ReplayKit.framework */; };
 		A84DDEE4A99B2EC57893FFF4 /* KDLWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA6F1FABF3833A2A54E9949D /* KDLWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		C58D94498CAA9CB41178DFD9 /* SessionActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86DABE6D9593BC2EB8898784 /* SessionActivity.swift */; };
 		D7B7D48763A4D48A399FAC4E /* BroadcastPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63A4019601ADF1ABAFA76C6D /* BroadcastPicker.swift */; };
 		E110E94491E2847B2C724C16 /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E6A7D3D3401C5B3D91E1E45 /* LogView.swift */; };
 		EFD030E5AEA4FA36D12A7991 /* KDLWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 607136204660E8050577F7D9 /* KDLWidgets.swift */; };
@@ -84,7 +82,6 @@
 		63A4019601ADF1ABAFA76C6D /* BroadcastPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastPicker.swift; sourceTree = "<group>"; };
 		64E428C722EE30DD2ED39383 /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
 		7659BD8BB7B8202F94B08BAB /* KDLBroadcast.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = KDLBroadcast.entitlements; sourceTree = "<group>"; };
-		86DABE6D9593BC2EB8898784 /* SessionActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionActivity.swift; sourceTree = "<group>"; };
 		92547FB01CD1461C245FBECB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		9B8CB398E127BC917CB6E7D9 /* KDL.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = KDL.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9C0BE1ACD3367187AE35DC51 /* EntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntrySheet.swift; sourceTree = "<group>"; };
@@ -202,7 +199,6 @@
 			children = (
 				4F886F435EB02747C2C0E087 /* Intents.swift */,
 				32A789FF18EB14632CDE032E /* KDL.swift */,
-				86DABE6D9593BC2EB8898784 /* SessionActivity.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -374,7 +370,6 @@
 				278ECE87E2ED52E3D51D8979 /* Intents.swift in Sources */,
 				9600D3CFB5C180900BCC0B85 /* KDL.swift in Sources */,
 				EFD030E5AEA4FA36D12A7991 /* KDLWidgets.swift in Sources */,
-				1BFF4817D3A36DB3C4726C62 /* SessionActivity.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -388,7 +383,6 @@
 				98B691BD639CD319AA6903B7 /* KDL.swift in Sources */,
 				9F5182DB64C3CAAAD907CA92 /* KDLApp.swift in Sources */,
 				E110E94491E2847B2C724C16 /* LogView.swift in Sources */,
-				C58D94498CAA9CB41178DFD9 /* SessionActivity.swift in Sources */,
 				19FD28521AE1892EFFE5C56E /* SetupView.swift in Sources */,
 				4A28C67D755E32847103E488 /* TimelineScreen.swift in Sources */,
 			);

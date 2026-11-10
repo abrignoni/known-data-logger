@@ -1,4 +1,3 @@
-import ActivityKit
 import AppIntents
 import KDLCore
 import SwiftUI
@@ -8,7 +7,6 @@ import WidgetKit
 struct KDLWidgets: WidgetBundle {
     var body: some Widget {
         QuickLogWidget()
-        SessionLiveActivity()
         if #available(iOS 18.0, *) {
             MarkControl()
             StampControl()
@@ -118,42 +116,5 @@ struct StampControl: ControlWidget {
         }
         .displayName("KDL Stamp")
         .description("Stamps an action to describe later.")
-    }
-}
-
-// MARK: Live Activity while a session runs
-
-struct SessionLiveActivity: Widget {
-    var body: some WidgetConfiguration {
-        ActivityConfiguration(for: SessionActivityAttributes.self) { context in
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("KDL session").font(.headline)
-                    Text(context.attributes.started, style: .timer).font(.subheadline.monospacedDigit())
-                    Text("\(context.attributes.scenarioId) · \(context.attributes.deviceLabel)").font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button(intent: MarkIntent()) { Label("Mark", systemImage: "flag.fill") }.tint(.orange)
-                Button(intent: StampIntent()) { Label("Stamp", systemImage: "clock.badge.checkmark") }.tint(.blue)
-            }
-            .buttonStyle(.borderedProminent)
-            .padding()
-        } dynamicIsland: { context in
-            DynamicIsland {
-                DynamicIslandExpandedRegion(.leading) { Text(context.attributes.started, style: .timer).monospacedDigit() }
-                DynamicIslandExpandedRegion(.trailing) {
-                    Button(intent: MarkIntent()) { Label("Mark", systemImage: "flag.fill") }.tint(.orange)
-                }
-                DynamicIslandExpandedRegion(.bottom) {
-                    Button(intent: StampIntent()) { Label("Stamp", systemImage: "clock.badge.checkmark") }.tint(.blue)
-                }
-            } compactLeading: {
-                Image(systemName: "record.circle").foregroundStyle(.red)
-            } compactTrailing: {
-                Text(context.attributes.started, style: .timer).monospacedDigit().frame(maxWidth: 52)
-            } minimal: {
-                Image(systemName: "record.circle").foregroundStyle(.red)
-            }
-        }
     }
 }

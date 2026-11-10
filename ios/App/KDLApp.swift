@@ -1,4 +1,3 @@
-import ActivityKit
 import AppIntents
 import KDLCore
 import SwiftUI
@@ -13,7 +12,7 @@ struct KDLApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(model)
-                .onChange(of: phase) { _, p in if p == .active { model.refresh() } }
+                .onChange(of: phase) { _, p in if p == .active { model.closeOrphanSession(); model.refresh() } }
         }
     }
 }
@@ -66,8 +65,6 @@ final class AppModel: ObservableObject {
     var pending: [Entry] { Review.pending(rows) }
     var apps: [AppUnderTest] { store?.apps() ?? [] }
     var sessionActive: Bool { store?.sessionActive ?? false }
-    /// As last written by the broadcast extension (it cannot say so if iOS stops it abruptly).
-    var broadcastOn: Bool { store?.setting("broadcast_active") == "1" }
 
     /// The screenshot shown for an entry: its own, or the one of the mark it labels.
     func shot(for e: Entry) -> Shot? { shots[e.entryId] ?? e.refersTo.flatMap { shots[$0] } }
@@ -77,6 +74,15 @@ final class AppModel: ObservableObject {
         return UIImage(contentsOfFile: KDL.screensDir.appendingPathComponent(f).path)
     }
     var sessionStart: Date? { store?.sessionStart().map { Date(ms: $0.utcMs) } }
+
+    /// A session the extension started but never stopped (iOS can end an extension without telling
+    /// it) is closed when KDL opens and the screen is no longer being captured.
+    func closeOrphanSession() {
+        guard let store, store.sessionActive, !UIScreen.main.isCaptured else { return }
+        run("Closing the session") {
+            try $0.stopSession(detail: "screen capture was not running when KDL was opened; the capture ended without a stop from the extension")
+        }
+    }
 
     func refresh() {
         rows = store?.entries() ?? []
@@ -137,18 +143,6 @@ final class AppModel: ObservableObject {
     func remove(_ e: Entry) { run("Removing") { try $0.tombstone(e) } }
 
     // MARK: sessions
-
-    func startSession() {
-        run("Starting the session") { try $0.startSession() }
-        guard ActivityAuthorizationInfo().areActivitiesEnabled, let store else { return }
-        let attrs = SessionActivityAttributes(scenarioId: store.scenarioId, deviceLabel: store.deviceLabel, started: sessionStart ?? .now)
-        _ = try? Activity.request(attributes: attrs, content: .init(state: .init(logged: 0), staleDate: nil))
-    }
-
-    func stopSession() {
-        run("Stopping the session") { try $0.stopSession() }
-        Task { for a in Activity<SessionActivityAttributes>.activities { await a.end(nil, dismissalPolicy: .immediate) } }
-    }
 
     // MARK: setup
 
