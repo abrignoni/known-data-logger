@@ -257,11 +257,17 @@ def build(exports, out_path):
         p = (m.get("profiles") or [{}])[-1]
         dev = m.get("device_label", "")
         lines += [("", ""), ("Device", dev), ("Export folder", os.path.basename(e["folder"])),
-                  ("Make and model", f"{p.get('manufacturer', '')} {p.get('model', '')}".strip()),
-                  ("Android", f"{p.get('release', '')} (SDK {p.get('sdk_int', '')}), build {p.get('incremental', '')}"),
-                  ("Security patch", p.get("security_patch")), ("Fingerprint", p.get("fingerprint")),
-                  ("Kernel", p.get("kernel")), ("Baseband", p.get("baseband")), ("Carrier", p.get("carrier")),
-                  ("Logger", f"{m.get('logger', {}).get('package')} {m.get('logger', {}).get('version_name')}"),
+                  ("Make and model", f"{p.get('manufacturer', '')} {p.get('model', '')}".strip())]
+        if p.get("manufacturer") == "Apple":
+            # The iOS app fills release (iOS version), incremental (build), kernel and carrier; it has no
+            # source for the Android-only fields.
+            lines += [("iOS", f"{p.get('release', '')}, build {p.get('incremental', '')}"),
+                      ("Kernel", p.get("kernel")), ("Carrier", p.get("carrier"))]
+        else:
+            lines += [("Android", f"{p.get('release', '')} (SDK {p.get('sdk_int', '')}), build {p.get('incremental', '')}"),
+                      ("Security patch", p.get("security_patch")), ("Fingerprint", p.get("fingerprint")),
+                      ("Kernel", p.get("kernel")), ("Baseband", p.get("baseband")), ("Carrier", p.get("carrier"))]
+        lines += [("Logger", f"{m.get('logger', {}).get('package')} {m.get('logger', {}).get('version_name')}"),
                   ("Profile snapshots", len(m.get("profiles") or []))]
         for name, result in e["checks"]:
             lines.append((f"Check: {name}", result))

@@ -229,6 +229,26 @@ class DocTest(unittest.TestCase):
         self.assertEqual(1, code)
         self.assertIn("BROKEN at seq 2", out)
 
+    def test_device_lines_follow_the_platform(self):
+        d = make_export(self.tmp, self.rows)
+        mpath = os.path.join(d, "manifest.json")
+        out = os.path.join(self.tmp, "doc.xlsx")
+
+        def scenario(profile):
+            m = json.load(open(mpath)); m["profiles"] = [profile]
+            json.dump(m, open(mpath, "w"))
+            md.build([md.load_export(d)], out)
+            return {r[0]: r[1] for r in load_workbook(out)["Scenario"].iter_rows(values_only=True) if r[0]}
+
+        ios = scenario({"manufacturer": "Apple", "model": "iPhone14,5", "release": "26.6", "incremental": "23G71",
+                        "kernel": "25.6.0", "sdk_int": None, "fingerprint": None})
+        self.assertEqual("26.6, build 23G71", ios["iOS"])
+        self.assertNotIn("Android", ios)
+        self.assertNotIn("Fingerprint", ios)
+        android = scenario({"manufacturer": "Google", "model": "Pixel 7a", "release": "17", "sdk_int": 37, "incremental": "1"})
+        self.assertEqual("17 (SDK 37), build 1", android["Android"])
+        self.assertNotIn("iOS", android)
+
     def test_sheet_names_are_valid_and_unique(self):
         used = set()
         self.assertEqual("a_b", md.sheet_name("a/b", used))
