@@ -9,7 +9,6 @@ struct KDLWidgets: WidgetBundle {
         QuickLogWidget()
         if #available(iOS 18.0, *) {
             MarkControl()
-            StampControl()
         }
     }
 }
@@ -49,7 +48,6 @@ struct QuickLogProvider: TimelineProvider {
 
 struct QuickLogView: View {
     let entry: QuickLogEntry
-    @Environment(\.widgetFamily) var family
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -62,16 +60,11 @@ struct QuickLogView: View {
                     Text("No session").font(.caption).foregroundStyle(.secondary)
                 }
             }
-            HStack(spacing: 8) {
-                Button(intent: MarkIntent()) {
-                    Label("Mark", systemImage: "flag.fill").frame(maxWidth: .infinity)
-                }.tint(.orange)
-                Button(intent: StampIntent()) {
-                    Label("Stamp", systemImage: "clock.badge.checkmark").frame(maxWidth: .infinity)
-                }.tint(.blue)
+            Button(intent: MarkIntent()) {
+                Label("Mark", systemImage: "flag.fill").frame(maxWidth: .infinity)
             }
+            .tint(.orange)
             .buttonStyle(.borderedProminent)
-            .labelStyle(family == .systemSmall ? AnyLabelStyle(.iconOnly) : AnyLabelStyle(.titleAndIcon))
             Spacer(minLength: 0)
             if let last = entry.last { Text(last).font(.caption2).foregroundStyle(.secondary).lineLimit(1) }
             if entry.toCheck > 0 { Text("\(entry.toCheck) to check").font(.caption2).foregroundStyle(.orange) }
@@ -80,17 +73,11 @@ struct QuickLogView: View {
     }
 }
 
-struct AnyLabelStyle: LabelStyle {
-    private let make: (Configuration) -> AnyView
-    init<S: LabelStyle>(_ s: S) { make = { AnyView(s.makeBody(configuration: $0)) } }
-    func makeBody(configuration: Configuration) -> some View { make(configuration) }
-}
-
 struct QuickLogWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "QuickLog", provider: QuickLogProvider()) { QuickLogView(entry: $0) }
             .configurationDisplayName("KDL quick log")
-            .description("Mark or stamp an action without opening KDL.")
+            .description("Mark an action without opening KDL.")
             .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
@@ -108,13 +95,3 @@ struct MarkControl: ControlWidget {
     }
 }
 
-@available(iOS 18.0, *)
-struct StampControl: ControlWidget {
-    var body: some ControlWidgetConfiguration {
-        StaticControlConfiguration(kind: "com.abrignoni.knowndatalogger.stamp") {
-            ControlWidgetButton(action: StampIntent()) { Label("KDL Stamp", systemImage: "clock.badge.checkmark") }
-        }
-        .displayName("KDL Stamp")
-        .description("Stamps an action to describe later.")
-    }
-}

@@ -17,16 +17,20 @@ struct KDLApp: App {
     }
 }
 
+/// Two screens in workflow order: Session (start and stop capture) and Review (label, then export).
+/// Setup is done once per phone, so it sits behind a gear and opens by itself the first time.
 struct RootView: View {
     @EnvironmentObject var model: AppModel
+    @State private var showSetup = false
 
     var body: some View {
         TabView {
-            LogView().tabItem { Label("Log", systemImage: "square.and.pencil") }
-            TimelineScreen().tabItem { Label("Timeline", systemImage: "list.bullet") }
+            SessionView(showSetup: $showSetup).tabItem { Label("Session", systemImage: "record.circle") }
+            ReviewView().tabItem { Label("Review", systemImage: "checklist") }
                 .badge(model.pending.count)
-            SetupView().tabItem { Label("Setup", systemImage: "gearshape") }
         }
+        .sheet(isPresented: $showSetup) { SetupView() }
+        .onAppear { if model.needsSetup { showSetup = true } }
         .alert(item: $model.message) { m in Alert(title: Text(m.title), message: Text(m.body)) }
     }
 }
@@ -45,8 +49,6 @@ final class AppModel: ObservableObject {
     @Published var lastExport: URL?
     /// Start of an open Start/Done window (calls, recordings), kept in the database so it survives the app being closed.
     @Published var windowStart: Stamp?
-    /// The last draft saved, for Repeat.
-    @Published var lastDraft: Draft?
     /// Screenshots by entry id.
     @Published var shots: [String: Shot] = [:]
 
@@ -62,9 +64,41 @@ final class AppModel: ObservableObject {
     }
 
     var current: [Entry] { Timeline.current(rows) }
+    /// Unlabelled marks and stamped entries, oldest first: the order they are labelled in.
     var pending: [Entry] { Review.pending(rows) }
     var apps: [AppUnderTest] { store?.apps() ?? [] }
     var sessionActive: Bool { store?.sessionActive ?? false }
+    var sessionStart: Date? { store?.sessionStart().map { Date(ms: $0.utcMs) } }
+    var needsSetup: Bool { (store?.scenarioId.isEmpty ?? true) || (store?.deviceLabel.isEmpty ?? true) }
+
+    /// The name shown for an app: the tester's name for it, else Apple's usual name, else the bundle id.
+    func appName(_ pkg: String?) -> String? {
+        guard let pkg else { return nil }
+        return apps.first { $0.pkg == pkg }?.label ?? AppNames.names[pkg] ?? pkg
+    }
+
+    /// Apps the screen capture saw in front, KDL excluded, in the order first seen.
+    var appsUsed: [String] {
+        var seen: [String] = []
+        for r in rows where r.kind == Kind.autoEvent && r.action == AutoAction.screen {
+            if let p = r.appPackage, p != KDL.bundleId, !seen.contains(p) { seen.append(p) }
+        }
+        return seen
+    }
+
+    /// Apps used with no version typed yet (iOS cannot read another app's version).
+    var appsMissingVersion: [String] {
+        appsUsed.filter { p in apps.first { $0.pkg == p }?.versionName?.isEmpty ?? true }
+    }
+
+    /// Counts for the running session: marks, screenshots saved, apps seen.
+    var sessionCounts: (marks: Int, shots: Int, apps: Int) {
+        guard let startSeq = rows.last(where: { $0.action == "capture_session_start" })?.seq else { return (0, 0, 0) }
+        let inside = rows.filter { $0.seq > startSeq && $0.revisionN == 0 }
+        let marks = inside.filter(\.isMark)
+        let apps = Set(inside.filter { $0.action == AutoAction.screen }.compactMap(\.appPackage)).subtracting([KDL.bundleId])
+        return (marks.count, marks.filter { shots[$0.entryId]?.file != nil }.count, apps.count)
+    }
 
     /// The screenshot shown for an entry: its own, or the one of the mark it labels.
     func shot(for e: Entry) -> Shot? { shots[e.entryId] ?? e.refersTo.flatMap { shots[$0] } }
@@ -73,7 +107,12 @@ final class AppModel: ObservableObject {
         guard let f = shot(for: e)?.file else { return nil }
         return UIImage(contentsOfFile: KDL.screensDir.appendingPathComponent(f).path)
     }
-    var sessionStart: Date? { store?.sessionStart().map { Date(ms: $0.utcMs) } }
+
+    /// The form for the next item to label, if any.
+    func nextToLabel() -> EntryMode? {
+        guard let e = pending.first else { return nil }
+        return e.isMark ? .label(e) : .edit(e)
+    }
 
     /// A session the extension started but never stopped (iOS can end an extension without telling
     /// it) is closed when KDL opens and the screen is no longer being captured.
@@ -100,17 +139,7 @@ final class AppModel: ObservableObject {
 
     // MARK: logging
 
-    func log(_ d: Draft, at stamp: Stamp) {
-        run("Logging") { try $0.log(d, stamp: stamp) }
-        if !d.action.isEmpty { lastDraft = d }
-    }
-
-    func mark() {
-        run("Mark") { try $0.mark() }
-        KDL.postMark()
-    }
-
-    func stamp() { run("Stamp") { try $0.log(Draft(action: "")) } }
+    func log(_ d: Draft, at stamp: Stamp) { run("Logging") { try $0.log(d, stamp: stamp) } }
 
     func startWindow() {
         let s = Clocks.stamp()
@@ -128,7 +157,6 @@ final class AppModel: ObservableObject {
             try s.putStamp(nil, forKey: "window_start")
         }
         windowStart = nil
-        lastDraft = d
     }
 
     /// A label for a mark is its own action row at the mark's time, pointing back at the mark.
@@ -142,8 +170,6 @@ final class AppModel: ObservableObject {
 
     func remove(_ e: Entry) { run("Removing") { try $0.tombstone(e) } }
 
-    // MARK: sessions
-
     // MARK: setup
 
     func takeSnapshot(carrier: String, notes: String) {
@@ -152,6 +178,14 @@ final class AppModel: ObservableObject {
                         release: d.systemVersion, incremental: Clocks.sysctlString("kern.osversion"),
                         kernel: Clocks.sysctlString("kern.osrelease"), carrier: carrier, notes: notes)
         run("Device snapshot") { try $0.addProfile(p) }
+    }
+
+    func saveApp(pkg: String, name: String, version: String, account: String) {
+        let existing = apps.first { $0.pkg == pkg }
+        run("Saving the app") {
+            try $0.upsertApp(AppUnderTest(pkg: pkg, label: name.isEmpty ? pkg : name, versionName: version, account: account,
+                                          addedUtcMs: existing?.addedUtcMs ?? Clocks.stamp().utcMs))
+        }
     }
 
     func export() {
@@ -175,18 +209,23 @@ func clock(_ s: Stamp) -> String {
     Date(ms: s.utcMs).formatted(.dateTime.hour().minute().second())
 }
 
+/// Words shown for an action key: "visited_url" reads "Visited URL".
+func actionWords(_ key: String) -> String {
+    templateLabel(key).capitalizedFirst.replacingOccurrences(of: " url", with: " URL")
+}
+
 struct KDLShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: MarkIntent(), phrases: ["Mark in \(.applicationName)"], shortTitle: "Mark", systemImageName: "flag.fill")
-        AppShortcut(intent: StampIntent(), phrases: ["Stamp now in \(.applicationName)"], shortTitle: "Stamp now",
-                    systemImageName: "clock.badge.checkmark")
-        AppShortcut(intent: LogActionIntent(), phrases: ["Log an action in \(.applicationName)"], shortTitle: "Log action",
-                    systemImageName: "square.and.pencil")
     }
 }
 
+extension String {
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
+}
+
 extension View {
-    /// A Done button above the keyboard and swipe-down to close it, so the tab bar is never stuck behind the keyboard.
+    /// A Done button above the keyboard and swipe-down to close it, so nothing stays stuck behind the keyboard.
     func keyboardDone() -> some View {
         scrollDismissesKeyboard(.interactively)
             .toolbar {

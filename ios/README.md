@@ -1,30 +1,52 @@
 # KDL for iOS (0.2.0)
 
 The iOS version of the known-data logger. iOS gives apps no way to watch other apps' screens, taps,
-typed text or notifications. The tester logs each action by hand, fast, and KDL writes the same
-rows, hash chain and export folder as the Android app. With screen capture on, each Mark also saves a
-screenshot and every app switch is logged with the app's bundle id. `tools/make_documentation.py` and
-the other tools read an iOS export the same way.
+typed text or notifications. Instead, the tester runs a screen capture, does each action in its app
+and marks it (double-tap the back of the phone), then labels each mark from its screenshot. KDL
+writes the same rows, hash chain and export folder as the Android app, and every app switch is
+logged with the app's bundle id. `tools/make_documentation.py` and the other tools read an iOS
+export the same way.
+
+## Workflow
+
+Once per phone: Setup (scenario id, device label, device snapshot), and a Shortcut that runs KDL's
+Mark set as Settings > Accessibility > Touch > Back Tap > Double Tap.
+
+Each test:
+
+1. **Session** screen: start screen capture (round button, KDL Screen, Start Broadcast). This
+   starts the session.
+2. Do each action in its app. When it is done, double-tap the back of the phone. A "Marked" banner
+   confirms it; the mark gets a screenshot and the app in front.
+3. Stop the capture (round button or the red indicator). This ends the session.
+4. **Review** screen, To label: each mark shows its screenshot and app. Pick the action, type the
+   text that matters (content, counterpart), Save; the next mark opens. A label's time is the
+   mark's, with time quality "after" (the mark comes right after the act).
+5. Review lists the apps used that have no version yet (iOS cannot read other apps' versions).
+6. Export, at the bottom of Review.
 
 ## What it does
 
-- Scenario id and device label, a device profile snapshot, and a list of apps under test. iOS does
-  not let KDL read another app's version, so the tester types it.
-- Sessions: starting screen capture starts the session and stopping it ends the session (see
-  Screen capture). There is no separate session button.
-- Hand logging from the Log tab: one tap on a common action opens a form with the time already
-  stamped. Other, Repeat, and Start timing / Done for calls and recordings.
-- Mark (stamps "this is the action") and Stamp now (stamps an action to describe later), from the
-  app, a Home Screen widget, Back Tap or Shortcuts, or Control Center and Lock Screen controls
-  (iOS 18; also the Action button on phones that have one). These run without opening KDL.
-- Shortcuts: Mark, Stamp now, and Log action (action, app, content, counterpart, note). Log action
-  works from a personal automation on the App trigger, which does not tell the shortcut which app
-  fired (Phase 0), so set Action and App in each automation.
-- Timeline: Everything (where it opens) and To check (unlabelled marks and stamped entries). Labelling a mark adds an
-  action row at the mark's time that refers to it. Edits add a revision; removing adds a tombstone.
-- Export everything: writes `kdl_<scenario>_<device>_<UTC time>/` with `manifest.json`,
-  `actions.jsonl` and `actions.csv` to On My iPhone > KDL > Exports in the Files app, and offers the
-  share sheet. Each export is logged as its own row first.
+- **Session**: start and stop screen capture, with live counts of marks, screenshots and apps.
+  "Log something with no screenshot" logs events the screen does not show (a restart, airplane
+  mode, a SIM swap, a call while locked), stamped when tapped, plus Start timing / Done for calls
+  and recordings.
+- **Review**: To label (unlabelled marks and stamped entries, oldest first) and Everything (newest
+  first; a labelled mark is shown through its label, app switches read "Switched to Notes").
+  Labelling a mark adds an action row at the mark's time that refers to it. Edits add a revision;
+  removing adds a tombstone. Tap a screenshot to zoom.
+- **Export** (bottom of Review): writes `kdl_<scenario>_<device>_<UTC time>/` with
+  `manifest.json`, `actions.jsonl`, `actions.csv` and `screens/` to On My iPhone > KDL > Exports in
+  the Files app, and offers the share sheet. Each export is logged as its own row first.
+- **Setup** (gear on Session; opens by itself until the scenario id and device label are set):
+  scenario and device, device snapshots, apps (optional; name, version, account), and
+  Diagnostics (clocks, latest row hash).
+- **Mark** runs from Back Tap or Shortcuts (with a "Marked" banner), a Home Screen widget, or a
+  Control Center or Lock Screen control (iOS 18). Marking from Control Center or the Lock Screen
+  puts that overlay in the screenshot; Back Tap does not.
+- App names shown for bundle ids come from a small built-in table of Apple apps (display only;
+  the log keeps the bundle id). Four of those ids were seen on the test phone; the rest are not
+  checked on a device.
 
 ## Screen capture
 
@@ -135,7 +157,7 @@ say which surface wrote it, so which tap made which row, and whether every tap w
 established. After reinstalling as 0.1.0, a second export held the same 13 rows byte for byte plus
 its own export row, and its last hash matched the one shown on the Setup tab.
 
-Not tried on the phone: the Home Screen widget, the share sheet, the Log action shortcut, a restart,
+Not tried on the phone: the Home Screen widget, the share sheet, a restart,
 a clock or time zone change.
 
 Screen capture, same phone, 0.2.0 development build (before the three changes listed below):

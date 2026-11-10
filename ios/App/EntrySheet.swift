@@ -1,5 +1,6 @@
 import KDLCore
 import SwiftUI
+import UIKit
 
 /// What the entry form is for.
 enum EntryMode: Identifiable {
@@ -22,10 +23,14 @@ enum EntryMode: Identifiable {
     }
 }
 
+/// One form for every entry. Ordered as the tester works from a screenshot: picture, what happened,
+/// the text that matters, then the rest under More.
 struct EntrySheet: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
     let mode: EntryMode
+    /// Called after a successful save, before the form closes (Review uses it to open the next mark).
+    var onSaved: () -> Void = {}
 
     @State private var action = ""
     @State private var app = ""
@@ -35,78 +40,112 @@ struct EntrySheet: View {
     @State private var note = ""
     @State private var expected = ""
     @State private var quality = TimeQuality.exact
+    @State private var more = false
     @State private var confirmReset = false
     @State private var confirmRemove = false
+    @State private var zoom = false
     @State private var loaded = false
 
     private var title: String {
         switch mode {
-        case .new: return action.isEmpty ? "Log an action" : templateLabel(action).capitalizedFirst
+        case .new: return action.isEmpty ? "Log an action" : actionWords(action)
         case .windowDone: return "Done timing"
-        case .label: return "Label the mark"
+        case .label: return "What happened?"
         case .edit: return "Edit"
         }
     }
 
     private var when: String {
         switch mode {
-        case .new(_, let s): return "Time \(clock(s)), stamped when you tapped"
-        case .windowDone: return model.windowStart.map { "From \(clock($0)) to now" } ?? ""
-        case .label(let e): return "Time \(clock(e.stamp)), the mark's time. The mark stays as it is."
-        case .edit(let e): return "Time \(clock(e.stamp)). An edit keeps this time and adds a revision."
+        case .new(_, let s): return "Time \(clock(s)), taken when you tapped."
+        case .windowDone: return model.windowStart.map { "From \(clock($0)) to now." } ?? ""
+        case .label(let e): return "Marked at \(clock(e.stamp)). The label gets this time."
+        case .edit(let e): return "Time \(clock(e.stamp)). Saving keeps this time and adds a revision."
         }
+    }
+
+    private var suggestions: [String] {
+        let s = AppNames.suggestions[app] ?? AppNames.fallbackSuggestions
+        return s.filter { $0 != action }
+    }
+
+    /// Apps offered: those under test, those the capture saw, and the entry's own.
+    private var appChoices: [String] {
+        var out = model.apps.map(\.pkg)
+        for p in model.appsUsed where !out.contains(p) { out.append(p) }
+        if !app.isEmpty && !out.contains(app) { out.append(app) }
+        return out
     }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    Text(when).font(.subheadline).foregroundStyle(.secondary)
                     if let e = entry, let img = model.image(for: e) {
-                        Image(uiImage: img).resizable().scaledToFit().frame(maxHeight: 360).frame(maxWidth: .infinity)
-                    } else if let e = entry, let s = model.shot(for: e) {
-                        Text("Screenshot: \(s.status)").font(.footnote).foregroundStyle(.secondary)
+                        Button { zoom = true } label: {
+                            Image(uiImage: img).resizable().scaledToFit().frame(maxHeight: 420).frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.plain)
+                        Text("Tap the picture to zoom.").font(.caption).foregroundStyle(.secondary)
+                    } else if let e = entry, e.isMark {
+                        Text(model.shot(for: e).map { "No screenshot (\($0.status))." } ?? "No screenshot: screen capture was off.")
+                            .font(.footnote).foregroundStyle(.secondary)
                     }
+                    Text(when).font(.footnote).foregroundStyle(.secondary)
                 }
-                Section("Action") {
-                    Picker("Template", selection: $action) {
-                        Text("Pick or type below").tag("")
-                        ForEach(actionTemplates, id: \.self) { Text(templateLabel($0)).tag($0) }
-                        if !action.isEmpty && !actionTemplates.contains(action) { Text(action).tag(action) }
+
+                Section {
+                    TextField("Action, e.g. sent_message", text: $action)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack {
+                            ForEach(suggestions, id: \.self) { s in
+                                Button(actionWords(s)) { action = s }.buttonStyle(.bordered).controlSize(.small)
+                            }
+                            Menu {
+                                ForEach(actionTemplates, id: \.self) { t in Button(actionWords(t)) { action = t } }
+                            } label: { Label("All", systemImage: "list.bullet") }
+                            .buttonStyle(.bordered).controlSize(.small)
+                        }
                     }
-                    TextField("Or type an action", text: $action).textInputAutocapitalization(.never).autocorrectionDisabled()
                     Picker("App", selection: $app) {
                         Text("None (device or system)").tag("")
-                        ForEach(model.apps) { Text($0.label).tag($0.pkg) }
-                        if !app.isEmpty && !model.apps.contains(where: { $0.pkg == app }) { Text(app).tag(app) }
+                        ForEach(appChoices, id: \.self) { Text(model.appName($0) ?? $0).tag($0) }
                     }
+                } header: { Text("Action") } footer: {
+                    if needsAction && action.trimmingCharacters(in: .whitespaces).isEmpty { Text("Pick or type an action to save.") }
                 }
+
                 Section {
-                    TextField("Content", text: $content, axis: .vertical)
-                    TextField("Counterpart", text: $counterpart)
-                    TextField("Conversation", text: $conversation)
-                    TextField("Note", text: $note, axis: .vertical)
-                    TextField("Expected artifacts, e.g. ileapp:key", text: $expected)
-                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    TextField("Content: the exact text, URL or file name", text: $content, axis: .vertical)
+                    TextField("Counterpart: the other person or account", text: $counterpart)
                 } footer: { Text(KDL.noSecrets) }
-                Section("The tap was") {
-                    Picker("Time quality", selection: $quality) {
-                        Text("Exact").tag(TimeQuality.exact)
-                        Text("After the act").tag(TimeQuality.after)
-                        Text("Before the act").tag(TimeQuality.before)
-                        Text("Approximate").tag(TimeQuality.approximate)
+
+                Section {
+                    DisclosureGroup("More", isExpanded: $more) {
+                        TextField("Conversation", text: $conversation)
+                        TextField("Note", text: $note, axis: .vertical)
+                        TextField("Expected artifacts, e.g. ileapp:key", text: $expected)
+                            .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        Picker("The time is", selection: $quality) {
+                            Text("Exact").tag(TimeQuality.exact)
+                            Text("After the act").tag(TimeQuality.after)
+                            Text("Before the act").tag(TimeQuality.before)
+                            Text("Approximate").tag(TimeQuality.approximate)
+                        }
                     }
                 }
-                if case .edit(let e) = mode {
+
+                if let e = entry {
                     Section {
-                        Button("Remove entry", role: .destructive) { confirmRemove = true }
+                        Button(e.isMark ? "Remove this mark" : "Remove entry", role: .destructive) { confirmRemove = true }
                     } footer: {
-                        Text("Removing adds a tombstone revision. Revision \(e.revisionN) and earlier stay in the log.")
+                        Text("Removing adds a tombstone revision; the earlier rows stay in the log and the export.")
                     }
                 }
             }
-            .navigationTitle(title)
             .keyboardDone()
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
@@ -121,11 +160,14 @@ struct EntrySheet: View {
             } message: {
                 Text("A reset erases this log on the phone. Save this entry, then export and copy the export off the phone before resetting.")
             }
-            .confirmationDialog("Remove this entry?", isPresented: $confirmRemove, titleVisibility: .visible) {
+            .confirmationDialog("Remove this?", isPresented: $confirmRemove, titleVisibility: .visible) {
                 Button("Remove", role: .destructive) {
-                    if case .edit(let e) = mode { model.remove(e) }
+                    if let e = entry { model.remove(e); onSaved() }
                     dismiss()
                 }
+            }
+            .fullScreenCover(isPresented: $zoom) {
+                if let e = entry, let img = model.image(for: e) { ZoomView(image: img) }
             }
             .onAppear(perform: load)
         }
@@ -151,16 +193,17 @@ struct EntrySheet: View {
         switch mode {
         case .new(let a, _):
             action = a
-            app = model.lastDraft?.appPackage ?? model.apps.first?.pkg ?? ""
         case .windowDone:
-            action = model.lastDraft?.action ?? ""
-            app = model.lastDraft?.appPackage ?? ""
+            action = ""
         case .label(let m):
-            app = m.appPackage ?? model.lastDraft?.appPackage ?? ""
+            app = m.appPackage ?? ""
+            // A mark is tapped right after the act (Back Tap once it is done), so its label's time is "after".
+            quality = TimeQuality.after
         case .edit(let e):
             action = e.action; app = e.appPackage ?? ""; content = e.content ?? ""; counterpart = e.counterpart ?? ""
             conversation = e.conversationId ?? ""; note = e.detail ?? ""; expected = e.expectedArtifacts.joined(separator: " ")
             quality = e.timeQuality
+            more = !conversation.isEmpty || !note.isEmpty || !expected.isEmpty
         }
     }
 
@@ -180,10 +223,50 @@ struct EntrySheet: View {
         case .label(let m): model.label(m, with: d)
         case .edit(let e): model.revise(e, d)
         }
+        onSaved()
         dismiss()
     }
 }
 
-extension String {
-    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
+/// A screenshot full screen, with pinch to zoom.
+struct ZoomView: View {
+    let image: UIImage
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZoomableImage(image: image)
+                .ignoresSafeArea(edges: .bottom)
+                .background(Color.black)
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+    }
+}
+
+struct ZoomableImage: UIViewRepresentable {
+    let image: UIImage
+
+    func makeUIView(context: Context) -> UIScrollView {
+        let s = UIScrollView()
+        s.minimumZoomScale = 1
+        s.maximumZoomScale = 5
+        s.delegate = context.coordinator
+        s.backgroundColor = .black
+        let v = UIImageView(image: image)
+        v.contentMode = .scaleAspectFit
+        v.frame = s.bounds
+        v.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        s.addSubview(v)
+        context.coordinator.view = v
+        return s
+    }
+
+    func updateUIView(_ uiView: UIScrollView, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator: NSObject, UIScrollViewDelegate {
+        weak var view: UIView?
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? { view }
+    }
 }
