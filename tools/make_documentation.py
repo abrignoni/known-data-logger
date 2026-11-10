@@ -392,6 +392,8 @@ SCENARIO_EVENTS = (
     "app_installed", "app_updated", "app_removed", "app_data_cleared",
     "app_version_changed_since_last_seen", "app_version_changed_since_added",
     "profile_snapshot", "rule_taught", "rule_removed", "hash_chain_backfilled",
+    # iOS: the tester started or stopped the screen broadcast.
+    "screen_capture_started", "screen_capture_stopped",
 )
 
 

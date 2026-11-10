@@ -109,3 +109,46 @@ final class StoreTests: XCTestCase {
         XCTAssertEqual("sc", again.scenarioId)
     }
 }
+
+final class ShotTests: XCTestCase {
+    func testMarksWithoutShotAndExportCopiesScreens() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("kdl-shot-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let s = try Store(url: dir.appendingPathComponent("data/kl.db"))
+        s.scenarioId = "sc"; s.deviceLabel = "d"
+        let m1 = try s.log(Draft(action: AutoAction.mark, source: Source.mark), kind: Kind.autoEvent).last!
+        let m2 = try s.log(Draft(action: AutoAction.mark, source: Source.mark), kind: Kind.autoEvent).last!
+        XCTAssertEqual([m1.seq, m2.seq], s.marksWithoutShot(sinceUtcMs: 0).map(\.seq))
+        let screens = dir.appendingPathComponent("data/screens")
+        try FileManager.default.createDirectory(at: screens, withIntermediateDirectories: true)
+        let png = Data("not really a png".utf8)
+        try png.write(to: screens.appendingPathComponent("\(m1.entryId).png"))
+        try s.putShot(Shot(entryId: m1.entryId, file: "\(m1.entryId).png", sha256: sha256Hex(png), status: "ok", utcMs: m1.stamp.utcMs + 40))
+        try s.putShot(Shot(entryId: m2.entryId, file: nil, sha256: nil, status: "failed:no frame", utcMs: m2.stamp.utcMs + 40))
+        XCTAssertTrue(s.marksWithoutShot(sinceUtcMs: 0).isEmpty)
+
+        let out = try Exporter.export(store: s, to: dir, logger: LoggerInfo(package: "x", versionName: "0"), screensDir: screens)
+        XCTAssertEqual(png, try Data(contentsOf: out.appendingPathComponent("screens/\(m1.entryId).png")))
+        let m = try JSONSerialization.jsonObject(with: Data(contentsOf: out.appendingPathComponent("manifest.json"))) as! [String: Any]
+        let shots = m["screenshots"] as! [[String: Any]]
+        XCTAssertEqual(2, shots.count)
+        XCTAssertEqual(true, shots.first { $0["entry_id"] as? String == m1.entryId }?["hash_match"] as? Bool)
+        let rows = try Row.parse(jsonl: Data(contentsOf: out.appendingPathComponent("actions.jsonl")))
+        XCTAssertNil(Chain.firstBreak(rows), "attaching a screenshot does not touch the chain")
+        let line = try String(contentsOf: out.appendingPathComponent("actions.jsonl"), encoding: .utf8).split(separator: "\n")[0]
+        XCTAssertTrue(line.contains("\"screenshot\":{\"file\":\"\(m1.entryId).png\""), String(line))
+    }
+}
+
+final class ForegroundTests: XCTestCase {
+    func testMarkCarriesTheAppInFrontOnlyWhileTheBroadcastRuns() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("kdl-fg-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let s = try Store(url: dir.appendingPathComponent("kl.db"))
+        try s.log(Draft(appPackage: "com.apple.mobilenotes", action: AutoAction.screen, source: Source.autoEvent), kind: Kind.autoEvent)
+        XCTAssertNil(try s.mark().appPackage, "no broadcast running, so the app in front is not known")
+        try s.putSetting("broadcast_active", "1")
+        try s.log(Draft(appPackage: "com.apple.mobilesafari", action: AutoAction.screen, source: Source.autoEvent), kind: Kind.autoEvent)
+        XCTAssertEqual("com.apple.mobilesafari", try s.mark().appPackage)
+    }
+}

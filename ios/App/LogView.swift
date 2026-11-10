@@ -37,6 +37,20 @@ struct LogView: View {
                 }
 
                 Section {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Screen capture").font(.headline)
+                            Text(model.broadcastOn ? "On: each Mark saves a screenshot" : "Off")
+                                .font(.subheadline).foregroundStyle(model.broadcastOn ? .red : .secondary)
+                        }
+                        Spacer()
+                        BroadcastPicker().frame(width: 44, height: 44)
+                    }
+                } footer: {
+                    Text("Tap the round button, pick KDL Screen, then Start Broadcast. While it runs, every Mark saves a screenshot and each app switch is logged. Stop it with the same button or the red indicator at the top of the screen.")
+                }
+
+                Section {
                     HStack(spacing: 12) {
                         BigButton(title: "Mark", icon: "flag.fill", tint: .orange) { model.mark() }
                         BigButton(title: "Stamp now", icon: "clock.badge.checkmark", tint: .blue) { model.stamp() }

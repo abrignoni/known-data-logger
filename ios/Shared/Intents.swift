@@ -10,10 +10,14 @@ struct MarkIntent: AppIntent {
     static var description = IntentDescription("Stamps \"this is the action\" now. Label it later in KDL's Timeline.")
     static var openAppWhenRun = false
 
-    func perform() async throws -> some IntentResult {
-        try KDL.store().log(Draft(action: AutoAction.mark, source: Source.mark), kind: Kind.autoEvent)
+    /// Shortcuts and Back Tap show the dialog as a short banner, so the tester knows the tap counted.
+    /// Widgets and controls do not show it.
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let m = try KDL.store().mark()
+        KDL.postMark()
         KDL.reloadSurfaces()
-        return .result()
+        let t = Date(timeIntervalSince1970: TimeInterval(m.stamp.utcMs) / 1000).formatted(date: .omitted, time: .standard)
+        return .result(dialog: "Marked \(t)")
     }
 }
 

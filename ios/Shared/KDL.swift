@@ -20,6 +20,17 @@ enum KDL {
             .appendingPathComponent("KDL", isDirectory: true)
     }
 
+    /// Screenshots taken by the broadcast extension, named after the entry they belong to.
+    static var screensDir: URL { dataDir.appendingPathComponent("screens", isDirectory: true) }
+
+    /// Posted after every mark, so a running screen broadcast saves its latest frame for it.
+    static let markNotification = "com.abrignoni.knowndatalogger.mark"
+
+    static func postMark() {
+        CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
+                                             CFNotificationName(markNotification as CFString), nil, nil, true)
+    }
+
     static var usesAppGroup: Bool {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) != nil
     }

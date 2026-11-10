@@ -48,6 +48,8 @@ final class AppModel: ObservableObject {
     @Published var windowStart: Stamp?
     /// The last draft saved, for Repeat.
     @Published var lastDraft: Draft?
+    /// Screenshots by entry id.
+    @Published var shots: [String: Shot] = [:]
 
     let store: Store?
 
@@ -64,10 +66,21 @@ final class AppModel: ObservableObject {
     var pending: [Entry] { Review.pending(rows) }
     var apps: [AppUnderTest] { store?.apps() ?? [] }
     var sessionActive: Bool { store?.sessionActive ?? false }
+    /// As last written by the broadcast extension (it cannot say so if iOS stops it abruptly).
+    var broadcastOn: Bool { store?.setting("broadcast_active") == "1" }
+
+    /// The screenshot shown for an entry: its own, or the one of the mark it labels.
+    func shot(for e: Entry) -> Shot? { shots[e.entryId] ?? e.refersTo.flatMap { shots[$0] } }
+
+    func image(for e: Entry) -> UIImage? {
+        guard let f = shot(for: e)?.file else { return nil }
+        return UIImage(contentsOfFile: KDL.screensDir.appendingPathComponent(f).path)
+    }
     var sessionStart: Date? { store?.sessionStart().map { Date(ms: $0.utcMs) } }
 
     func refresh() {
         rows = store?.entries() ?? []
+        shots = store?.shots() ?? [:]
         objectWillChange.send()
     }
 
@@ -86,7 +99,10 @@ final class AppModel: ObservableObject {
         if !d.action.isEmpty { lastDraft = d }
     }
 
-    func mark() { run("Mark") { try $0.log(Draft(action: AutoAction.mark, source: Source.mark), kind: Kind.autoEvent) } }
+    func mark() {
+        run("Mark") { try $0.mark() }
+        KDL.postMark()
+    }
 
     func stamp() { run("Stamp") { try $0.log(Draft(action: "")) } }
 
@@ -148,7 +164,7 @@ final class AppModel: ObservableObject {
         guard let store else { return }
         do {
             try FileManager.default.createDirectory(at: KDL.exportsDir, withIntermediateDirectories: true)
-            lastExport = try Exporter.export(store: store, to: KDL.exportsDir, logger: KDL.logger)
+            lastExport = try Exporter.export(store: store, to: KDL.exportsDir, logger: KDL.logger, screensDir: KDL.screensDir)
         } catch {
             message = Message(title: "Export failed", body: "\(error)")
         }

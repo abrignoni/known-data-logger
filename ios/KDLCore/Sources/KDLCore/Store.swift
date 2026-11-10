@@ -355,6 +355,42 @@ public final class Store: @unchecked Sendable {
         return out
     }
 
+    /// Records a screenshot for an entry (its original row). One screenshot per entry, as on Android.
+    public func putShot(_ s: Shot) throws {
+        lock.lock(); defer { lock.unlock() }
+        try query("""
+            INSERT INTO screenshots(entry_id, file, sha256, status, utc_ms) VALUES(?,?,?,?,?)
+            ON CONFLICT(entry_id) DO UPDATE SET file=excluded.file, sha256=excluded.sha256, status=excluded.status, utc_ms=excluded.utc_ms
+            """, [.text(s.entryId), Self.s(s.file), Self.s(s.sha256), .text(s.status), .int(s.utcMs)])
+    }
+
+    /// The app the screen broadcast last reported in front, while a broadcast is running; else nil.
+    /// A mark carries it, as the Android mark carries the app last seen in the foreground.
+    public func foregroundApp() -> String? {
+        guard setting("broadcast_active") == "1" else { return nil }
+        lock.lock(); defer { lock.unlock() }
+        let r = try? query("SELECT app_package FROM entries WHERE kind = ? AND action = ? AND revision_n = 0 ORDER BY seq DESC LIMIT 1",
+                           [.text(Kind.autoEvent), .text(AutoAction.screen)]).first
+        return r?.text("app_package")
+    }
+
+    /// Logs a mark with the app in front, when the screen broadcast knows it.
+    @discardableResult
+    public func mark() throws -> Entry {
+        try log(Draft(appPackage: foregroundApp(), action: AutoAction.mark, source: Source.mark), kind: Kind.autoEvent).last!
+    }
+
+    /// Marks (original rows) stamped at or after `sinceUtcMs` that have no screenshot row yet.
+    public func marksWithoutShot(sinceUtcMs: Int64) -> [Entry] {
+        lock.lock(); defer { lock.unlock() }
+        let rows = (try? query("""
+            SELECT e.seq FROM entries e LEFT JOIN screenshots s ON s.entry_id = e.entry_id
+            WHERE e.kind = ? AND e.action = ? AND e.revision_n = 0 AND e.utc_ms >= ? AND s.entry_id IS NULL
+            """, [.text(Kind.autoEvent), .text(AutoAction.mark), .int(sinceUtcMs)])) ?? []
+        let seqs = Set(rows.compactMap { $0.int("seq") })
+        return entriesLocked().filter { seqs.contains($0.seq) }
+    }
+
     /// The newest row's hash, shown on the Setup tab so the tester can note it.
     public func lastRowHash() -> String? {
         lock.lock(); defer { lock.unlock() }

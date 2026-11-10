@@ -26,7 +26,9 @@ struct TimelineScreen: View {
                     Text(filter == 0 ? "Nothing to check." : "Nothing logged yet.").foregroundStyle(.secondary)
                 }
                 ForEach(Array(shown), id: \.seq) { e in
-                    Button { open(e) } label: { EntryRow(entry: e, revisions: revisions[e.entryId] ?? 1, apps: model.apps) }
+                    Button { open(e) } label: {
+                        EntryRow(entry: e, revisions: revisions[e.entryId] ?? 1, apps: model.apps, shot: model.shot(for: e))
+                    }
                         .foregroundStyle(.primary)
                         .disabled(!editable(e))
                 }
@@ -49,6 +51,7 @@ struct EntryRow: View {
     let entry: Entry
     let revisions: Int
     let apps: [AppUnderTest]
+    let shot: Shot?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -62,6 +65,7 @@ struct EntryRow: View {
             let parts = [app, entry.counterpart, entry.content, entry.windowS.map { String(format: "%.0f s", $0) }].compactMap { $0 }
             if !parts.isEmpty { Text(parts.joined(separator: " · ")).font(.subheadline).lineLimit(2) }
             if let d = entry.detail, entry.source == Source.system { Text(d).font(.caption).foregroundStyle(.secondary).lineLimit(3) }
+            if let s = shot { Label(s.status == "ok" ? "Screenshot" : "Screenshot \(s.status)", systemImage: "photo").font(.caption).foregroundStyle(.secondary) }
             if revisions > 1 { Text("Edited, \(revisions) revisions").font(.caption).foregroundStyle(.secondary) }
         }
     }

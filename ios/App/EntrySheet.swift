@@ -60,7 +60,14 @@ struct EntrySheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section { Text(when).font(.subheadline).foregroundStyle(.secondary) }
+                Section {
+                    Text(when).font(.subheadline).foregroundStyle(.secondary)
+                    if let e = entry, let img = model.image(for: e) {
+                        Image(uiImage: img).resizable().scaledToFit().frame(maxHeight: 360).frame(maxWidth: .infinity)
+                    } else if let e = entry, let s = model.shot(for: e) {
+                        Text("Screenshot: \(s.status)").font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
                 Section("Action") {
                     Picker("Template", selection: $action) {
                         Text("Pick or type below").tag("")
@@ -121,6 +128,14 @@ struct EntrySheet: View {
                 }
             }
             .onAppear(perform: load)
+        }
+    }
+
+    /// The existing entry this form is about, if any.
+    private var entry: Entry? {
+        switch mode {
+        case .label(let e), .edit(let e): return e
+        default: return nil
         }
     }
 

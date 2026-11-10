@@ -262,6 +262,7 @@ private let systemLabels: [String: String] = [
     "capture_session_start": "Session started", "capture_session_stop": "Session stopped",
     "boot_detected": "Phone restarted", "clock_change_detected": "Clock changed", "export": "Exported",
     "export_failed": "Export failed", "profile_snapshot": "Device snapshot",
+    "screen_capture_started": "Screen capture started", "screen_capture_stopped": "Screen capture stopped",
 ]
 
 /// The words shown for an entry in the interface (the log keeps the action key).

@@ -1,9 +1,10 @@
-# KDL for iOS (0.1.0)
+# KDL for iOS (0.2.0)
 
 The iOS version of the known-data logger. iOS gives apps no way to watch other apps' screens, taps,
-typed text or notifications, so this version does not capture anything on its own. The tester logs
-each action by hand, fast, and KDL writes the same rows, hash chain and export folder as the Android
-app. `tools/make_documentation.py` and the other tools read an iOS export the same way.
+typed text or notifications. The tester logs each action by hand, fast, and KDL writes the same
+rows, hash chain and export folder as the Android app. With screen capture on, each Mark also saves a
+screenshot and every app switch is logged with the app's bundle id. `tools/make_documentation.py` and
+the other tools read an iOS export the same way.
 
 ## What it does
 
@@ -24,6 +25,31 @@ app. `tools/make_documentation.py` and the other tools read an iOS export the sa
 - Export everything: writes `kdl_<scenario>_<device>_<UTC time>/` with `manifest.json`,
   `actions.jsonl` and `actions.csv` to On My iPhone > KDL > Exports in the Files app, and offers the
   share sheet. Each export is logged as its own row first.
+
+## Screen capture
+
+The tester starts it from the Log tab (Screen capture, round button, KDL Screen, Start Broadcast).
+It is a ReplayKit broadcast upload extension, `com.abrignoni.knowndatalogger.broadcast`. iOS shows a
+red indicator while it runs.
+
+- It keeps only the latest video frame. Every Mark, from wherever it is tapped, posts a Darwin
+  notification; the extension then saves the latest frame as a PNG named after the mark, in the App
+  Group `Library/KDL/screens/`, and records its SHA-256 and status (`ok`, `blank` when every sampled
+  pixel is near black, or `failed:<reason>`) in the `screenshots` table. The export copies the files
+  to `screens/` and checks each hash again, as on Android.
+- Each app switch ReplayKit reports becomes an `auto_event` row, action `screen`, with the bundle
+  id in `app_package`. ReplayKit does not report the Home Screen.
+- While capture runs, a Mark carries the bundle id of the app last reported in front, so a label
+  made from it lands on that app's sheet in the spreadsheet.
+- Start and stop are `screen_capture_started` and `screen_capture_stopped` rows. The stop row gives
+  the number of screenshots, failures and app switches, the largest gap between a mark and its frame,
+  and the extension's peak memory footprint. A start with no stop means iOS ended the extension.
+- Marking from Control Center or the Lock Screen puts that overlay in the screenshot. Back Tap
+  (Settings > Accessibility > Touch > Back Tap, set to a Shortcut that runs KDL's Mark) leaves the
+  screen alone. Run from Shortcuts or Back Tap, Mark shows a "Marked" banner with the time.
+
+Apple marks the broadcast classes "No longer supported" from iOS 27, where ScreenCaptureKit takes
+over. This route was tested on iOS 26.6 only.
 
 ## Clocks
 
@@ -107,14 +133,20 @@ say which surface wrote it, so which tap made which row, and whether every tap w
 established. After reinstalling as 0.1.0, a second export held the same 13 rows byte for byte plus
 its own export row, and its last hash matched the one shown on the Setup tab.
 
-Not tried on the phone: the Home Screen widget, the share sheet, the Shortcuts actions, a restart,
+Not tried on the phone: the Home Screen widget, the share sheet, the Log action shortcut, a restart,
 a clock or time zone change.
+
+Screen capture, same phone, 0.2.0 development build (before the three changes listed below):
+Notes, Safari and Settings > About, one Back Tap mark in each. Three marks, three screenshots, each
+of the right screen (checked by eye on the phone), hash match at export. Frames were 888 x 1920
+pixels (the screen is 1170 x 2532), each within 29 ms of its mark. Peak memory footprint 17 MB. Four
+app switches logged (Notes, Safari, Settings, KDL). Back Tap missed some double taps; those made no
+row, and nothing on screen said so. That led to the "Marked" banner, the app on the mark, and the
+separate capture start and stop rows, which have not been tried on the phone yet.
 
 ## Not built yet
 
-- Screenshots and app-switch rows from a screen broadcast (Phase 2). The model and export already
-  carry screenshot rows; an app switch will be an `auto_event` row with the bundle id in
-  `app_package`.
+- Screen capture on iOS 27 (ScreenCaptureKit).
 - An ordering fix in the tools for boot_count -1 exports.
 - The marks do not record which surface they came from (app, widget, control, Live Activity).
 - An iLEAPP module for KDL's own database, and a map of the traces KDL leaves on the phone.
