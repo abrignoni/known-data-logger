@@ -1,0 +1,5 @@
+KDLCore/.build/
+KDLCore/.swiftpm/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+build/

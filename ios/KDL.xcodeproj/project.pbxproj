@@ -1,0 +1,566 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		19FD28521AE1892EFFE5C56E /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64E428C722EE30DD2ED39383 /* SetupView.swift */; };
+		1BFF4817D3A36DB3C4726C62 /* SessionActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86DABE6D9593BC2EB8898784 /* SessionActivity.swift */; };
+		1CA2A5EC8C715AEBE3890A5D /* EntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C0BE1ACD3367187AE35DC51 /* EntrySheet.swift */; };
+		278ECE87E2ED52E3D51D8979 /* Intents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F886F435EB02747C2C0E087 /* Intents.swift */; };
+		41B8B24C85349AEE91E424B4 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 52850D1EF62D7BA04EC32E4F /* PrivacyInfo.xcprivacy */; };
+		4688D417D0226D126CEDFD2E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9FBB8A637F508B05151D3F04 /* PrivacyInfo.xcprivacy */; };
+		4A28C67D755E32847103E488 /* TimelineScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18238E4E3B0519E2A29065EF /* TimelineScreen.swift */; };
+		6F4587E5C458CE8B9BD79793 /* Intents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F886F435EB02747C2C0E087 /* Intents.swift */; };
+		8051B4D1B7057F76235CE759 /* KDLCore in Frameworks */ = {isa = PBXBuildFile; productRef = 35B4639AD7DF03F8BDDEEA9A /* KDLCore */; };
+		8431E638C245CA442EEC5BFF /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4F8D22FDB880A0A9FE78B7DB /* SwiftUI.framework */; };
+		9600D3CFB5C180900BCC0B85 /* KDL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32A789FF18EB14632CDE032E /* KDL.swift */; };
+		98B691BD639CD319AA6903B7 /* KDL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32A789FF18EB14632CDE032E /* KDL.swift */; };
+		9B4F474C5E63994D79E107A2 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F60553CA9F32DE07847916F2 /* WidgetKit.framework */; };
+		9F5182DB64C3CAAAD907CA92 /* KDLApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D13B926D88D73FBCC53BCEB /* KDLApp.swift */; };
+		A84DDEE4A99B2EC57893FFF4 /* KDLWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA6F1FABF3833A2A54E9949D /* KDLWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		C58D94498CAA9CB41178DFD9 /* SessionActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86DABE6D9593BC2EB8898784 /* SessionActivity.swift */; };
+		E110E94491E2847B2C724C16 /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E6A7D3D3401C5B3D91E1E45 /* LogView.swift */; };
+		EFD030E5AEA4FA36D12A7991 /* KDLWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 607136204660E8050577F7D9 /* KDLWidgets.swift */; };
+		F4B771628A832C88471F8FA0 /* KDLCore in Frameworks */ = {isa = PBXBuildFile; productRef = F702C144FDD8AE584F08B306 /* KDLCore */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		319F851B4A8C3EBA37558C8F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A67757D7FC9E6FE93B3DCE76 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1E91A9D2F219E2F4A70B7375;
+			remoteInfo = KDLWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		E65B77A72A4C6A7864B28361 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A84DDEE4A99B2EC57893FFF4 /* KDLWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		18238E4E3B0519E2A29065EF /* TimelineScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineScreen.swift; sourceTree = "<group>"; };
+		1D13B926D88D73FBCC53BCEB /* KDLApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KDLApp.swift; sourceTree = "<group>"; };
+		2BBC1C12B96F8244A9754596 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		32A789FF18EB14632CDE032E /* KDL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KDL.swift; sourceTree = "<group>"; };
+		3C5C8BF80DDE879CDC0B0AFA /* KDLCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = KDLCore; path = KDLCore; sourceTree = SOURCE_ROOT; };
+		4F886F435EB02747C2C0E087 /* Intents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Intents.swift; sourceTree = "<group>"; };
+		4F8D22FDB880A0A9FE78B7DB /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		52850D1EF62D7BA04EC32E4F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		5E6A7D3D3401C5B3D91E1E45 /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
+		607136204660E8050577F7D9 /* KDLWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KDLWidgets.swift; sourceTree = "<group>"; };
+		64E428C722EE30DD2ED39383 /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
+		86DABE6D9593BC2EB8898784 /* SessionActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionActivity.swift; sourceTree = "<group>"; };
+		92547FB01CD1461C245FBECB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		9B8CB398E127BC917CB6E7D9 /* KDL.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = KDL.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9C0BE1ACD3367187AE35DC51 /* EntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntrySheet.swift; sourceTree = "<group>"; };
+		9FBB8A637F508B05151D3F04 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		A38C6D3F6DDA8BA86F342033 /* KDL.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = KDL.entitlements; sourceTree = "<group>"; };
+		AA6F1FABF3833A2A54E9949D /* KDLWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = KDLWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		ACC9542A8399552B0619562B /* KDLWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = KDLWidgets.entitlements; sourceTree = "<group>"; };
+		F60553CA9F32DE07847916F2 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		85558E9E4963DF77A88562E7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8051B4D1B7057F76235CE759 /* KDLCore in Frameworks */,
+				9B4F474C5E63994D79E107A2 /* WidgetKit.framework in Frameworks */,
+				8431E638C245CA442EEC5BFF /* SwiftUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8584CDC65905CDF534B3AE11 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F4B771628A832C88471F8FA0 /* KDLCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0E8F8675E543CC5E084A18BF /* Widgets */ = {
+			isa = PBXGroup;
+			children = (
+				92547FB01CD1461C245FBECB /* Info.plist */,
+				ACC9542A8399552B0619562B /* KDLWidgets.entitlements */,
+				607136204660E8050577F7D9 /* KDLWidgets.swift */,
+				9FBB8A637F508B05151D3F04 /* PrivacyInfo.xcprivacy */,
+			);
+			path = Widgets;
+			sourceTree = "<group>";
+		};
+		6C374657C1E0AFD6F094DEB5 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				9C0BE1ACD3367187AE35DC51 /* EntrySheet.swift */,
+				2BBC1C12B96F8244A9754596 /* Info.plist */,
+				A38C6D3F6DDA8BA86F342033 /* KDL.entitlements */,
+				1D13B926D88D73FBCC53BCEB /* KDLApp.swift */,
+				5E6A7D3D3401C5B3D91E1E45 /* LogView.swift */,
+				52850D1EF62D7BA04EC32E4F /* PrivacyInfo.xcprivacy */,
+				64E428C722EE30DD2ED39383 /* SetupView.swift */,
+				18238E4E3B0519E2A29065EF /* TimelineScreen.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		7D0563D167678E6EF3460496 = {
+			isa = PBXGroup;
+			children = (
+				6C374657C1E0AFD6F094DEB5 /* App */,
+				8331CAEDF20796060DD4FF43 /* Packages */,
+				B85BE0CC6AF43D91743118A0 /* Shared */,
+				0E8F8675E543CC5E084A18BF /* Widgets */,
+				C618033D0DD71091FD390C3C /* Frameworks */,
+				87E83C8DB5404F114D217BC4 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		8331CAEDF20796060DD4FF43 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				3C5C8BF80DDE879CDC0B0AFA /* KDLCore */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		87E83C8DB5404F114D217BC4 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				9B8CB398E127BC917CB6E7D9 /* KDL.app */,
+				AA6F1FABF3833A2A54E9949D /* KDLWidgets.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B85BE0CC6AF43D91743118A0 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				4F886F435EB02747C2C0E087 /* Intents.swift */,
+				32A789FF18EB14632CDE032E /* KDL.swift */,
+				86DABE6D9593BC2EB8898784 /* SessionActivity.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		C618033D0DD71091FD390C3C /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				4F8D22FDB880A0A9FE78B7DB /* SwiftUI.framework */,
+				F60553CA9F32DE07847916F2 /* WidgetKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1E91A9D2F219E2F4A70B7375 /* KDLWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 640DA83F1328C2A7074547ED /* Build configuration list for PBXNativeTarget "KDLWidgets" */;
+			buildPhases = (
+				659ACFE015F29A3E706BD939 /* Sources */,
+				DBEBEA9094EAC866B90865B0 /* Resources */,
+				85558E9E4963DF77A88562E7 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = KDLWidgets;
+			packageProductDependencies = (
+				35B4639AD7DF03F8BDDEEA9A /* KDLCore */,
+			);
+			productName = KDLWidgets;
+			productReference = AA6F1FABF3833A2A54E9949D /* KDLWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		6DC7A011F0EC3099B417741F /* KDL */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A844713CA153B58A2E062A37 /* Build configuration list for PBXNativeTarget "KDL" */;
+			buildPhases = (
+				FE31F24AF5A0F664E54357C9 /* Sources */,
+				0354C9EA2C736904BE1CC5F6 /* Resources */,
+				8584CDC65905CDF534B3AE11 /* Frameworks */,
+				E65B77A72A4C6A7864B28361 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				097B7F83A1A743FCD815D1CC /* PBXTargetDependency */,
+			);
+			name = KDL;
+			packageProductDependencies = (
+				F702C144FDD8AE584F08B306 /* KDLCore */,
+			);
+			productName = KDL;
+			productReference = 9B8CB398E127BC917CB6E7D9 /* KDL.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A67757D7FC9E6FE93B3DCE76 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					1E91A9D2F219E2F4A70B7375 = {
+						DevelopmentTeam = 33DUL485L9;
+						ProvisioningStyle = Automatic;
+					};
+					6DC7A011F0EC3099B417741F = {
+						DevelopmentTeam = 33DUL485L9;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 29CAC1518F66C782CF29250F /* Build configuration list for PBXProject "KDL" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 7D0563D167678E6EF3460496;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				808EF0BD0F0C29B3BEFEB215 /* XCLocalSwiftPackageReference "KDLCore" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 87E83C8DB5404F114D217BC4 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				6DC7A011F0EC3099B417741F /* KDL */,
+				1E91A9D2F219E2F4A70B7375 /* KDLWidgets */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		0354C9EA2C736904BE1CC5F6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				41B8B24C85349AEE91E424B4 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DBEBEA9094EAC866B90865B0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4688D417D0226D126CEDFD2E /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		659ACFE015F29A3E706BD939 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				278ECE87E2ED52E3D51D8979 /* Intents.swift in Sources */,
+				9600D3CFB5C180900BCC0B85 /* KDL.swift in Sources */,
+				EFD030E5AEA4FA36D12A7991 /* KDLWidgets.swift in Sources */,
+				1BFF4817D3A36DB3C4726C62 /* SessionActivity.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FE31F24AF5A0F664E54357C9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1CA2A5EC8C715AEBE3890A5D /* EntrySheet.swift in Sources */,
+				6F4587E5C458CE8B9BD79793 /* Intents.swift in Sources */,
+				98B691BD639CD319AA6903B7 /* KDL.swift in Sources */,
+				9F5182DB64C3CAAAD907CA92 /* KDLApp.swift in Sources */,
+				E110E94491E2847B2C724C16 /* LogView.swift in Sources */,
+				C58D94498CAA9CB41178DFD9 /* SessionActivity.swift in Sources */,
+				19FD28521AE1892EFFE5C56E /* SetupView.swift in Sources */,
+				4A28C67D755E32847103E488 /* TimelineScreen.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		097B7F83A1A743FCD815D1CC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1E91A9D2F219E2F4A70B7375 /* KDLWidgets */;
+			targetProxy = 319F851B4A8C3EBA37558C8F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0159A25F3D3B36E916001F81 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/KDL.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.abrignoni.knowndatalogger;
+				PRODUCT_NAME = KDL;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		5415437F81E0228E03BF00DD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 33DUL485L9;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		D0BBDDFE4EC593ADFF565315 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Widgets/KDLWidgets.entitlements;
+				INFOPLIST_FILE = Widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.abrignoni.knowndatalogger.widgets;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		DA6A46BC59694DE02DD3C332 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 33DUL485L9;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		DD73D439553A2EAEF35E6E91 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Widgets/KDLWidgets.entitlements;
+				INFOPLIST_FILE = Widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.abrignoni.knowndatalogger.widgets;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		FC2F781E5C81A86F1C5EC363 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/KDL.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.abrignoni.knowndatalogger;
+				PRODUCT_NAME = KDL;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		29CAC1518F66C782CF29250F /* Build configuration list for PBXProject "KDL" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5415437F81E0228E03BF00DD /* Debug */,
+				DA6A46BC59694DE02DD3C332 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		640DA83F1328C2A7074547ED /* Build configuration list for PBXNativeTarget "KDLWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D0BBDDFE4EC593ADFF565315 /* Debug */,
+				DD73D439553A2EAEF35E6E91 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A844713CA153B58A2E062A37 /* Build configuration list for PBXNativeTarget "KDL" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FC2F781E5C81A86F1C5EC363 /* Debug */,
+				0159A25F3D3B36E916001F81 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		808EF0BD0F0C29B3BEFEB215 /* XCLocalSwiftPackageReference "KDLCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = KDLCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		35B4639AD7DF03F8BDDEEA9A /* KDLCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = KDLCore;
+		};
+		F702C144FDD8AE584F08B306 /* KDLCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = KDLCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A67757D7FC9E6FE93B3DCE76 /* Project object */;
+}

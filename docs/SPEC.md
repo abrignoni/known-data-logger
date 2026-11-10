@@ -263,7 +263,8 @@ tolerances. Details and limits are in the README.
 
 ## Later
 
-- iOS build.
+- iOS build. Phase 1 (hand logging, same rows, hash chain and export) is in `ios/`, see
+  [ios/README.md](../ios/README.md). Screen capture is Phase 2.
 - An ALEAPP module for the logger's own database.
 - Template packs per app; a look at the Demmel playbook format.
 

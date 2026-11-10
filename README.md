@@ -285,7 +285,9 @@ on a Pixel 7a with Android 17
   recorded as two notifications and two `received_message` entries
 - the app icon's one-colour layer showed correctly with the launcher's themed (Minimal) icon style,
   which this launcher applies to the home screen only
-- iOS is planned.
+
+An iOS version (0.1.0, hand logging only, no automatic capture) is in `ios/`. See
+[ios/README.md](ios/README.md).
 
 ## License
 
