@@ -41,6 +41,11 @@ Each test:
 - **Export** (bottom of Review): writes `kdl_<scenario>_<device>_<UTC time>/` with
   `manifest.json`, `actions.jsonl`, `actions.csv` and `screens/` to On My iPhone > KDL > Exports in
   the Files app, and offers the share sheet. Each export is logged as its own row first.
+- **Text suggestions**: the label form reads the screenshot's text on the phone (Vision text
+  recognition, language correction off) and lists the lines under Content, web addresses first.
+  Tapping one fills Content; press and hold to use it as Counterpart. Nothing is filled without a
+  tap. On the Mac, the same recognition read the test phone's screenshots in about 0.1 s each after
+  a first run of 51 s; speed on the phone is not measured yet.
 - **Setup** (gear on Session; opens by itself until the scenario id and device label are set):
   scenario and device, device snapshots, apps (optional; name, version, account), and
   Diagnostics (clocks, latest row hash).

@@ -46,6 +46,9 @@ struct EntrySheet: View {
     @State private var zoom = false
     /// Version for an app with none on file, asked here once (optional).
     @State private var newVersion = ""
+    /// Text read from the screenshot, offered as suggestions. Nothing is used unless the tester taps it.
+    @State private var screenLines: [String] = []
+    @State private var reading = false
     @State private var loaded = false
 
     private var title: String {
@@ -129,8 +132,29 @@ struct EntrySheet: View {
 
                 Section {
                     TextField("Content: the exact text, URL or file name", text: $content, axis: .vertical)
+                    if reading {
+                        HStack { ProgressView(); Text("Reading the screenshot").font(.footnote).foregroundStyle(.secondary) }
+                    } else if !screenLines.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("From the screenshot").font(.caption).foregroundStyle(.secondary)
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack {
+                                    ForEach(screenLines, id: \.self) { s in
+                                        Button { content = s } label: { Text(s).lineLimit(1) }
+                                            .buttonStyle(.bordered).controlSize(.small)
+                                            .contextMenu {
+                                                Button("Use as Content") { content = s }
+                                                Button("Use as Counterpart") { counterpart = s }
+                                            }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     TextField("Counterpart: the other person or account", text: $counterpart)
-                } footer: { Text(KDL.noSecrets) }
+                } footer: {
+                    Text((screenLines.isEmpty ? "" : "Tap a suggestion to fill Content; press and hold one to use it as Counterpart. Check it against the picture: text recognition can misread characters. ") + KDL.noSecrets)
+                }
 
                 Section {
                     DisclosureGroup("More", isExpanded: $more) {
@@ -181,6 +205,12 @@ struct EntrySheet: View {
                 if let e = entry, let img = model.image(for: e) { ZoomView(image: img) }
             }
             .onAppear(perform: load)
+            .task {
+                guard screenLines.isEmpty, let e = entry, let img = model.image(for: e) else { return }
+                reading = true
+                screenLines = await ScreenText.lines(in: img)
+                reading = false
+            }
         }
     }
 

@@ -29,6 +29,7 @@
 		A283557DEE2334DB0E4C12F5 /* ReplayKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CF699C1CA7F77699D5A7AB53 /* ReplayKit.framework */; };
 		A84DDEE4A99B2EC57893FFF4 /* KDLWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA6F1FABF3833A2A54E9949D /* KDLWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		D7B7D48763A4D48A399FAC4E /* BroadcastPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63A4019601ADF1ABAFA76C6D /* BroadcastPicker.swift */; };
+		D9C6FBF7A2231EC367AC6135 /* ScreenText.swift in Sources */ = {isa = PBXBuildFile; fileRef = B47D8F662D149BBB5FAEB462 /* ScreenText.swift */; };
 		EFD030E5AEA4FA36D12A7991 /* KDLWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 607136204660E8050577F7D9 /* KDLWidgets.swift */; };
 		F4B771628A832C88471F8FA0 /* KDLCore in Frameworks */ = {isa = PBXBuildFile; productRef = F702C144FDD8AE584F08B306 /* KDLCore */; };
 		F95E0DCEFE616625E82F3720 /* ReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35EE95DB43768310B4B4BAF8 /* ReviewView.swift */; };
@@ -91,6 +92,7 @@
 		AA6F1FABF3833A2A54E9949D /* KDLWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = KDLWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		AC8B14DB3484120663B08D9A /* AppNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNames.swift; sourceTree = "<group>"; };
 		ACC9542A8399552B0619562B /* KDLWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = KDLWidgets.entitlements; sourceTree = "<group>"; };
+		B47D8F662D149BBB5FAEB462 /* ScreenText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenText.swift; sourceTree = "<group>"; };
 		CF699C1CA7F77699D5A7AB53 /* ReplayKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ReplayKit.framework; path = System/Library/Frameworks/ReplayKit.framework; sourceTree = SDKROOT; };
 		F60553CA9F32DE07847916F2 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		F6172DC3B13D43676C213D77 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -160,6 +162,7 @@
 				1D13B926D88D73FBCC53BCEB /* KDLApp.swift */,
 				52850D1EF62D7BA04EC32E4F /* PrivacyInfo.xcprivacy */,
 				35EE95DB43768310B4B4BAF8 /* ReviewView.swift */,
+				B47D8F662D149BBB5FAEB462 /* ScreenText.swift */,
 				54CE6DB0E36CC135C407DD8F /* SessionView.swift */,
 				64E428C722EE30DD2ED39383 /* SetupView.swift */,
 			);
@@ -387,6 +390,7 @@
 				98B691BD639CD319AA6903B7 /* KDL.swift in Sources */,
 				9F5182DB64C3CAAAD907CA92 /* KDLApp.swift in Sources */,
 				F95E0DCEFE616625E82F3720 /* ReviewView.swift in Sources */,
+				D9C6FBF7A2231EC367AC6135 /* ScreenText.swift in Sources */,
 				1B93929D781038A803B86472 /* SessionView.swift in Sources */,
 				19FD28521AE1892EFFE5C56E /* SetupView.swift in Sources */,
 			);
