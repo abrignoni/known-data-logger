@@ -67,13 +67,23 @@ class ViewTreeTest {
         assertTrue(text.startsWith("bell") && text.endsWith("end"))
     }
 
+    @Test fun textsAreOfferedTopToBottomOnceEachAndNeverFromAPasswordField() {
+        fun at(text: String?, y: Int, password: Boolean = false) =
+            VNode("android.widget.TextView", "com.example.chat", "com.example.chat:id/t", text, null, "[10,$y][500,${y + 40}]", password = password)
+        val root = VNode("android.widget.FrameLayout", "com.example.chat", null, null, null, "[0,0][1080,2400]", children = listOf(
+            at("third", 900), at("first", 100), at("typed-secret", 500, password = true), at("second", 300), at("first", 1200), at("  ", 50)))
+        assertEquals(listOf("first", "second", "third"), ViewTree.texts(ViewTree.xml(root)))
+        assertEquals(listOf("first"), ViewTree.texts(ViewTree.xml(root), limit = 1))
+    }
+
     @Test fun filesDetailNamesBothFilesAndTheirHashes() {
         val shot = Shot("e1", "e1.png", "aa", "ok", 1)
         val t = TreeFile("e1", "e1.xml", "bb", "ok", 1)
-        val o = JSONObject(ViewTree.filesDetail(shot, t))
+        val o = JSONObject(ViewTree.filesDetail("e1", shot, t))
+        assertEquals("e1", o.getString("entry_id"))
         assertEquals("aa", o.getJSONObject("screenshot").getString("sha256"))
         assertEquals("e1.xml", o.getJSONObject("view_tree").getString("file"))
-        val only = JSONObject(ViewTree.filesDetail(shot, null))
+        val only = JSONObject(ViewTree.filesDetail("e1", shot, null))
         assertFalse(only.has("view_tree"))
     }
 

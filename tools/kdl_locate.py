@@ -923,7 +923,28 @@ def where(h):
 
 # ---- workbook ------------------------------------------------------------------------------
 
-def write_workbook(out, summary, entry_rows, hit_rows, profile_rows, time_rows, del_rows, inventory, not_read):
+def screen_text_entries(export, package, logged):
+    """One made-up entry per distinct text line on a saved view tree of the package, stamped with the
+    time of the entry the tree belongs to, so the usual search can look for it. Lines the tester
+    already logged, and lines under 4 characters, are left out. Capped at 400 lines."""
+    by_id = {r["entry_id"]: r for r in md.current(export["rows"])}
+    out, seen = [], set(logged)
+    for entry_id, path in sorted((export.get("trees") or {}).items()):
+        base = by_id.get(entry_id)
+        if base is None:
+            continue
+        for text, _, _ in md.tree_lines(path, package):
+            n = kc.norm(text)
+            if len(text) < 4 or n in seen:
+                continue
+            seen.add(n)
+            out.append(dict(base, content=text, counterpart=None, conversation_id=None, _tree=os.path.basename(path)))
+            if len(out) >= 400:
+                return out
+    return out
+
+
+def write_workbook(out, summary, entry_rows, hit_rows, profile_rows, time_rows, del_rows, inventory, not_read, screen_rows=None):
     wb = Workbook()
     used = set()
     ws = wb.active
@@ -946,6 +967,10 @@ def write_workbook(out, summary, entry_rows, hit_rows, profile_rows, time_rows, 
                        "Status", "Reason", "Records read"], inventory),
         ("Not read", ["Store", "Store type", "Reason"], not_read),
     ]
+    if screen_rows is not None:
+        # Text the app showed on a marked screen that the tester did not log, and where it was found.
+        sheets.insert(3, ("Screen text", ["Mark time", "Text on screen", "Found", "Match", "Store", "Table or group", "Record",
+                                          "Field", "Time fields in the same record (field, epoch, delta s)", "View tree"], screen_rows))
     for name, headers, rows in sheets:
         md.write_table(wb.create_sheet(md.sheet_name(name, used)), headers, rows)
     wb.save(out)
@@ -1002,6 +1027,9 @@ def main(argv=None):
         hits = search(entries, stores, tol)
         protobuf_paths_for_blob_hits(hits)
         tonly = time_only(entries, stores, tol)
+        logged = {kc.norm(e.get(f) or "") for e in entries for f in ("content", "counterpart", "conversation_id")}
+        screen_entries = screen_text_entries(export, a.package, logged)
+        screen_hits = search(screen_entries, stores, tol) if screen_entries else []
         dels = deletion_rows(deletions, by_id, stores, tol)
     finally:
         if not a.keep_staged:
@@ -1098,7 +1126,24 @@ def main(argv=None):
     for name, result in export["checks"]:
         if "MISMATCH" in result or "BROKEN" in result:
             summary.insert(3, ("WARNING", f"{name}: {result}"))
-    write_workbook(a.output, summary, entry_rows, hit_rows, profile, time_rows, dels, inventory, not_read)
+    screen_rows = None
+    if screen_entries:
+        by_text = collections.defaultdict(list)
+        for h in screen_hits:
+            by_text[id(h["entry"])].append(h)
+        screen_rows = []
+        for se in screen_entries:
+            hs = by_text.get(id(se), [])
+            when = kc.entry_label(se) if hasattr(kc, "entry_label") else se["utc_ms"]
+            if not hs:
+                screen_rows.append([when, se["content"], "no", None, None, None, None, None, None, se["_tree"]])
+            for h in hs[:20]:
+                times = "; ".join(f"{tf} ({ep}, {delta:+.1f})" for tf, ep, delta in h["times"][:4])
+                screen_rows.append([when, se["content"], "yes", h["kind"], h["store"].name, h["rec"].container,
+                                    str(h["rec"].where), h["field"], times, se["_tree"]])
+        summary.append(("Screen text", f"{len(screen_entries)} text line(s) from saved view trees that were not logged; "
+                                       f"{sum(1 for se in screen_entries if by_text.get(id(se)))} found in a store (Screen text sheet)"))
+    write_workbook(a.output, summary, entry_rows, hit_rows, profile, time_rows, dels, inventory, not_read, screen_rows)
     print(f"Wrote {a.output}: {len(entries)} entries, {len(hits)} hits, {len(stores)} stores "
           f"({len(not_read)} not read), {len(deletions)} deletion(s)")
     if a.keep_staged:

@@ -314,13 +314,35 @@ object ViewTree {
         sb.append('"')
     }
 
+    /**
+     * The text lines of a saved tree, top to bottom then left to right, each once. Used to offer the
+     * screen's own words when a mark is labelled, so the tester does not have to retype them.
+     */
+    fun texts(xml: String, limit: Int = 60): List<String> {
+        val doc = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder()
+            .parse(xml.byteInputStream(Charsets.UTF_8))
+        val nodes = doc.getElementsByTagName("node")
+        val found = ArrayList<Triple<Int, Int, String>>()
+        val bounds = Regex("""\[(-?\d+),(-?\d+)\]""")
+        for (i in 0 until nodes.length) {
+            val a = nodes.item(i).attributes
+            val text = a.getNamedItem("text")?.nodeValue?.trim().orEmpty()
+            if (text.isEmpty()) continue
+            val m = bounds.find(a.getNamedItem("bounds")?.nodeValue.orEmpty())
+            found += Triple(m?.groupValues?.get(2)?.toIntOrNull() ?: 0, m?.groupValues?.get(1)?.toIntOrNull() ?: 0, text)
+        }
+        return found.sortedWith(compareBy({ it.first }, { it.second })).map { it.third }.distinct().take(limit)
+    }
+
     /** The detail of the chained row that names the files saved for an entry and their hashes. */
-    fun filesDetail(shot: Shot?, tree: TreeFile?): String {
+    fun filesDetail(entryId: String, shot: Shot?, tree: TreeFile?): String {
         fun part(file: String?, sha: String?, status: String?) = org.json.JSONObject().apply {
             put("file", file ?: org.json.JSONObject.NULL); put("sha256", sha ?: org.json.JSONObject.NULL)
             put("status", status ?: org.json.JSONObject.NULL)
         }
         return org.json.JSONObject().apply {
+            // The entry is named here, not in refers_to: a row that refers to a mark counts as its label.
+            put("entry_id", entryId)
             if (shot != null) put("screenshot", part(shot.file, shot.sha256, shot.status))
             if (tree != null) put("view_tree", part(tree.file, tree.sha256, tree.status))
         }.toString()

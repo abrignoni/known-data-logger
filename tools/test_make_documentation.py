@@ -86,9 +86,9 @@ class DocTest(unittest.TestCase):
     def _with_tree(self, tree_on_disk=b"<hierarchy/>", chained_tree=b"<hierarchy/>", chained_shot=b"png"):
         """An export with a view tree and the capture_files row that puts both file hashes in the chain."""
         sha = lambda x: hashlib.sha256(x).hexdigest()
-        detail = json.dumps({"screenshot": {"file": "s1.png", "sha256": sha(chained_shot), "status": "ok"},
+        detail = json.dumps({"entry_id": "a", "screenshot": {"file": "s1.png", "sha256": sha(chained_shot), "status": "ok"},
                              "view_tree": {"file": "a.xml", "sha256": sha(chained_tree), "status": "ok"}})
-        rows = self.rows + [row(7, "f", "capture_files", kind="system_event", refers_to="a", detail=detail, source="system")]
+        rows = self.rows + [row(7, "f", "capture_files", kind="system_event", detail=detail, source="system")]
         d = make_export(self.tmp, rows)
         os.makedirs(os.path.join(d, "trees"))
         with open(os.path.join(d, "trees", "a.xml"), "wb") as f:
@@ -106,6 +106,13 @@ class DocTest(unittest.TestCase):
         self.assertEqual(checks["files against chained rows"], "2 of 2 match")
         self.assertFalse(any(md.failed(v) for v in checks.values()))
 
+    def test_a_mark_with_hashed_files_still_needs_a_label(self):
+        # The capture_files row names the mark in its detail, not in refers_to, so it is not taken for a label.
+        detail = json.dumps({"entry_id": "m", "screenshot": {"file": "s1.png", "sha256": "0", "status": "ok"}})
+        rows = self.rows + [row(7, "f", "capture_files", kind="system_event", detail=detail, source="system")]
+        why = [w for r, w in md.pending_review(md.current(rows)) if r["entry_id"] == "m"]
+        self.assertEqual(why, ["mark without a label"])
+
     def test_a_changed_view_tree_is_caught_twice(self):
         checks = self._with_tree(tree_on_disk=b"<hierarchy>edited</hierarchy>")
         self.assertIn("MISMATCH", checks["view tree a.xml"])            # against the manifest
@@ -119,7 +126,39 @@ class DocTest(unittest.TestCase):
         self.assertNotIn("screenshot s1.png", checks)
         self.assertIn("MISMATCH", checks["chained screenshot s1.png"])
 
+    def test_screen_text_sheet_lists_the_tree_lines_in_screen_order_under_the_label(self):
+        xml = ("<hierarchy><node text='second line' content-desc='' bounds='[0,300][9,340]' package='com.example.chat'/>"
+               "<node text='first line' content-desc='said by A' bounds='[0,100][9,140]' package='com.example.chat'/>"
+               "<node text='' bounds='[0,0][9,9]' package='com.example.chat'/></hierarchy>").encode()
+        rows = self.rows + [row(7, "lab", "sent_message", refers_to="m", content="x")]
+        d = make_export(self.tmp, rows)
+        os.makedirs(os.path.join(d, "trees"))
+        with open(os.path.join(d, "trees", "m.xml"), "wb") as f:
+            f.write(xml)
+        with open(os.path.join(d, "manifest.json")) as f:
+            m = json.load(f)
+        m["view_trees"] = [{"entry_id": "m", "file": "m.xml", "status": "ok", "sha256_at_capture": hashlib.sha256(xml).hexdigest()}]
+        with open(os.path.join(d, "manifest.json"), "w") as f:
+            json.dump(m, f)
+        out = os.path.join(self.tmp, "doc.xlsx")
+        info = md.build([md.load_export(d)], out)
+        self.assertEqual(info["screen_text"], 2)
+        ws = load_workbook(out)["Screen text"]
+        got = [[c.value for c in r] for r in ws.iter_rows(min_row=2)]
+        self.assertEqual([g[6] for g in got], ["first line", "second line"])
+        self.assertEqual(got[0][7], "said by A")
+        self.assertTrue(got[0][10].endswith("m.xml"))
+        self.assertEqual(ws.cell(row=2, column=11).hyperlink.target, got[0][10])
+
     def test_export_without_view_trees_reports_nothing_about_them(self):
+        self.assertNotIn("Screen text", load_workbook(self._doc()).sheetnames)
+
+    def _doc(self):
+        out = os.path.join(self.tmp, "plain.xlsx")
+        md.build([md.load_export(make_export(self.tmp, self.rows))], out)
+        return out
+
+    def test_export_without_view_trees_reports_no_checks_about_them(self):
         checks = dict(md.load_export(make_export(self.tmp, self.rows))["checks"])
         self.assertNotIn("view trees", checks)
         self.assertNotIn("files against chained rows", checks)

@@ -621,6 +621,18 @@ when the next session starts.
 - After each capture KDL writes a `capture_files` row with the SHA-256 of the screenshot and of the
   view tree. That row is in the hash chain, so the chain covers both files.
 
+What KDL does with a saved view tree:
+
+- **When you label a mark or a captured event**, the form lists the text that was on that screen,
+  top to bottom, under the screenshot. Tap a line to use it as Content. Press and hold a line to use
+  it as the counterpart. Nothing is filled in without a tap, and you can still type. The first lines
+  are often the app's own buttons and banners; "Show all" lists the rest.
+- **In the spreadsheet**, a Screen text sheet lists every line of every saved tree in screen order,
+  with the entry it belongs to and links to the screenshot and the tree file.
+- **In `kdl_locate.py`**, a Screen text sheet lists the lines that were on a marked screen and that
+  you did not log, and says whether each was found in one of the app's stores and where. Lines under
+  4 characters are left out, and at most 400 lines are searched.
+
 Tried on an Android 15 emulator (11 November 2026) with Google Messages and Settings: a message
 holding the words "PIN" and "password" and one holding a verification code were in the saved tree
 as shown, and digits typed into the Settings confirm-PIN field were not.

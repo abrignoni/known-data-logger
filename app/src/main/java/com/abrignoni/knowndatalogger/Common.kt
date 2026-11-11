@@ -1,5 +1,11 @@
 package com.abrignoni.knowndatalogger
 
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
@@ -102,7 +108,7 @@ internal fun ShotThumb(repo: Repo, shot: Shot?) {
     if (shot.status != "ok") Text("Screenshot: ${shot.status}", style = MaterialTheme.typography.bodySmall)
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun EditDialog(repo: Repo, e: Entry, shot: Shot?, onDone: () -> Unit) {
     val ctx = LocalContext.current
@@ -203,6 +209,24 @@ internal fun EditDialog(repo: Repo, e: Entry, shot: Shot?, onDone: () -> Unit) {
             if (rawEvent && !e.isWithheldNotification) Text("Captured: ${templateLabel(e.action)} ${e.content?.let { "\"$it\"" } ?: ""}",
                 color = Kdl.Muted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
             ShotThumb(repo, shot)
+            // The screen's own words, from the view tree saved with the screenshot.
+            val screenText by produceState(emptyList<String>(), e.entryId) {
+                value = withContext(Dispatchers.IO) { repo.treeTexts(e) }
+            }
+            if (screenText.isNotEmpty() && !ownRow) {
+                var showAll by remember { mutableStateOf(false) }
+                Text("Text on this screen · tap to use as Content, hold for Counterpart", color = Kdl.Muted,
+                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                (if (showAll) screenText else screenText.take(6)).forEach { line ->
+                    Text(line, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
+                            .combinedClickable(onClick = { content = line }, onLongClick = { counterpart = line })
+                            .heightIn(min = 40.dp).padding(vertical = 6.dp))
+                }
+                if (screenText.size > 6) TextButton(onClick = { showAll = !showAll }, contentPadding = PaddingValues(0.dp)) {
+                    Text(if (showAll) "Show fewer" else "Show all ${screenText.size} lines")
+                }
+            }
             // The common actions one tap away; the full list is in the field below.
             if (labellingMark || rawEvent || e.needsDetail) FlowRow(Modifier.padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 QUICK.forEach { (key, label) -> FilterChip(selected = action == key, onClick = { action = key }, label = { Text(label) }) }

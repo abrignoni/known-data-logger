@@ -109,6 +109,13 @@ of the tree into the hash chain. Tried on an Android 15 emulator (11 November 20
 with the words "PIN", "password" and a verification code were in the saved tree as shown, digits
 typed into the Settings confirm-PIN field were not, and the export passed `make_documentation.py`.
 
+The saved tree is used in three places. The label form lists the screen's text under the screenshot:
+tap a line for Content, press and hold for the counterpart. `make_documentation.py` adds a Screen text
+sheet with every line of every tree and links to the picture and the tree. `kdl_locate.py` adds a
+Screen text sheet for the lines on a marked screen that were not logged, with where each was found in
+the app's stores. On the emulator, a tap filled Content with a three-line message exactly and a hold
+filled the counterpart with the thread's number.
+
 Known limits:
 
 - A view tree is what the app reports, not what a person saw. An app can report more than the screen

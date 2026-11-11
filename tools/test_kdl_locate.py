@@ -4,6 +4,7 @@ Every value below is invented for the test. The fixture writers for MMKV, LevelD
 are checked by the vendored readers, which are the oracles here.
 """
 import json
+import hashlib
 import os
 import shutil
 import sqlite3
@@ -363,6 +364,56 @@ class LocateTest(unittest.TestCase):
             self.assertTrue(all("evil" not in h["Store"] for h in hits))
         nr = sheet(os.path.join(self.tmp, "x.zip.xlsx"), "Not read")
         self.assertTrue(any("rejected" in r["Reason"] for r in nr))
+
+
+class ScreenTextTest(unittest.TestCase):
+    """Text on a marked screen that the tester did not log is looked for too."""
+
+    def test_unlogged_screen_text_is_searched_and_logged_text_is_not_repeated(self):
+        tmp = tempfile.mkdtemp()
+        try:
+            root = os.path.join(tmp, "extraction")
+            build_app(root)
+            rows = [r for r in entries() if r["entry_id"] != "e4"]   # "Parking is on level 3" was not logged
+            export = make_export(tmp, rows)
+            os.makedirs(os.path.join(export, "trees"))
+            node = lambda text, y: (f'<node text="{text}" resource-id="{PKG}:id/body" class="android.widget.TextView" '
+                                    f'package="{PKG}" content-desc="" bounds="[0,{y}][500,{y + 40}]" />')
+            xml = ("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation=\"0\">"
+                   + node("Parking is on level 3", 100) + node("Never on the phone at all", 200)
+                   + node("See you at 6pm", 300) + node("ok", 400) + "</hierarchy>").encode()
+            with open(os.path.join(export, "trees", "e1.xml"), "wb") as f:
+                f.write(xml)
+            with open(os.path.join(export, "manifest.json")) as f:
+                m = json.load(f)
+            m["view_trees"] = [{"entry_id": "e1", "file": "e1.xml", "status": "ok",
+                                "sha256_at_capture": hashlib.sha256(xml).hexdigest()}]
+            with open(os.path.join(export, "manifest.json"), "w") as f:
+                json.dump(m, f)
+            out = os.path.join(tmp, "locate.xlsx")
+            kl.main(["--export", export, "--extraction", root, "--package", PKG, "-o", out, "--work", os.path.join(tmp, "work")])
+            rows = sheet(out, "Screen text")
+            by_text = {}
+            for r in rows:
+                by_text.setdefault(r["Text on screen"], []).append(r)
+            self.assertEqual(set(by_text), {"Parking is on level 3", "Never on the phone at all"})  # logged and short lines left out
+            self.assertTrue(all(r["Found"] == "yes" for r in by_text["Parking is on level 3"]))
+            self.assertTrue(any("notes.db" in (r["Store"] or "") for r in by_text["Parking is on level 3"]))
+            self.assertEqual([r["Found"] for r in by_text["Never on the phone at all"]], ["no"])
+        finally:
+            shutil.rmtree(tmp)
+
+    def test_export_without_trees_has_no_screen_text_sheet(self):
+        self.assertNotIn("Screen text", load_workbook(LocateTest_out()).sheetnames)
+
+
+def LocateTest_out():
+    tmp = tempfile.mkdtemp()
+    root = os.path.join(tmp, "extraction")
+    build_app(root)
+    out = os.path.join(tmp, "locate.xlsx")
+    kl.main(["--export", make_export(tmp, entries()), "--extraction", root, "--package", PKG, "-o", out, "--work", os.path.join(tmp, "work")])
+    return out
 
 
 class UnitTest(unittest.TestCase):

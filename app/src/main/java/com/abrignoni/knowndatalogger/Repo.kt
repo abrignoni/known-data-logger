@@ -189,14 +189,21 @@ class Repo private constructor(private val context: Context) {
 
     fun recordTree(tree: TreeFile) = db.putTree(tree)
 
+    /** Text lines of the view tree saved for an entry, or for the event it labels; empty when there is none. */
+    fun treeTexts(e: Entry): List<String> = try {
+        val trees = db.trees()
+        val t = trees[e.entryId] ?: e.refersTo?.let { trees[it] }
+        t?.file?.let { File(treesDir(), it) }?.takeIf { it.exists() }?.let { ViewTree.texts(it.readText(Charsets.UTF_8)) } ?: emptyList()
+    } catch (ex: Exception) { emptyList() }
+
     /**
      * Puts the hashes of an entry's screenshot and view tree into the chain, as a row of its own:
      * the files are written after the entry's row, so that row cannot carry them.
      */
     fun logCaptureFiles(entryId: String, appPackage: String?, shot: Shot?, tree: TreeFile?) {
         if (shot?.file == null && tree?.file == null) return
-        log(Draft(appPackage = appPackage, action = "capture_files", refersTo = entryId, source = Source.SYSTEM,
-            detail = ViewTree.filesDetail(shot, tree)), kind = Kind.SYSTEM_EVENT)
+        log(Draft(appPackage = appPackage, action = "capture_files", source = Source.SYSTEM,
+            detail = ViewTree.filesDetail(entryId, shot, tree)), kind = Kind.SYSTEM_EVENT)
     }
 
     /** Start stamp of an open Start/Done window, kept in the database so a killed app keeps it. */
