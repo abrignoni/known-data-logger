@@ -1,0 +1,1 @@
+Rules can be exported to a file and imported from one. Start over in Setup erases the log and keeps apps, rules and options. An export shows its progress. Start without capture runs a session for hand logging when the accessibility service is off.
