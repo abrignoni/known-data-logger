@@ -130,11 +130,16 @@ fun Onboarding(repo: Repo, onDone: () -> Unit) {
                         }
                         Text("If Android says the app was denied access (an APK installed from a file): Settings, Apps, KDL, the three-dot menu, Allow restricted settings, then switch it on again.",
                             color = Kdl.Muted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 20.dp))
+                        if (!enabled) TextButton(onClick = { step = 3 }, contentPadding = PaddingValues(0.dp), modifier = Modifier.padding(top = 12.dp)) {
+                            Text("Skip: I will log by hand")
+                        }
                     }
                     else -> {
                         Text("You're set.", style = MaterialTheme.typography.headlineSmall)
-                        Text("Start a session on the Session tab and use the phone. Tap the red MARK button to save a moment with a screenshot. " +
-                            "After a session, Check shows anything KDL inferred or could not label.",
+                        Text(if (enabled) "Start a session on the Session tab and use the phone. Tap the red MARK button to save a moment with a screenshot. " +
+                            "After a session, Check shows anything KDL inferred or could not label."
+                            else "Capture is off, so KDL records only what you log by hand. On the Session tab tap Start without capture, then use the chips. " +
+                            "You can turn capture on later from Setup, Capture.",
                             color = Kdl.Muted, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 8.dp))
                     }
                 }

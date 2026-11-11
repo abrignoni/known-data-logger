@@ -60,6 +60,42 @@ fun parseRules(text: String): List<Rule> {
     }
 }
 
+/** Rules read from a file someone else made, with how many of its rules could not be used. */
+data class RulesRead(val rules: List<Rule>, val skipped: Int)
+
+/**
+ * Reads a rules file for import. Unlike parseRules, one bad rule does not fail the file: it is
+ * counted and left out. A rule is used only when it could ever match and write something: it needs
+ * an id, a package, an action, a known event, a view id or a label pattern that compiles, and
+ * content that is absent or "last_typed". Throws IllegalArgumentException when the text is not a
+ * rules file at all.
+ */
+fun readRulesForImport(text: String): RulesRead {
+    val arr = try { JSONObject(text).getJSONArray("rules") } catch (e: Exception) {
+        throw IllegalArgumentException("Not a KDL rules file")
+    }
+    val out = mutableListOf<Rule>()
+    var skipped = 0
+    for (i in 0 until arr.length()) {
+        val r = try {
+            val o = arr.getJSONObject(i)
+            fun opt(k: String): String? = if (o.isNull(k) || !o.has(k)) null else o.getString(k)
+            Rule(
+                id = o.getString("id").trim(), pkg = o.getString("package").trim(), viewId = opt("view_id")?.ifBlank { null },
+                labelRegex = opt("label_regex")?.ifBlank { null }, action = o.getString("action").trim(), content = opt("content"),
+                verifiedWith = opt("verified_with"), event = opt("event") ?: RuleEvent.TAP,
+            )
+        } catch (e: Exception) { null }
+        val usable = r != null && r.id.isNotEmpty() && r.pkg.isNotEmpty() && r.action.isNotEmpty() &&
+            r.event in setOf(RuleEvent.TAP, RuleEvent.FIELD_CLEARED) &&
+            (r.viewId != null || r.labelRegex != null) &&
+            (r.labelRegex == null || runCatching { Regex(r.labelRegex) }.isSuccess) &&
+            (r.content == null || r.content == "last_typed")
+        if (usable) out += r!! else skipped++
+    }
+    return RulesRead(out, skipped)
+}
+
 /** Screenshots belong to the original row (revision 0) of their entry. */
 fun jsonl(rows: List<Entry>, shots: Map<String, Shot> = emptyMap()): String =
     rows.sortedBy { it.seq }.joinToString("") {

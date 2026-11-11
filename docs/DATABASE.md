@@ -12,8 +12,13 @@ Path on the device: `/data/data/com.abrignoni.knowndatalogger/databases/kl.db`.
 
 State keys: `onboarded`, `capture_session_active`, `session_start` and `window_start` (clock
 readings as JSON), `capture_all_apps`, `shot_on_auto_action`, `shot_on_every_tap`,
-`mask_notification_codes`, `mark_y` (where MARK was left), `known_version:<package>`, and
-`export_tree` (the export folder picked last, as a content URI).
+`mask_notification_codes`, `mark_y` (where MARK was left), `known_version:<package>`,
+`export_tree` (the export folder picked last, as a content URI), and `session_hand_only` (1 while
+a session started without capture is running).
+
+Start over in the app empties `entries`, `screenshots` and `profiles`, resets their row numbering,
+removes `session_start`, `window_start` and the `known_version:` keys, and rebuilds the file with
+`VACUUM`. The other settings and `apps` stay.
 
 ## profiles
 

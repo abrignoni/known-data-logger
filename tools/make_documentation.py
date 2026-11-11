@@ -391,7 +391,8 @@ SCENARIO_EVENTS = (
     "boot_detected", "capture_session_start", "capture_session_stop", "export_failed",
     "app_installed", "app_updated", "app_removed", "app_data_cleared",
     "app_version_changed_since_last_seen", "app_version_changed_since_added",
-    "profile_snapshot", "rule_taught", "rule_removed", "hash_chain_backfilled",
+    "profile_snapshot", "rule_taught", "rule_removed", "rules_imported", "hash_chain_backfilled",
+    "log_started_over",
 )
 
 

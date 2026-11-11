@@ -210,12 +210,16 @@ stay ticked.
 If you installed from a file and Android says the app was denied access, see
 [Install from an APK file](#from-an-apk-file-on-the-phone).
 
+If capture cannot be turned on for this phone, tap **Skip: I will log by hand**. KDL then records
+only what you log yourself. See [Start without capture](#start-without-capture).
+
 ### Step 4: Ready
 
 ![You're set](manual/firstrun-4-ready.png)
 
 Tap **Start using KDL**. KDL takes the first device snapshot (make, model, Android version, build,
-security patch, fingerprint, kernel, baseband) and opens the Session tab.
+security patch, fingerprint, kernel, baseband) and opens the Session tab. If you skipped step 3, the
+page says capture is off and that the Session tab offers **Start without capture**.
 
 ## 4. Record a session
 
@@ -228,7 +232,7 @@ KDL has three tabs: **Session**, **Check** and **Setup**.
 ### Start
 
 Tap **Start session**. If capture is off, the button reads **Open Accessibility settings**
-instead.
+instead, with **Start without capture** under it.
 
 While a session runs, the Session tab shows:
 
@@ -248,6 +252,22 @@ If KDL gets switched off in Accessibility settings while a session runs, the Ses
 "Session running, capture is off", with a **Capture is off** card and a button to
 **Open Accessibility settings**. Nothing is captured and MARK is hidden until you turn it back on.
 Log by hand still works. KDL checks every few seconds, and when you come back to it.
+
+### Start without capture
+
+| Capture is off | Logging by hand |
+|---|---|
+| ![Session tab with capture off: Open Accessibility settings and Start without capture](manual/session-start-without-capture.png) | ![Logging by hand, capture is off](manual/session-hand-only.png) |
+
+For a phone where the accessibility service cannot be switched on, **Start without capture** starts
+a session for hand logging only. There is no MARK, there are no screenshots, and nothing is
+captured or inferred. The **Log by hand** chips, the Timeline, the hash chain and the export work
+as in any session. The session's start row ends with `capture=off`, so the log says how it was
+recorded.
+
+During such a session the Session tab reads "Logging by hand, capture is off", with a link to
+Accessibility settings and no warning. If you turn capture on while it runs, KDL starts capturing
+from that moment and MARK appears. That last part comes from the code and was not tried.
 
 ### What gets captured
 
@@ -517,9 +537,9 @@ Things to know:
 - A cleared field can only be taught when it has a view id, because its label would be the
   message you typed.
 - Taught rules are saved in `rules.json` in the app's files folder,
-  `Android/data/com.abrignoni.knowndatalogger/files/`. Pull it with `adb pull` to share it, or
-  push someone else's with `adb push`. A rule in that file overrides a built-in rule with the same
-  id.
+  `Android/data/com.abrignoni.knowndatalogger/files/`. Share them with **Export rules** and load
+  someone else's with **Import rules**, both in [Setup, Rules](#rules). `adb pull` and `adb push`
+  on that file still work. A rule in that file overrides a built-in rule with the same id.
 - Each taught rule records the device label, model, app version and time it was taught.
 - If `rules.json` holds a rule KDL cannot read, saving the rule refuses and leaves the file as it
   is. The label itself is still saved.
@@ -586,7 +606,23 @@ when the next session starts.
 ![Rules](manual/setup-rules.png)
 
 Every rule in effect: the action, the app, whether it matches a **Tap** or a **Field cleared**,
-and whether it is **built in** or **taught here**. Taught rules have **Remove**.
+and whether it is **built in** or **taught or imported**. Taught and imported rules have
+**Remove**.
+
+![Import 2 rules? with one rule left out](manual/rules-import.png)
+
+- **Export rules** writes the taught and imported rules to a file, `kdl-rules.json` unless you
+  rename it, in the folder you pick. Built-in rules are not in it. The button is grey when there
+  are none to export.
+- **Import rules** opens Android's file picker. Pick a rules file and KDL lists what is in it:
+  each rule's action, app and event, and whether it is **new** or **replaces a rule in effect**
+  (a rule with the same id, built in or not). A rule KDL cannot use is counted and left out: one
+  with no id, package or action, an event other than tap or field cleared, no view id and no label
+  pattern, a label pattern that does not compile, or content other than the typed text. Tap
+  **Import** to add them. The import is logged as a **Rules imported** row with the file name and
+  the rule ids.
+- A rule decides what KDL writes as an inferred action, so import rules only from someone you
+  trust. Inferred actions still wait in Check until you accept them.
 
 ### Device
 
@@ -595,6 +631,33 @@ and whether it is **built in** or **taught here**. Taught rules have **Remove**.
 The latest device snapshot. Add the **Carrier** and **Notes** if you want them, then
 **Add new snapshot**. Take a new snapshot after an OS update. Earlier snapshots are kept, and each
 one is logged.
+
+### Start over
+
+| Start over | The new log |
+|---|---|
+| ![Start over: what is erased, rows since the last export, the new scenario id](manual/startover-dialog.png) | ![Timeline of the new log: Started over, Device snapshot](manual/startover-timeline.png) |
+
+**Start over** erases the log and begins a new one. While a session runs or an export is in
+progress, tapping it only says to stop the session or wait.
+
+- It erases every row, the screenshots, the device snapshots and the live copy
+  (`actions-live.jsonl`). The dialog says how many rows and screenshots that is.
+- It keeps the app list, the rules, the options and the export folder.
+- It tells you what was not exported: "This log was never exported", or how many rows were added
+  since the last export that finished. Export first if you need them.
+- **Scenario id for the new log** starts as the current one. Change it for a new scenario.
+- The new log opens with a **Started over** row, then a fresh device snapshot. The hash chain
+  starts again at that row, so a hash you noted before belongs to the erased log.
+
+On the Android 15 emulator (11 November 2026), after a Start over the database held only the new
+rows, the screenshots folder was empty, `rules.json` and the app list were as before, the text of
+an earlier message was no longer in the database file, and `make_documentation.py` reported the
+new export's hash chain as intact. Start over does not delete exports already in your export
+folder.
+
+To remove everything, rules and settings included, use Android's Clear storage. See
+[I want to start over](#i-want-to-start-over).
 
 ### Latest row hash
 
@@ -611,7 +674,11 @@ The hash of the newest row in the log, with a copy button. Write it in your docu
    session).
 2. Android's folder picker opens. Pick a folder or make a new one, then tap **Use this folder**.
 3. Android asks whether KDL may access files in that folder. Tap **Allow**.
-4. KDL says "Exported" and shows the folder name under the button.
+4. While it runs, a progress bar replaces the button and counts the files: "Exporting: 14 of 28
+   files". The files are the screenshots and the three log files.
+5. KDL says "Exported" and shows the folder name under the button.
+
+![Exporting: 14 of 28 files](manual/export-progress.png)
 
 ![Session tab after an export: Goes to Documents/KDL-exports, Change folder](manual/export-4-same-folder.png)
 
@@ -858,7 +925,7 @@ with the tool's output yourself. A checker script that reads both is planned.
 ### Start session is missing
 
 The button says **Open Accessibility settings** because capture is off. Turn on Known-data logger
-in Accessibility.
+in Accessibility, or tap **Start without capture** to log by hand only.
 
 ### Android says "App was denied access"
 
@@ -887,7 +954,9 @@ Scenario sheet.
 
 ### I want to start over
 
-KDL has no reset button. Use Android's: in KDL's App info, tap **Storage & cache**, then **Clear
+To erase the log and keep your apps, rules and options, use [Start over](#start-over) in Setup.
+
+To remove everything, use Android's: in KDL's App info, tap **Storage & cache**, then **Clear
 storage**, then **Delete**. Export first, and copy the export off the phone if you need it.
 
 | Delete app data? | Opening KDL afterwards |
