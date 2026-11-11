@@ -269,9 +269,10 @@ built and signed by this workflow.
 
 ## Status
 
-Version 0.3.1, Android only. Tested, with 0.3.0 and earlier builds, on an Android 15 emulator and
+Version 0.3.2, Android only. Tested, with 0.3.0 and earlier builds, on an Android 15 emulator and
 on a Pixel 7a with Android 17
-(8 November 2026), installed with `adb` into a separate user profile on that phone. On the Pixel:
+(8 November 2026), installed with `adb` into a separate user profile on that phone. The changes in
+0.3.2 were tried on the Android 15 emulator only (11 November 2026). On the Pixel:
 - installing with `adb install --user` and turning the service on did not ask for "Allow
   restricted settings"; installing the same APK from the Files app did (Android recorded it as a
   local-file install), and Allow restricted settings in App info cleared it
