@@ -497,6 +497,32 @@ fun treeFolderName(documentId: String): String =
 
 
 /**
+ * Rows written after the last export that finished, or null when the log was never exported.
+ * An export row followed by an export_failed row for the same folder did not finish. The answer
+ * tells the tester what an erase would lose.
+ */
+fun rowsSinceLastExport(rows: List<Entry>): Int? {
+    val ordered = rows.sortedBy { it.seq }
+    val failed = ordered.filter { it.action == "export_failed" }.mapNotNull { it.detail?.substringBefore(':') }.toSet()
+    val last = ordered.lastOrNull { it.kind == Kind.EXPORT && it.detail !in failed } ?: return null
+    return ordered.count { it.seq > last.seq }
+}
+
+/** What an import would do with one rule: add it, or replace a rule already in effect with the same id. */
+data class RuleImportItem(val rule: Rule, val replaces: Boolean)
+
+/** Marks each rule read from a file as new or as a replacement for a rule in effect (built in or local). */
+fun planRuleImport(read: List<Rule>, inEffect: List<Rule>): List<RuleImportItem> {
+    val ids = inEffect.map { it.id }.toSet()
+    // A file that repeats an id keeps its last rule for that id, as Rules.merge does.
+    return Rules.merge(read).map { RuleImportItem(it, it.id in ids) }
+}
+
+/** Words for an export in progress: the files written so far out of all of them. */
+fun exportProgressWords(done: Int, total: Int): String =
+    if (total <= 0) "Exporting" else "Exporting: $done of $total files"
+
+/**
  * Tamper evidence for the log. Each row's hash covers its own fields plus the previous row's
  * hash, in seq order, so editing, removing or reordering a row breaks every hash after it.
  *
@@ -626,6 +652,7 @@ private val SYSTEM_LABELS = mapOf(
     "app_updated" to "App updated", "app_removed" to "App removed", "app_data_cleared" to "App data cleared",
     "app_version_changed_since_last_seen" to "App version changed", "rule_taught" to "Rule taught",
     "rule_removed" to "Rule removed", "hash_chain_backfilled" to "Hash chain started",
+    "rules_imported" to "Rules imported", "log_started_over" to "Started over",
 )
 
 /** The words shown for an entry in the interface (the log keeps the action key). */

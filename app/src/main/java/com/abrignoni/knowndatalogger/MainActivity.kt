@@ -63,6 +63,9 @@ internal var windowStart: Pending? by mutableStateOf(null)
 internal var lastDraft: Draft? = null
 internal var lastExport: String? by mutableStateOf(null)
 
+/** Files written so far and in all, while an export runs; null when none is running. */
+internal var exportProgress: Pair<Int, Int>? by mutableStateOf(null)
+
 /** Which part of Check is showing: 0 to check, 1 timeline. Kept across refreshes. */
 internal val checkSegment = mutableIntStateOf(0)
 
@@ -198,11 +201,13 @@ internal class Exporter(val run: () -> Unit, val pick: () -> Unit, val folder: S
 internal fun rememberExporter(repo: Repo, bump: () -> Unit): Exporter {
     val ctx = LocalContext.current
     fun export(uri: android.net.Uri) {
-        toast(ctx, "Exporting")
+        if (exportProgress != null) return   // one export at a time
+        exportProgress = 0 to 0
         val main = android.os.Handler(android.os.Looper.getMainLooper())
         Thread {
-            val result = runCatching { repo.exportTo(uri) }
+            val result = runCatching { repo.exportTo(uri) { done, total -> main.post { if (exportProgress != null) exportProgress = done to total } } }
             main.post {
+                exportProgress = null
                 result.onSuccess { lastExport = it; toast(ctx, "Exported") }
                     .onFailure { toast(ctx, "Export failed: ${it.message}") }
                 bump()
@@ -258,15 +263,21 @@ fun SessionScreen(repo: Repo, bump: () -> Unit, openCheck: (Int) -> Unit) {
                 }
                 Column(Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(10.dp).clip(CircleShape).background(if (enabled) Kdl.Mark else Kdl.Amber))
+                        // A session started without capture is hand logging by choice, so it gets no warning.
+                        val handOnly = !enabled && repo.handOnly
+                        Box(Modifier.size(10.dp).clip(CircleShape).background(if (enabled) Kdl.Mark else if (handOnly) Kdl.Primary else Kdl.Amber))
                         Spacer(Modifier.width(8.dp))
-                        Text(if (enabled) "Recording" else "Session running, capture is off", color = if (enabled) Kdl.Muted else Kdl.Amber)
+                        Text(if (enabled) "Recording" else if (handOnly) "Logging by hand, capture is off" else "Session running, capture is off",
+                            color = if (enabled || handOnly) Kdl.Muted else Kdl.Amber)
                     }
                     val ms = start?.let { if (it.bootCount == Clocks.bootCount(ctx.contentResolver)) now - it.elapsedMs else null }
                     Text(ms?.let { duration(it) } ?: "--:--", fontSize = 57.sp, modifier = Modifier.padding(top = 4.dp))
                     Text(appNames, color = Kdl.Muted)
                 }
-                if (!enabled) {
+                if (!enabled && repo.handOnly) {
+                    TextButton(onClick = { ctx.startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) { Text("Turn on capture in Accessibility settings") }
+                } else if (!enabled) {
                     // The session flag outlives the service: without this, the timer keeps running over nothing.
                     Card(colors = CardDefaults.cardColors(containerColor = Kdl.Surface), modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                         Column(Modifier.padding(14.dp)) {
@@ -324,7 +335,7 @@ fun SessionScreen(repo: Repo, bump: () -> Unit, openCheck: (Int) -> Unit) {
                 )
                 if (enabled) {
                     Button(
-                        onClick = { repo.startSession(); CaptureService.instance?.syncSession(); bump() },
+                        onClick = { repo.startSession(capture = true); CaptureService.instance?.syncSession(); bump() },
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(56.dp),
                     ) { Icon(Icons.Filled.FiberManualRecord, null); Spacer(Modifier.width(8.dp)); Text("Start session", fontSize = 16.sp) }
                 } else {
@@ -332,6 +343,11 @@ fun SessionScreen(repo: Repo, bump: () -> Unit, openCheck: (Int) -> Unit) {
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(56.dp)) {
                         Icon(Icons.Outlined.OpenInNew, null); Spacer(Modifier.width(8.dp)); Text("Open Accessibility settings", fontSize = 16.sp)
                     }
+                    // For a phone where the service cannot be switched on: the log, the hash chain and the export work the same.
+                    OutlinedButton(onClick = { repo.startSession(capture = false); bump() },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).padding(top = 10.dp)) { Text("Start without capture") }
+                    Text("Log by hand only: no MARK, no screenshots, nothing captured.", color = Kdl.Muted,
+                        style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
                 }
                 last?.let { s ->
                     SectionLabel("Last session")
@@ -349,7 +365,15 @@ fun SessionScreen(repo: Repo, bump: () -> Unit, openCheck: (Int) -> Unit) {
                     }
                 }
                 SectionLabel("Export")
-                OutlinedButton(onClick = export.run, modifier = Modifier.fillMaxWidth()) {
+                val running = exportProgress
+                if (running != null) {
+                    // An export copies every screenshot, so it says how far along it is.
+                    val (done, total) = running
+                    if (total > 0) LinearProgressIndicator(progress = { done.toFloat() / total }, modifier = Modifier.fillMaxWidth().padding(top = 14.dp))
+                    else LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 14.dp))
+                    Text(exportProgressWords(done, total), color = Kdl.Muted, style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 6.dp))
+                } else OutlinedButton(onClick = export.run, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Outlined.FileUpload, null); Spacer(Modifier.width(8.dp)); Text("Export everything")
                 }
                 Text("Exports every session on this phone, with screenshots and the hash chain." +

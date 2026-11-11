@@ -155,6 +155,26 @@ class Db(context: Context) : SQLiteOpenHelper(context, NAME, null, SCHEMA_VERSIO
             out
         }
 
+    /**
+     * Erases the log: every entry, screenshot row and device snapshot, and the state that belongs
+     * to them (an open timing, the session start, the app versions the log had accounted for).
+     * The app list and the other settings stay. The file is then rebuilt, so erased rows do not
+     * stay behind in its free pages.
+     */
+    fun eraseLog() {
+        val w = writableDatabase
+        w.beginTransaction()
+        try {
+            w.delete("entries", null, null)
+            w.delete("screenshots", null, null)
+            w.delete("profiles", null, null)
+            w.delete("sqlite_sequence", "name IN ('entries','profiles')", null)
+            w.delete("settings", "key IN ('session_start','window_start') OR key LIKE 'known_version:%'", null)
+            w.setTransactionSuccessful()
+        } finally { w.endTransaction() }
+        w.execSQL("VACUUM")
+    }
+
     fun setting(key: String): String? =
         readableDatabase.rawQuery("SELECT value FROM settings WHERE key=?", arrayOf(key)).use {
             if (it.moveToFirst()) it.getString(0) else null

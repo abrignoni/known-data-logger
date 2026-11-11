@@ -43,6 +43,8 @@ class Repo private constructor(private val context: Context) {
         const val KEY_SHOT_TAP = "shot_on_every_tap"
         const val KEY_ALL_APPS = "capture_all_apps"
         const val KEY_MASK_CODES = "mask_notification_codes"
+        /** Set while a session that was started without the capture service is running. */
+        const val KEY_HAND_ONLY = "session_hand_only"
         val DEFAULT_CAPTURE_PACKAGES = setOf("com.android.systemui", "com.android.settings")
     }
 
@@ -79,19 +81,29 @@ class Repo private constructor(private val context: Context) {
     /** Stamp of the running session's start, for the timer. */
     fun sessionStart(): Stamp? = loadStamp("session_start")
 
-    fun startSession() {
+    /** True while a session started without capture is running: hand logging only, by choice. */
+    val handOnly: Boolean get() = flag(KEY_HAND_ONLY, false)
+
+    /**
+     * Starts a session. capture says whether the capture service was on at the start; a session
+     * started without it is for logging by hand, and the start row says so.
+     */
+    fun startSession(capture: Boolean = true) {
         val s = stamp()
         setFlag(KEY_SESSION, true)
+        setFlag(KEY_HAND_ONLY, !capture)
         saveStamp("session_start", s)
         val allApps = flag(KEY_ALL_APPS, false)
         log(Draft(action = "capture_session_start", source = Source.SYSTEM,
             detail = "apps: " + (if (allApps) "all" else capturePackages().sorted().joinToString(" ")) +
-                "; screenshots: auto=${flag(KEY_SHOT_AUTO, true)} every_tap=${flag(KEY_SHOT_TAP, false)}"),
+                "; screenshots: auto=${flag(KEY_SHOT_AUTO, true)} every_tap=${flag(KEY_SHOT_TAP, false)}" +
+                "; capture=${if (capture) "on" else "off"}"),
             s, kind = Kind.SYSTEM_EVENT)
     }
 
     fun stopSession() {
         setFlag(KEY_SESSION, false)
+        setFlag(KEY_HAND_ONLY, false)
         log(Draft(action = "capture_session_stop", source = Source.SYSTEM), kind = Kind.SYSTEM_EVENT)
     }
 
@@ -151,6 +163,18 @@ class Repo private constructor(private val context: Context) {
             detail = "${rule.id}: ${rule.event} ${rule.viewId ?: rule.labelRegex} -> ${rule.action}"), kind = Kind.SYSTEM_EVENT)
     }
 
+    /** The local rules as a rules file, for sharing. Refuses, like saving does, when rules.json does not read cleanly. */
+    fun localRulesJson(): String = rulesToJson(localRulesForWrite())
+
+    /** Adds rules read from a file to rules.json (same id replaces) and logs what came in. */
+    fun importRules(rules: List<Rule>, fileName: String?) {
+        if (rules.isEmpty()) return
+        rulesFile().writeText(rulesToJson(Rules.merge(localRulesForWrite(), rules)))
+        log(Draft(action = "rules_imported", source = Source.SYSTEM,
+            detail = "${plural(rules.size, "rule")} from ${fileName ?: "a file"}: " + rules.joinToString(", ") { it.id }.take(600)),
+            kind = Kind.SYSTEM_EVENT)
+    }
+
     fun removeLocalRule(id: String) {
         rulesFile().writeText(rulesToJson(localRulesForWrite().filter { it.id != id }))
         log(Draft(action = "rule_removed", source = Source.SYSTEM, detail = id), kind = Kind.SYSTEM_EVENT)
@@ -182,6 +206,28 @@ class Repo private constructor(private val context: Context) {
             networkTimeMs = if (o.isNull("network_time_ms")) null else o.getLong("network_time_ms"),
             gnssTimeMs = if (o.isNull("gnss_time_ms")) null else o.getLong("gnss_time_ms"),
         )
+    }
+
+    /**
+     * Erases the log and starts a new one: entries, screenshots, device snapshots and the live copy
+     * go; the app list, rules, options and the export folder stay. The new log opens with a row
+     * that says it follows an erased one, then a fresh device snapshot.
+     */
+    @Synchronized
+    fun startOver(newScenarioId: String) {
+        check(!sessionActive) { "Stop the session first" }
+        val carrier = db.profiles().lastOrNull()?.carrier
+        db.eraseLog()
+        screensDir().listFiles()?.forEach { it.delete() }
+        liveFile().delete()
+        lastHash = null
+        lastStamp = null
+        lastStampLoaded = false
+        if (newScenarioId.isNotBlank()) scenarioId = newScenarioId
+        log(Draft(action = "log_started_over", source = Source.SYSTEM,
+            detail = "the earlier log on this phone was erased in the app; a hash noted before this row belongs to that log"),
+            kind = Kind.SYSTEM_EVENT)
+        refreshProfile(carrier, null)
     }
 
     private fun latestProfileId(): Long? = db.profiles().lastOrNull()?.id
@@ -487,13 +533,13 @@ class Repo private constructor(private val context: Context) {
      * Logs the export as its own entry, then writes manifest.json, actions.jsonl and actions.csv
      * into a new folder under the tree the user picked. Returns the folder name.
      */
-    fun exportTo(treeUri: Uri): String {
+    fun exportTo(treeUri: Uri, progress: (done: Int, total: Int) -> Unit = { _, _ -> }): String {
         val s = stamp()
         val name = exportFolderName(s)
         // The export row comes first so the export lists itself; a failure is logged after it.
         log(Draft(action = "export", detail = "folder $name"), s, kind = Kind.EXPORT)
         try {
-            return writeExport(treeUri, name, s)
+            return writeExport(treeUri, name, s, progress)
         } catch (e: Exception) {
             log(Draft(action = "export_failed", detail = "folder $name: ${e.javaClass.simpleName}", source = Source.SYSTEM),
                 kind = Kind.SYSTEM_EVENT)
@@ -502,9 +548,13 @@ class Repo private constructor(private val context: Context) {
     }
 
     /** Screenshots are copied and hashed one at a time; manifest.json is written last. */
-    private fun writeExport(treeUri: Uri, name: String, s: Stamp): String {
+    private fun writeExport(treeUri: Uri, name: String, s: Stamp, progress: (Int, Int) -> Unit): String {
         val rows = db.entries()
         val shots = db.shots()
+        // Progress counts files: each screenshot that is still on disk, then the three log files.
+        val total = shots.values.count { sh -> sh.file?.let { File(screensDir(), it).exists() } == true } + 3
+        var done = 0
+        progress(done, total)
         val parent = DocumentsContract.buildDocumentUriUsingTree(treeUri, DocumentsContract.getTreeDocumentId(treeUri))
         val dir = DocumentsContract.createDocument(resolver, parent, DocumentsContract.Document.MIME_TYPE_DIR, name)
             ?: error("Could not create the export folder")
@@ -535,11 +585,14 @@ class Repo private constructor(private val context: Context) {
                 }
             }
             exportHash[sh.entryId] = md.digest().joinToString("") { "%02x".format(it) }
+            progress(++done, total)
         }
 
         val jsonlBytes = jsonl(rows, shots).toByteArray(Charsets.UTF_8)
         put("actions.jsonl", "application/octet-stream", jsonlBytes)
+        progress(++done, total)
         put("actions.csv", "text/csv", Csv.document(rows, shots).toByteArray(Charsets.UTF_8))
+        progress(++done, total)
         val shotList = JSONArray(shots.values.sortedBy { it.utcMs }.map { sh ->
             val now = exportHash[sh.entryId]
             JSONObject().apply {
@@ -555,6 +608,7 @@ class Repo private constructor(private val context: Context) {
         })
         put("manifest.json", "application/json",
             manifest(rows, jsonlBytes, s).apply { put("screenshots", shotList) }.toString(2).toByteArray(Charsets.UTF_8))
+        progress(++done, total)
         return name
     }
 }

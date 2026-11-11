@@ -44,6 +44,11 @@ There is no field for passwords or passcodes. Keep those in your private notes.
    **Setup** holds the scenario, apps, capture options, rules, device snapshots and the latest
    row hash.
 
+Where the accessibility service cannot be switched on, **Start without capture** on the Session tab
+starts a session for hand logging only: no MARK, no screenshots, nothing captured. **Start over** in
+Setup erases the log and keeps the apps, rules and options. An export shows its progress file by
+file.
+
 What is captured, only in the apps under test plus System UI and Settings unless you choose all apps:
 
 - screen changes, taps (label and view id), and typed text as the field's final value, stamped
@@ -86,8 +91,8 @@ teach new ones in the app: label a captured tap, cleared field or mark in Timeli
 rule". A rule from a tap without a view id matches the tap's label (whole label, case-insensitive),
 so that label is stored in the rule; check taught rules before sharing them. A cleared field can
 only be taught when it has a view id, because its label would be the typed message. If
-`rules.json` has a rule the app cannot read, saving refuses rather than overwriting it. Taught rules are saved in `rules.json` in the app's external files folder, where you can
-pull them to share or push someone else's. Each shipped rule says
+`rules.json` has a rule the app cannot read, saving refuses rather than overwriting it. Taught rules are saved in `rules.json` in the app's external files folder. Setup, Rules has
+Export rules and Import rules to share them; an import lists each rule and leaves out any it cannot use. Each shipped rule says
 which app version it was checked against. Auto labels stay "to review" until someone accepts them.
 
 Screenshots use the accessibility service's own capture (Android 11 and later): no extra
