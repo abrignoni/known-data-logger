@@ -41,5 +41,8 @@ object Clocks {
 
     /** Time from the last GNSS fix (API 29+). Null when unavailable. */
     private fun gnssTime(): Long? =
-        try { SystemClock.currentGnssTimeClock().millis() } catch (e: Exception) { null }
+        // The version check matters: before API 29 the call is a missing method, an Error that the catch below does not take.
+        if (Build.VERSION.SDK_INT >= 29) {
+            try { SystemClock.currentGnssTimeClock().millis() } catch (e: Exception) { null }
+        } else null
 }

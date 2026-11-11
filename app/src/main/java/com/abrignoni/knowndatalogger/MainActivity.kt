@@ -84,9 +84,12 @@ internal fun dayWord(s: Stamp): String {
     return when (day) {
         today -> "Today"
         today.minusDays(1) -> "Yesterday"
-        else -> day.format(DateTimeFormatter.ofPattern("MMM d"))
+        else -> day.format(DateTimeFormatter.ofPattern(if (day.year == today.year) "MMM d" else "MMM d, yyyy"))
     }
 }
+
+/** Time of day, with the day in front when the stamp is not from today: "Yesterday 14:02:11". */
+internal fun whenWords(s: Stamp): String = dayWord(s).let { if (it == "Today") hms(s) else "$it ${hms(s)}" }
 
 /** A labelled field that opens a menu, used where a value is picked from a list. */
 @Composable
@@ -184,31 +187,44 @@ internal fun SectionLabel(text: String, trailing: @Composable () -> Unit = {}) {
     }
 }
 
-/** Opens the system folder picker and exports off the main thread. */
+/**
+ * Export actions: [run] exports to the folder picked last, or opens the picker when there is none;
+ * [pick] always opens the picker; [folder] names the remembered folder.
+ */
+internal class Exporter(val run: () -> Unit, val pick: () -> Unit, val folder: String?)
+
+/** Exports off the main thread, into the remembered folder or one picked in the system folder picker. */
 @Composable
-internal fun rememberExporter(repo: Repo, bump: () -> Unit): () -> Unit {
+internal fun rememberExporter(repo: Repo, bump: () -> Unit): Exporter {
     val ctx = LocalContext.current
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        if (uri != null) {
-            toast(ctx, "Exporting")
-            val main = android.os.Handler(android.os.Looper.getMainLooper())
-            Thread {
-                val result = runCatching { repo.exportTo(uri) }
-                main.post {
-                    result.onSuccess { lastExport = it; toast(ctx, "Exported") }
-                        .onFailure { toast(ctx, "Export failed: ${it.message}") }
-                    bump()
-                }
-            }.start()
-        }
+    fun export(uri: android.net.Uri) {
+        toast(ctx, "Exporting")
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        Thread {
+            val result = runCatching { repo.exportTo(uri) }
+            main.post {
+                result.onSuccess { lastExport = it; toast(ctx, "Exported") }
+                    .onFailure { toast(ctx, "Export failed: ${it.message}") }
+                bump()
+            }
+        }.start()
     }
-    return { picker.launch(null) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) { repo.rememberExportTree(uri); export(uri) }
+    }
+    val saved = remember { repo.exportTree() }
+    return Exporter(
+        // Checked again at the tap: the folder can be deleted while this screen is open.
+        run = { repo.exportTree()?.let { export(it) } ?: picker.launch(null) },
+        pick = { picker.launch(null) },
+        folder = saved?.let { treeFolderName(android.provider.DocumentsContract.getTreeDocumentId(it)) },
+    )
 }
 
 // ---------------- Session ----------------
 
 /** Chips for logging by hand: template key and label. */
-private val QUICK = listOf(
+internal val QUICK = listOf(
     "sent_message" to "Sent message", "received_message" to "Received message",
     "outgoing_call" to "Outgoing call", "incoming_call" to "Incoming call",
     "took_photo" to "Took photo", "deleted_message" to "Deleted message",
@@ -219,7 +235,7 @@ private val QUICK = listOf(
 fun SessionScreen(repo: Repo, bump: () -> Unit, openCheck: (Int) -> Unit) {
     val ctx = LocalContext.current
     val active = repo.sessionActive
-    val enabled = serviceEnabled(ctx)
+    var enabled by remember { mutableStateOf(serviceEnabled(ctx)) }
     val apps = remember { repo.db.apps() }
     val appNames = apps.joinToString(", ") { it.label }.ifBlank { "no apps picked" }
     var last by remember { mutableStateOf(repo.lastSession()) }
@@ -237,17 +253,33 @@ fun SessionScreen(repo: Repo, bump: () -> Unit, openCheck: (Int) -> Unit) {
                     var n = 0
                     while (true) {
                         delay(1000); now = android.os.SystemClock.elapsedRealtime()
-                        if (++n % 3 == 0) last = repo.lastSession()   // event count, every 3 s
+                        if (++n % 3 == 0) { last = repo.lastSession(); enabled = serviceEnabled(ctx) }   // event count and capture state, every 3 s
                     }
                 }
                 Column(Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(10.dp).clip(CircleShape).background(Kdl.Mark))
-                        Spacer(Modifier.width(8.dp)); Text("Recording", color = Kdl.Muted)
+                        Box(Modifier.size(10.dp).clip(CircleShape).background(if (enabled) Kdl.Mark else Kdl.Amber))
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (enabled) "Recording" else "Session running, capture is off", color = if (enabled) Kdl.Muted else Kdl.Amber)
                     }
                     val ms = start?.let { if (it.bootCount == Clocks.bootCount(ctx.contentResolver)) now - it.elapsedMs else null }
                     Text(ms?.let { duration(it) } ?: "--:--", fontSize = 57.sp, modifier = Modifier.padding(top = 4.dp))
                     Text(appNames, color = Kdl.Muted)
+                }
+                if (!enabled) {
+                    // The session flag outlives the service: without this, the timer keeps running over nothing.
+                    Card(colors = CardDefaults.cardColors(containerColor = Kdl.Surface), modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                        Column(Modifier.padding(14.dp)) {
+                            Text("Capture is off", color = Kdl.Amber, style = MaterialTheme.typography.titleMedium)
+                            Text("KDL is switched off in Accessibility settings. Nothing is being captured and MARK is hidden. " +
+                                "Log by hand still works.", color = Kdl.Muted, style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp))
+                            FilledTonalButton(onClick = { ctx.startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
+                                modifier = Modifier.fillMaxWidth()) {
+                                Icon(Icons.Outlined.OpenInNew, null); Spacer(Modifier.width(8.dp)); Text("Open Accessibility settings")
+                            }
+                        }
+                    }
                 }
                 Button(
                     onClick = {
@@ -317,12 +349,19 @@ fun SessionScreen(repo: Repo, bump: () -> Unit, openCheck: (Int) -> Unit) {
                     }
                 }
                 SectionLabel("Export")
-                OutlinedButton(onClick = export, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = export.run, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Outlined.FileUpload, null); Spacer(Modifier.width(8.dp)); Text("Export everything")
                 }
                 Text("Exports every session on this phone, with screenshots and the hash chain." +
                     (lastExport?.let { "\nLast export: $it" } ?: ""),
-                    color = Kdl.Muted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp, bottom = 24.dp))
+                    color = Kdl.Muted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                export.folder?.let { f ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Goes to $f", color = Kdl.Muted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                        TextButton(onClick = export.pick) { Text("Change folder") }
+                    }
+                }
+                Spacer(Modifier.height(24.dp))
             }
         }
     }
@@ -347,9 +386,11 @@ fun SessionScreen(repo: Repo, bump: () -> Unit, openCheck: (Int) -> Unit) {
                 } else {
                     Text("Nothing to check.", color = Kdl.Muted, modifier = Modifier.padding(bottom = 20.dp))
                 }
-                OutlinedButton(onClick = { stopSheet = null; export() }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
+                OutlinedButton(onClick = { stopSheet = null; export.run() }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
                     Icon(Icons.Outlined.FileUpload, null); Spacer(Modifier.width(8.dp)); Text("Export")
                 }
+                export.folder?.let { Text("Goes to $it", color = Kdl.Muted, style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 2.dp)) }
                 TextButton(onClick = { stopSheet = null; bump() }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) { Text("Later") }
             }
         }
@@ -371,7 +412,7 @@ private fun LogSheet(repo: Repo, key: String, stamp: Stamp, onDone: () -> Unit) 
     val apps = remember { repo.db.apps() }
     val closing = key == "window_done"
     var action by remember { mutableStateOf(if (closing) (lastDraft?.action ?: "") else key) }
-    var app by remember { mutableStateOf(lastDraft?.appPackage ?: apps.firstOrNull()?.pkg) }
+    var app by remember { mutableStateOf(defaultLogApp(CaptureService.lastTestApp, lastDraft?.appPackage, apps.map { it.pkg })) }
     var content by remember { mutableStateOf("") }
     var counterpart by remember { mutableStateOf("") }
     var conversation by remember { mutableStateOf("") }
@@ -417,7 +458,7 @@ private fun LogSheet(repo: Repo, key: String, stamp: Stamp, onDone: () -> Unit) 
                 options = listOf<Pair<String?, String>>(null to "No app (device)") + apps.map { it.pkg to it.label }, onPick = { app = it })
             OutlinedTextField(content, { content = it }, label = { Text("Content") }, supportingText = { Text(NO_SECRETS) },
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
-            OutlinedTextField(counterpart, { counterpart = it }, label = { Text(if (direction == "in") "From" else "To") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(counterpart, { counterpart = it }, label = { Text(counterpartLabel(direction)) }, modifier = Modifier.fillMaxWidth())
             TextButton(onClick = { more = !more }, contentPadding = PaddingValues(0.dp)) {
                 Icon(if (more) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null)
                 Text(if (more) "Less" else "More: conversation, note, expected artifacts, timing")

@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Display
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
@@ -72,6 +73,8 @@ class CaptureService : AccessibilityService() {
     private var shotAuto = true
     private var shotTap = false
     private var pkgs: Set<String> = emptySet()
+    /** Apps on the Setup list, without the always-captured System UI and Settings. */
+    private var listed: Set<String> = emptySet()
     /** Fields seen as password fields this session; they stay withheld even if shown as plain text. */
     private val secretKeys = HashSet<String>()
     /**
@@ -93,6 +96,9 @@ class CaptureService : AccessibilityService() {
         shotAuto = repo.flag(Repo.KEY_SHOT_AUTO, true)
         shotTap = repo.flag(Repo.KEY_SHOT_TAP, false)
         pkgs = repo.capturePackages()
+        listed = repo.db.apps().map { it.pkg }.toSet()
+        // Forgotten when the session ends, not when the service reconnects in the middle of one.
+        if (!active) lastTestApp = null
         rules = repo.loadRules()
         secretKeys.clear()
         seenNotifications.clear()
@@ -289,6 +295,7 @@ class CaptureService : AccessibilityService() {
         if (lastScreen?.first != pkg) text.forgetLast()
         lastScreen = key
         if (pkg != SYSTEM_UI) lastApp = pkg
+        if (pkg in listed) lastTestApp = pkg
         flushText()
         repo.log(Draft(appPackage = pkg, action = AutoAction.SCREEN, content = title,
             detail = event.className?.let { "class $it" }, source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT)
@@ -440,7 +447,11 @@ class CaptureService : AccessibilityService() {
                     val dy = (e.rawY - downY).toInt()
                     if (kotlin.math.abs(dy) > 12) { moved = true; lp.y = startY + dy; wm.updateViewLayout(v, lp) }
                 }
-                MotionEvent.ACTION_UP -> if (!moved) onMark() else repo.db.putSetting("mark_y", lp.y.toString())
+                MotionEvent.ACTION_UP -> if (!moved) {
+                    // A short buzz says the mark was taken; unlike a banner, it cannot end up in the screenshot.
+                    v.performHapticFeedback(if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.VIRTUAL_KEY)
+                    onMark()
+                } else repo.db.putSetting("mark_y", lp.y.toString())
             }
             true
         }
@@ -459,5 +470,8 @@ class CaptureService : AccessibilityService() {
 
         /** The running service, if enabled, so the app can start or stop a session. */
         @Volatile var instance: CaptureService? = null
+
+        /** The app under test last seen in front this session; the hand-log sheet starts on it. */
+        @Volatile var lastTestApp: String? = null
     }
 }

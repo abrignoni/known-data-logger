@@ -183,12 +183,16 @@ Both go into every row of the log and into the export folder's name.
 
 ### Step 2: Pick apps
 
-![Pick apps with Camera and Messages ticked and a dash in Check all](manual/firstrun-2-pick-apps.png)
+![Pick apps with Camera and Messages ticked, a dash in Check all and the Search box](manual/firstrun-2-pick-apps.png)
 
 Tick the apps under test. The list shows apps with a launcher icon, without KDL itself. Capture
 records only the apps you tick, plus System UI and Settings, which are always captured. **Check
 all** at the top ticks every app in the list, and tapping it again clears them all. It shows a dash
 when only some are ticked. You can change the list later in [Setup](#apps).
+
+**Search** narrows the list by app name or package name. While a search is typed, the box reads
+**Check all shown** and ticks or clears only the apps on screen. Apps you ticked before the search
+stay ticked.
 
 ### Step 3: Turn on capture
 
@@ -238,6 +242,13 @@ The Check tab's badge counts the items waiting for you.
 
 Capture only runs between Start session and Stop session. Both moments are written to the log.
 
+![Session running, capture is off](manual/session-capture-off.png)
+
+If KDL gets switched off in Accessibility settings while a session runs, the Session tab says so:
+"Session running, capture is off", with a **Capture is off** card and a button to
+**Open Accessibility settings**. Nothing is captured and MARK is hidden until you turn it back on.
+Log by hand still works. KDL checks every few seconds, and when you come back to it.
+
 ### What gets captured
 
 In the apps under test, System UI and Settings, while the phone is unlocked:
@@ -266,7 +277,9 @@ rules.
 
 During a session a red **MARK** button floats over every app except KDL. Tap it at any moment you
 want saved. KDL writes a mark row and takes a screenshot. The button hides itself for the
-screenshot, so it is not in the picture.
+screenshot, so it is not in the picture. KDL asks the phone for a short buzz on the tap. Whether
+you feel it depends on the phone's touch vibration setting. The buzz was not tried on a real
+phone; the emulator has no vibration.
 
 - The mark is filed under the last captured app whose screen changed. System UI does not count,
   so a mark tapped after pulling down the notification shade still lands on the app.
@@ -291,11 +304,14 @@ photo with a camera app you did not pick, a SIM swap.
 2. **Other** opens an **Action** list of templates (messages, calls, media, browsing, contacts,
    accounts, apps, radios, clock and power changes, SIM, factory reset). You can also type your
    own action in **Or type an action**.
-3. Pick the **App**, or **No app (device)**.
+3. Pick the **App**, or **No app (device)**. The sheet starts on the app under test that was last
+   on screen in this session. If none was, it starts on the app of your last hand entry, and
+   otherwise on the first app in the list.
 4. Fill in **Content** (the exact text sent, a file name, a caption) and **To** or **From**. The
    label follows the action: received message, incoming call, missed call and received media are
    incoming ("From"). Every other action, a typed one included, is written with direction `out`
-   ("To"), even one with no real direction, like `viewed_message`.
+   ("To"), even one with no real direction, like `viewed_message`. Before an action is picked the
+   field reads "To or from".
 5. **More** opens **Conversation**, **Note**, **Expected artifacts** and **The tap was**:
    - Expected artifacts take `core:artifact_key` values (the field's hint says `aleapp:key`),
      separated by commas or spaces.
@@ -347,8 +363,10 @@ When nothing is left, the view says "Nothing to check."
 
 ![Label this mark](manual/check-label-mark.png)
 
-The sheet shows the mark's screenshot and its time. Pick or type the action and fill in what you
-know. **Save label** adds an action at the mark's time that points back at the mark.
+The sheet shows the mark's screenshot and its time. Tap one of the chips for the common actions
+(the same six as on the Session tab), or pick or type the action, and fill in what you know.
+**App** starts on the app the mark was filed under; change it if the mark landed on the wrong one.
+**Save label** adds an action at the mark's time that points back at the mark.
 **Discard mark** removes the mark (it is kept as a tombstone, see
 [section 6](#edit-revise-remove)).
 
@@ -434,6 +452,14 @@ hand-logged entry has been revised (accepted or changed inferred entries do not 
 cleared field, notification, and each time the capture service paused and came back. Tap any row
 to edit or label it.
 
+![Timeline with Today and Yesterday headers](manual/timeline-days.png)
+
+Each day starts under its own header: **Today**, **Yesterday**, or the date. On the To check
+cards, an item from another day shows the day in front of its time. For this picture the
+emulator's clock was moved one day ahead, which is the **Clock changed** row. The Timeline is
+ordered by the phone's time since boot, so after the clock is set back a day's header can show
+twice.
+
 ## 6. Edit entries and teach rules
 
 ### Edit, revise, remove
@@ -445,6 +471,10 @@ stays fixed".
 
 - **Save revision** writes a new revision. The original stays in the log, and the action time
   never changes.
+- **App** can be changed, so an entry logged under the wrong app is fixed here and keeps its time.
+  The revision takes the new app's version as installed when you save.
+- The counterpart field reads **To** or **From**, as it does when logging by hand. If you change
+  the action, the direction follows it: an entry changed from sent to received is written `in`.
 - **I deleted this, log the deletion** is for a test step where you deleted the thing in the app.
   It logs a new `deleted_item` action at the current time that points at this entry.
 - **Remove entry** takes the entry off the Timeline. The log keeps it and adds a tombstone
@@ -513,8 +543,8 @@ Change the scenario id or the device label. Tap **Save**. New rows carry the new
 ![Apps](manual/setup-apps.png)
 
 The apps under test, with the version each had when it was added. **Remove** takes one off.
-**Add app** opens a list of launcher apps. Pick one, and fill in an **Account handle** if the test
-uses an account (optional). No passwords here. **Add all apps** adds every launcher app that is not
+**Add app** opens a list of launcher apps with a **Search** box. Pick one, and fill in an
+**Account handle** if the test uses an account (optional). No passwords here. **Add all apps** adds every launcher app that is not
 in the list yet, without account handles. Apps already in the list keep theirs. Apps installed
 later are not added; tap it again or use **Add app**.
 
@@ -582,6 +612,12 @@ The hash of the newest row in the log, with a copy button. Write it in your docu
 2. Android's folder picker opens. Pick a folder or make a new one, then tap **Use this folder**.
 3. Android asks whether KDL may access files in that folder. Tap **Allow**.
 4. KDL says "Exported" and shows the folder name under the button.
+
+![Session tab after an export: Goes to Documents/KDL-exports, Change folder](manual/export-4-same-folder.png)
+
+KDL remembers the folder. The next export goes straight into it, with no picker, and the Session
+tab shows where: "Goes to Documents/KDL-exports". **Change folder** opens the picker again. If the
+folder is gone, the next export opens the picker.
 
 The export holds every session on the phone, with every revision of every entry. KDL writes the
 export as a row in the log first, so the export lists itself.
@@ -790,7 +826,8 @@ is recorded tap by tap. Use test personas and test PINs only.
   network and GNSS time when the phone has them. KDL notices reboots and clock or time zone changes
   and logs them as their own rows. Clock and reboot detection were tried on the emulator; time zone
   detection is covered by unit tests only.
-- **Android only.** There is no iOS version.
+- **This manual covers Android.** The iOS version is a separate app, in
+  [known-data-logger-ios](https://github.com/abrignoni/known-data-logger-ios).
 
 ### It leaves traces on the test phone
 
@@ -803,6 +840,9 @@ KDL is part of the test, and an extraction of the phone will show it:
 - `rules.json` in the same folder, if you taught rules
 - screenshots in the app's private folder
 - MediaStore entries for the export folder you pick
+- Android's record that KDL may use that folder. On the Android 15 emulator (11 November 2026) it
+  was listed by `dumpsys activity permissions` and `/data/system/urigrants.xml` held KDL's package
+  name. The folder's address is also in KDL's own `settings` table, under `export_tree`.
 
 KDL has no network permission and asks for no runtime permissions. Backup is off. The package name
 is fixed, `com.abrignoni.knowndatalogger`, so you can filter KDL out of usage and recent-task

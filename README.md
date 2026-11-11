@@ -140,6 +140,7 @@ phone, and line it up with the log using the network time column.
   [docs/DATABASE.md](docs/DATABASE.md).
 - Every entry is also appended to `Android/data/com.abrignoni.knowndatalogger/files/actions-live.jsonl`.
 - An export creates a folder you pick, so it leaves MediaStore entries. The export is logged.
+  KDL keeps that folder for the next export, so Android's record of the access stays on the phone.
 
 The package name is fixed (`com.abrignoni.knowndatalogger`) so you can filter the app out of
 usage and recent-task artifacts.
