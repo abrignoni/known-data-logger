@@ -10,7 +10,7 @@ Author: Alexis Brignoni.
 
 This manual describes KDL 0.3.2, the v0.3.2 release on GitHub. Every screenshot comes from an
 Android 15 emulator (Google APIs image, API 35, 1080 x 2400, no Play Store) running a debug build of
-0.3.0 or of the code that became 0.3.1 or 0.3.2, with made-up test data: the
+0.3.0 or of the code that became a later release, with made-up test data: the
 phone numbers are 555 numbers and the scenario is called `msg-demo-01`. The emulator's time zone
 was America/New_York (UTC-05:00), so the times you see are local to that zone.
 
@@ -457,7 +457,7 @@ screenshot of this section here.
 
 | Timeline | With captured events |
 |---|---|
-| ![Timeline](manual/timeline.png) | ![Timeline showing taps, screens and typed text](manual/timeline-captured-events.png) |
+| ![Timeline](manual/timeline.png) | ![Timeline showing screens, typed text, a cleared field and a notification](manual/timeline-captured-events.png) |
 
 The Timeline lists every current entry, newest first, with the time to the second. The time shown
 is local to the time zone recorded with the entry. Tags after the action say where it came from:
