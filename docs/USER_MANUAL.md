@@ -604,6 +604,27 @@ never finished), `unsupported` (Android 10 and earlier) and `failed:` with the r
 While a session runs, Setup reminds you that changes to these switches and to the app list apply
 when the next session starts.
 
+### View tree
+
+- **Save the view tree with screenshots** (on by default): with each screenshot, KDL also saves the
+  view tree of the app in front, as an `.xml` file. The view tree is what the app reports is on the
+  screen: each piece of text, its place on the screen and its type. It gives the exact text of a
+  screen without reading it off the picture.
+- What was typed into a password field is left out: that field is listed with empty text. Every
+  other text is saved as shown, including a message that mentions a password or carries a code.
+  "Hide verification codes" does not apply to view trees.
+- A tree is saved only for an app that is being captured. System UI is never saved, because its
+  tree holds the whole notification shade, and nothing is saved while the phone is locked. The
+  status then reads `not_captured:` with the reason.
+- The tree is what the app reports, not what a person saw. An app can report more than the screen
+  shows, less, or nothing.
+- After each capture KDL writes a `capture_files` row with the SHA-256 of the screenshot and of the
+  view tree. That row is in the hash chain, so the chain covers both files.
+
+Tried on an Android 15 emulator (11 November 2026) with Google Messages and Settings: a message
+holding the words "PIN" and "password" and one holding a verification code were in the saved tree
+as shown, and digits typed into the Settings confirm-PIN field were not.
+
 ### Rules
 
 ![Rules](manual/setup-rules.png)

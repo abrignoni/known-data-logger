@@ -79,6 +79,7 @@ private fun SetupHome(repo: Repo, bump: () -> Unit, open: (String) -> Unit) {
     var maskCodes by remember { mutableStateOf(repo.flag(Repo.KEY_MASK_CODES, true)) }
     var shotAuto by remember { mutableStateOf(repo.flag(Repo.KEY_SHOT_AUTO, true)) }
     var shotTap by remember { mutableStateOf(repo.flag(Repo.KEY_SHOT_TAP, false)) }
+    var saveTree by remember { mutableStateOf(repo.flag(Repo.KEY_TREE, true)) }
     val apps = remember { repo.db.apps() }
     val profile = remember { repo.db.profiles().lastOrNull() }
     val hash = remember { repo.lastRowHash() }
@@ -95,6 +96,7 @@ private fun SetupHome(repo: Repo, bump: () -> Unit, open: (String) -> Unit) {
             SwitchRow("Hide verification codes", "In notifications, screens and taps", maskCodes) { maskCodes = it; repo.setFlag(Repo.KEY_MASK_CODES, it) }
             SwitchRow("Screenshot inferred actions", null, shotAuto) { shotAuto = it; repo.setFlag(Repo.KEY_SHOT_AUTO, it) }
             SwitchRow("Screenshot every tap", null, shotTap) { shotTap = it; repo.setFlag(Repo.KEY_SHOT_TAP, it) }
+            SwitchRow("Save the view tree with screenshots", "The screen's text as the app reports it. Password fields are left empty; other text is kept as shown", saveTree) { saveTree = it; repo.setFlag(Repo.KEY_TREE, it) }
             if (repo.sessionActive) Text("Changes apply when the next session starts.", color = Kdl.Muted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
             NavRow("Rules", "${repo.loadRules().size}") { open("rules") }
             NavRow("Device", profile?.let { "${it.manufacturer?.replaceFirstChar { c -> c.uppercase() }} ${it.model} · Android ${it.release}" } ?: "No snapshot yet") { open("device") }

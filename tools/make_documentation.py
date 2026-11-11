@@ -118,6 +118,45 @@ def load_export(folder):
         shots[s["entry_id"]] = {"path": path, "status": status}
     ok = sum(1 for s in shots.values() if s["path"])
     checks.append(("screenshots", f"{ok} file(s), {len(shots)} listed"))
+    # View trees (schema 4): the screen's text as the app reported it, saved beside a screenshot.
+    tree_hash = {}
+    trees = manifest.get("view_trees", [])
+    for s in trees:
+        path = os.path.join(folder, "trees", os.path.basename(s["file"])) if s.get("file") else None
+        if path and os.path.exists(path):
+            with open(path, "rb") as f:
+                tree_hash[s["entry_id"]] = hashlib.sha256(f.read()).hexdigest()
+            if tree_hash[s["entry_id"]] != s.get("sha256_at_capture"):
+                checks.append((f"view tree {s['file']}", "MISMATCH with hash taken at capture"))
+        elif path:
+            checks.append((f"view tree {s['file']}", "listed in manifest but missing from trees/"))
+    if trees:
+        checks.append(("view trees", f"{len(tree_hash)} file(s), {len(trees)} listed"))
+    # capture_files rows put the file hashes inside the row hash chain. Each is checked against the file.
+    chained = bad = 0
+    for r in rows:
+        if r.get("action") != "capture_files":
+            continue
+        try:
+            d = json.loads(r.get("detail") or "{}")
+        except ValueError:
+            d = {}
+        for key, sub in (("screenshot", "screens"), ("view_tree", "trees")):
+            part = d.get(key) or {}
+            if not part.get("file"):
+                continue
+            chained += 1
+            path = os.path.join(folder, sub, os.path.basename(part["file"]))
+            if not os.path.exists(path):
+                bad += 1
+                checks.append((f"chained {key} {part['file']}", "named in a chained row but missing from the export"))
+                continue
+            with open(path, "rb") as f:
+                if hashlib.sha256(f.read()).hexdigest() != part.get("sha256"):
+                    bad += 1
+                    checks.append((f"chained {key} {part['file']}", "MISMATCH with the hash in its chained row"))
+    if chained:
+        checks.append(("files against chained rows", f"{chained - bad} of {chained} match"))
     return {"folder": folder, "manifest": manifest, "rows": rows, "checks": checks, "shots": shots}
 
 

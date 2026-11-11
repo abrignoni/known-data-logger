@@ -6,7 +6,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
-const val SCHEMA_VERSION = 3
+const val SCHEMA_VERSION = 4
 
 /** Allowed values for Entry.kind. */
 object Kind {
@@ -252,6 +252,82 @@ data class Shot(
 )
 
 /**
+ * The view tree saved with a screenshot: what the app in front reported was on screen, as text.
+ * Status is ok, or not_captured:<why> when no tree was saved (no window, or a window of an app
+ * that is not under test), or failed:<reason>.
+ */
+data class TreeFile(
+    val entryId: String,
+    val file: String?,
+    val sha256: String?,
+    val status: String,
+    val utcMs: Long,
+)
+
+/** One node of a view tree, already detached from the platform so it can be written and tested anywhere. */
+data class VNode(
+    val cls: String?, val pkg: String?, val id: String?, val text: String?, val desc: String?,
+    val bounds: String, val clickable: Boolean = false, val scrollable: Boolean = false,
+    val password: Boolean = false, val checked: Boolean = false, val selected: Boolean = false,
+    val children: List<VNode> = emptyList(),
+)
+
+/**
+ * Writes a view tree as XML, with the element and attribute names `uiautomator dump` uses, so one
+ * reader serves both. The only thing withheld is what was typed into a password field: its text is
+ * written empty. Every other text is written as the app showed it, including text that mentions a
+ * password or carries a code; the "Hide verification codes" option does not apply here.
+ */
+object ViewTree {
+    fun xml(root: VNode, rotation: Int = 0): String {
+        val sb = StringBuilder("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation=\"$rotation\">")
+        node(sb, root, 0)
+        return sb.append("</hierarchy>").toString()
+    }
+
+    /** Password fields in the tree: their text is not in the output. */
+    fun secretFields(n: VNode): Int = (if (n.password) 1 else 0) + n.children.sumOf { secretFields(it) }
+
+    private fun node(sb: StringBuilder, n: VNode, index: Int) {
+        sb.append("<node index=\"").append(index).append('"')
+        attr(sb, "text", if (n.password) "" else n.text)
+        attr(sb, "resource-id", n.id); attr(sb, "class", n.cls); attr(sb, "package", n.pkg)
+        attr(sb, "content-desc", if (n.password) "" else n.desc)
+        attr(sb, "checked", n.checked.toString()); attr(sb, "clickable", n.clickable.toString())
+        attr(sb, "scrollable", n.scrollable.toString()); attr(sb, "password", n.password.toString())
+        attr(sb, "selected", n.selected.toString()); attr(sb, "bounds", n.bounds)
+        if (n.children.isEmpty()) { sb.append(" />"); return }
+        sb.append('>')
+        n.children.forEachIndexed { i, c -> node(sb, c, i) }
+        sb.append("</node>")
+    }
+
+    private fun attr(sb: StringBuilder, name: String, value: String?) {
+        sb.append(' ').append(name).append("=\"")
+        for (ch in (cleanText(value) ?: "")) when {
+            ch == '&' -> sb.append("&amp;"); ch == '<' -> sb.append("&lt;"); ch == '>' -> sb.append("&gt;")
+            ch == '"' -> sb.append("&quot;"); ch == '\n' -> sb.append("&#10;"); ch == '\r' -> sb.append("&#13;")
+            ch == '\t' -> sb.append("&#9;")
+            ch < ' ' || ch == '\uFFFE' || ch == '\uFFFF' -> sb.append('\uFFFD')  // not allowed in XML 1.0
+            else -> sb.append(ch)
+        }
+        sb.append('"')
+    }
+
+    /** The detail of the chained row that names the files saved for an entry and their hashes. */
+    fun filesDetail(shot: Shot?, tree: TreeFile?): String {
+        fun part(file: String?, sha: String?, status: String?) = org.json.JSONObject().apply {
+            put("file", file ?: org.json.JSONObject.NULL); put("sha256", sha ?: org.json.JSONObject.NULL)
+            put("status", status ?: org.json.JSONObject.NULL)
+        }
+        return org.json.JSONObject().apply {
+            if (shot != null) put("screenshot", part(shot.file, shot.sha256, shot.status))
+            if (tree != null) put("view_tree", part(tree.file, tree.sha256, tree.status))
+        }.toString()
+    }
+}
+
+/**
  * One auto-label rule. Matches one event type (tap or field_cleared) in one package by view id
  * and/or label (regex, case insensitive). content = "last_typed" copies the text typed just
  * before the tap, or the text that was cleared.
@@ -347,11 +423,11 @@ object Csv {
         "local_time", "utc_time",
         "action", "app_package", "content", "counterpart", "direction", "conversation_id",
         "is_current", "reviewed", "source", "kind", "time_quality", "window_s",
-        "screenshot_file", "screenshot_status",
+        "screenshot_file", "screenshot_status", "view_tree_file", "view_tree_status",
         "detail", "refers_to", "expected_artifacts", "account", "app_version", "device_label", "scenario_id",
         "tz_id", "tz_offset_min", "network_time_utc", "boot_count", "elapsed_ms", "utc_ms", "boot_wall_ms",
         "network_time_ms", "gnss_time_ms", "edited_utc_ms",
-        "entry_id", "revision_n", "seq", "profile_id", "screenshot_sha256", "prev_hash", "row_hash",
+        "entry_id", "revision_n", "seq", "profile_id", "screenshot_sha256", "view_tree_sha256", "prev_hash", "row_hash",
     )
 
     fun field(v: Any?): String {
@@ -371,13 +447,14 @@ object Csv {
     fun utcIso(utcMs: Long): String = UTC.format(Instant.ofEpochMilli(utcMs))
 
     /** Values by column name; written in HEADER order. */
-    fun values(e: Entry, isCurrent: Boolean, shot: Shot? = null): Map<String, Any?> = mapOf(
+    fun values(e: Entry, isCurrent: Boolean, shot: Shot? = null, tree: TreeFile? = null): Map<String, Any?> = mapOf(
         "local_time" to localIso(e.stamp.utcMs, e.stamp.tzOffsetMin), "utc_time" to utcIso(e.stamp.utcMs),
         "action" to e.action, "app_package" to e.appPackage, "content" to e.content, "counterpart" to e.counterpart,
         "direction" to e.direction, "conversation_id" to e.conversationId,
         "is_current" to isCurrent, "reviewed" to e.reviewed, "source" to e.source, "kind" to e.kind,
         "time_quality" to e.timeQuality, "window_s" to e.windowS,
         "screenshot_file" to shot?.file, "screenshot_status" to shot?.status,
+        "view_tree_file" to tree?.file, "view_tree_status" to tree?.status,
         "detail" to e.detail, "refers_to" to e.refersTo, "expected_artifacts" to e.expectedArtifacts.joinToString(";"),
         "account" to e.account, "app_version" to e.appVersion, "device_label" to e.deviceLabel, "scenario_id" to e.scenarioId,
         "tz_id" to e.stamp.tzId, "tz_offset_min" to e.stamp.tzOffsetMin,
@@ -386,11 +463,12 @@ object Csv {
         "boot_wall_ms" to e.stamp.bootWallMs, "network_time_ms" to e.stamp.networkTimeMs,
         "gnss_time_ms" to e.stamp.gnssTimeMs, "edited_utc_ms" to e.editedUtcMs,
         "entry_id" to e.entryId, "revision_n" to e.revisionN, "seq" to e.seq, "profile_id" to e.profileId,
-        "screenshot_sha256" to shot?.sha256, "prev_hash" to e.prevHash, "row_hash" to e.rowHash,
+        "screenshot_sha256" to shot?.sha256, "view_tree_sha256" to tree?.sha256,
+        "prev_hash" to e.prevHash, "row_hash" to e.rowHash,
     )
 
-    fun row(e: Entry, isCurrent: Boolean, shot: Shot? = null): String {
-        val v = values(e, isCurrent, shot)
+    fun row(e: Entry, isCurrent: Boolean, shot: Shot? = null, tree: TreeFile? = null): String {
+        val v = values(e, isCurrent, shot, tree)
         return HEADER.joinToString(",") { field(v[it]) }
     }
 
@@ -399,12 +477,13 @@ object Csv {
      * Every revision shows its entry's screenshot, and a label made from a mark or captured event
      * shows that event's, so filtering to current rows keeps the screenshots.
      */
-    fun document(rows: List<Entry>, shots: Map<String, Shot> = emptyMap()): String {
+    fun document(rows: List<Entry>, shots: Map<String, Shot> = emptyMap(), trees: Map<String, TreeFile> = emptyMap()): String {
         val currentSeqs = Timeline.current(rows).map { it.seq }.toSet()
         val sb = StringBuilder(HEADER.joinToString(",")).append("\r\n")
         rows.sortedBy { it.seq }.forEach {
             val shot = shots[it.entryId] ?: it.refersTo?.let { r -> shots[r] }
-            sb.append(row(it, it.seq in currentSeqs, shot)).append("\r\n")
+            val tree = trees[it.entryId] ?: it.refersTo?.let { r -> trees[r] }
+            sb.append(row(it, it.seq in currentSeqs, shot, tree)).append("\r\n")
         }
         return sb.toString()
     }
@@ -653,6 +732,7 @@ private val SYSTEM_LABELS = mapOf(
     "app_version_changed_since_last_seen" to "App version changed", "rule_taught" to "Rule taught",
     "rule_removed" to "Rule removed", "hash_chain_backfilled" to "Hash chain started",
     "rules_imported" to "Rules imported", "log_started_over" to "Started over",
+    "capture_files" to "Files hashed",
 )
 
 /** The words shown for an entry in the interface (the log keeps the action key). */
@@ -665,5 +745,8 @@ fun displayLabel(e: Entry): String = when {
 
 /** True for the pause and resume rows the capture service writes. */
 val Entry.isCapturePause: Boolean get() = action == "capture_service_connected" || action == "capture_service_disconnected"
+
+/** True for the row that puts a screenshot's and a view tree's hash into the chain. */
+val Entry.isCaptureFiles: Boolean get() = action == "capture_files"
 
 fun plural(n: Int, one: String, many: String = one + "s") = "$n ${if (n == 1) one else many}"

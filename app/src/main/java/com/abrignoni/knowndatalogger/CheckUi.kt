@@ -172,7 +172,7 @@ private fun TimelineList(repo: Repo, rows: List<Entry>, shots: Map<String, Shot>
     var raw by showRaw
     val current = remember(rows, raw) {
         Timeline.current(rows).filter {
-            raw || ((it.kind != Kind.AUTO_EVENT || it.isMark || it.isWithheldNotification) && !it.isCapturePause)
+            raw || ((it.kind != Kind.AUTO_EVENT || it.isMark || it.isWithheldNotification) && !it.isCapturePause && !it.isCaptureFiles)
         }.reversed()
     }
     // The rows show a time of day only, so each day gets a header.

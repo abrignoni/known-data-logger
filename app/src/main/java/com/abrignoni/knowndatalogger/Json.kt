@@ -6,7 +6,7 @@ import org.json.JSONObject
 private fun Any?.orNull(): Any = this ?: JSONObject.NULL
 
 /** One actions.jsonl object. Key order follows the spec table. */
-fun Entry.toJson(shot: Shot? = null): JSONObject = JSONObject().apply {
+fun Entry.toJson(shot: Shot? = null, tree: TreeFile? = null): JSONObject = JSONObject().apply {
     put("schema", SCHEMA_VERSION)
     put("seq", seq)
     put("entry_id", entryId)
@@ -42,6 +42,9 @@ fun Entry.toJson(shot: Shot? = null): JSONObject = JSONObject().apply {
     put("prev_hash", prevHash.orNull())
     put("row_hash", rowHash.orNull())
     put("screenshot", shot?.let {
+        JSONObject().apply { put("file", it.file.orNull()); put("sha256", it.sha256.orNull()); put("status", it.status) }
+    }.orNull())
+    put("view_tree", tree?.let {
         JSONObject().apply { put("file", it.file.orNull()); put("sha256", it.sha256.orNull()); put("status", it.status) }
     }.orNull())
 }
@@ -97,9 +100,10 @@ fun readRulesForImport(text: String): RulesRead {
 }
 
 /** Screenshots belong to the original row (revision 0) of their entry. */
-fun jsonl(rows: List<Entry>, shots: Map<String, Shot> = emptyMap()): String =
+fun jsonl(rows: List<Entry>, shots: Map<String, Shot> = emptyMap(), trees: Map<String, TreeFile> = emptyMap()): String =
     rows.sortedBy { it.seq }.joinToString("") {
-        it.toJson(if (it.revisionN == 0) shots[it.entryId] else null).toString() + "\n"
+        it.toJson(if (it.revisionN == 0) shots[it.entryId] else null,
+            if (it.revisionN == 0) trees[it.entryId] else null).toString() + "\n"
     }
 
 /** Writes rules in the same format parseRules reads. */

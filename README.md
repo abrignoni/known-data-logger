@@ -100,8 +100,19 @@ permission and no prompt (none appeared on the emulator). They are stored in the
 sha256 taken at capture, copied to `screens/` on export and checked again. A black frame from an app
 that blocks screenshots is recorded as `blank`.
 
+With each screenshot KDL also saves the view tree of the app in front (not in a release yet; on by default, a switch
+on the Setup tab): the text the app reports is on the screen, with its place and type, as an `.xml`
+file in `trees/`. What was typed into a password field is left out; every other text is kept as
+shown, and "Hide verification codes" does not apply to it. No tree is saved for System UI or while
+the phone is locked. After each capture a `capture_files` row puts the SHA-256 of the screenshot and
+of the tree into the hash chain. Tried on an Android 15 emulator (11 November 2026): two messages
+with the words "PIN", "password" and a verification code were in the saved tree as shown, digits
+typed into the Settings confirm-PIN field were not, and the export passed `make_documentation.py`.
+
 Known limits:
 
+- A view tree is what the app reports, not what a person saw. An app can report more than the screen
+  shows, less, or nothing.
 - Tools that drive the phone through UiAutomation (uiautomator, Puma and similar) pause every
   accessibility service while they run. On the emulator each `uiautomator dump` showed up as a
   `capture_service_disconnected` and `capture_service_connected` pair in the log.
@@ -161,6 +172,7 @@ A folder named `kdl_<scenario>_<device>_<UTC time>` with:
   (action, app, content, counterpart), status (current, reviewed, source), screenshot, context,
   then clock internals and identifiers. Filter `is_current` to TRUE for the live version of each entry.
 - `screens/`: the screenshots, listed with their hashes in the manifest.
+- `trees/`: the view trees saved with screenshots, listed with their hashes in the manifest.
 
 ## Documentation (.xlsx)
 

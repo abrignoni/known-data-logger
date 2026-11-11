@@ -83,6 +83,47 @@ class DocTest(unittest.TestCase):
         e = md.load_export(d)
         self.assertTrue(any(k == "actions.jsonl sha256" and "MISMATCH" in v for k, v in e["checks"]))
 
+    def _with_tree(self, tree_on_disk=b"<hierarchy/>", chained_tree=b"<hierarchy/>", chained_shot=b"png"):
+        """An export with a view tree and the capture_files row that puts both file hashes in the chain."""
+        sha = lambda x: hashlib.sha256(x).hexdigest()
+        detail = json.dumps({"screenshot": {"file": "s1.png", "sha256": sha(chained_shot), "status": "ok"},
+                             "view_tree": {"file": "a.xml", "sha256": sha(chained_tree), "status": "ok"}})
+        rows = self.rows + [row(7, "f", "capture_files", kind="system_event", refers_to="a", detail=detail, source="system")]
+        d = make_export(self.tmp, rows)
+        os.makedirs(os.path.join(d, "trees"))
+        with open(os.path.join(d, "trees", "a.xml"), "wb") as f:
+            f.write(tree_on_disk)
+        with open(os.path.join(d, "manifest.json")) as f:
+            m = json.load(f)
+        m["view_trees"] = [{"entry_id": "a", "file": "a.xml", "status": "ok", "sha256_at_capture": sha(b"<hierarchy/>")}]
+        with open(os.path.join(d, "manifest.json"), "w") as f:
+            json.dump(m, f)
+        return dict(md.load_export(d)["checks"])
+
+    def test_view_tree_and_chained_file_hashes_are_checked(self):
+        checks = self._with_tree()
+        self.assertEqual(checks["view trees"], "1 file(s), 1 listed")
+        self.assertEqual(checks["files against chained rows"], "2 of 2 match")
+        self.assertFalse(any(md.failed(v) for v in checks.values()))
+
+    def test_a_changed_view_tree_is_caught_twice(self):
+        checks = self._with_tree(tree_on_disk=b"<hierarchy>edited</hierarchy>")
+        self.assertIn("MISMATCH", checks["view tree a.xml"])            # against the manifest
+        self.assertIn("MISMATCH", checks["chained view_tree a.xml"])    # against the row in the chain
+        self.assertEqual(checks["files against chained rows"], "1 of 2 match")
+
+    def test_a_file_swapped_together_with_its_manifest_hash_is_still_caught_by_the_chain(self):
+        # The manifest is not in the chain. A file replaced along with its manifest hash passes the
+        # manifest check; only the chained row gives it away.
+        checks = self._with_tree(chained_shot=b"the picture as it was captured")
+        self.assertNotIn("screenshot s1.png", checks)
+        self.assertIn("MISMATCH", checks["chained screenshot s1.png"])
+
+    def test_export_without_view_trees_reports_nothing_about_them(self):
+        checks = dict(md.load_export(make_export(self.tmp, self.rows))["checks"])
+        self.assertNotIn("view trees", checks)
+        self.assertNotIn("files against chained rows", checks)
+
     def test_order_follows_device_clock_not_wall_clock(self):
         rows = [row(1, "x", "first", utc_ms=1794146500000, elapsed_ms=10),   # clock set forward before it
                 row(2, "y", "second", utc_ms=1794146400000, elapsed_ms=20)]

@@ -1,4 +1,4 @@
-# kl.db layout (schema 3)
+# kl.db layout (schema 4)
 
 Path on the device: `/data/data/com.abrignoni.knowndatalogger/databases/kl.db`.
 `PRAGMA user_version` holds the schema number. Journal mode is DELETE (no `-wal`).
@@ -57,6 +57,13 @@ Apps under test. Version fields are read from PackageManager when the app is add
 | status | `ok`, `blank` (every sampled pixel black or near black), `failed:<reason>` or `unsupported` (Android 10 and earlier) |
 | utc_ms | when the screenshot row was written |
 
+## view_trees (schema 4)
+
+One row per view tree saved with a screenshot: `entry_id` (the entry the screenshot belongs to),
+`file` (name in the app's private `files/trees/` folder, empty when none was saved), `sha256`,
+`status` (`ok`, `ok_cut_at_6000_nodes`, `not_captured:<why>` or `failed:<reason>`) and `utc_ms`.
+Start over empties it.
+
 ## entries
 
 Every row the app writes, including revisions, tombstones and system rows. Columns match the
@@ -68,6 +75,7 @@ Schema 2 added `source` (`manual`, `auto_event`, `auto_rule`, `mark`, `system`) 
 reviewed.
 
 Schema 3 added `prev_hash` and `row_hash`, the hash chain described in SPEC.md.
+Schema 4 added the `view_trees` table and no column to `entries`.
 
 The current version of an entry is the row with the highest `revision_n` for its `entry_id`.
 If that row has `kind = 'tombstone'`, the entry was removed. Order by
