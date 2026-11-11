@@ -8,9 +8,9 @@ forensic tool can then check each action against what the tool reports.
 
 Author: Alexis Brignoni.
 
-This manual describes KDL 0.3.1, the v0.3.1 release on GitHub. Every screenshot comes from an
+This manual describes KDL 0.3.2, the v0.3.2 release on GitHub. Every screenshot comes from an
 Android 15 emulator (Google APIs image, API 35, 1080 x 2400, no Play Store) running a debug build of
-0.3.0 or of the code that became 0.3.1, with made-up test data: the
+0.3.0 or of the code that became 0.3.1 or 0.3.2, with made-up test data: the
 phone numbers are 555 numbers and the scenario is called `msg-demo-01`. The emulator's time zone
 was America/New_York (UTC-05:00), so the times you see are local to that zone.
 
@@ -42,26 +42,26 @@ was America/New_York (UTC-05:00), so the times you see are local to that zone.
 - Python 3 with `openpyxl` to make the spreadsheet (`python3 -m pip install openpyxl`). The script,
   `tools/make_documentation.py`, is in the release's source code download and in the repository.
   The APK alone does not include it.
-- The APK: `KDL-0.3.1.apk` from the v0.3.1 release on GitHub, and the release's `SHA256SUMS` file.
+- The APK: `KDL-0.3.2.apk` from the v0.3.2 release on GitHub, and the release's `SHA256SUMS` file.
 
 ### Check the download
 
-Compare the APK's SHA-256 with the line for `KDL-0.3.1.apk` in `SHA256SUMS`. They must match.
+Compare the APK's SHA-256 with the line for `KDL-0.3.2.apk` in `SHA256SUMS`. They must match.
 
 ```bash
-shasum -a 256 KDL-0.3.1.apk
+shasum -a 256 KDL-0.3.2.apk
 ```
 
-On Linux, `sha256sum KDL-0.3.1.apk` works too. On Windows:
+On Linux, `sha256sum KDL-0.3.2.apk` works too. On Windows:
 
 ```
-certutil -hashfile KDL-0.3.1.apk SHA256
+certutil -hashfile KDL-0.3.2.apk SHA256
 ```
 
 You can also check who signed it. `apksigner` comes with the Android SDK build tools:
 
 ```bash
-apksigner verify --print-certs KDL-0.3.1.apk
+apksigner verify --print-certs KDL-0.3.2.apk
 ```
 
 The line `Signer #1 certificate SHA-256 digest:` must read
@@ -91,14 +91,14 @@ Other phones and versions have not been tried.
 Connect the phone with USB debugging on and run:
 
 ```bash
-adb install KDL-0.3.1.apk
+adb install KDL-0.3.2.apk
 ```
 
 On a phone with more than one user profile, install into the test profile only. For example, for
 user 10:
 
 ```bash
-adb install --user 10 KDL-0.3.1.apk
+adb install --user 10 KDL-0.3.2.apk
 ```
 
 On the Pixel 7a with Android 17 (8 November 2026), an `adb install` did not trigger Android's
