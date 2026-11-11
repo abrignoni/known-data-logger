@@ -92,6 +92,9 @@ class CaptureService : AccessibilityService() {
     /** Called when the session is started or stopped from the app; re-reads settings, apps and rules. */
     fun syncSession() {
         active = repo.flag(Repo.KEY_SESSION, false)
+        // Capture is on now, so a session that began as hand logging is a capture session from here:
+        // if the service is lost later, the Session tab warns as it does for any other.
+        if (active && repo.handOnly) repo.setFlag(Repo.KEY_HAND_ONLY, false)
         allApps = repo.flag(Repo.KEY_ALL_APPS, false)
         shotAuto = repo.flag(Repo.KEY_SHOT_AUTO, true)
         shotTap = repo.flag(Repo.KEY_SHOT_TAP, false)

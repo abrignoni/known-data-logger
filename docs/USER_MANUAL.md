@@ -267,7 +267,10 @@ recorded.
 
 During such a session the Session tab reads "Logging by hand, capture is off", with a link to
 Accessibility settings and no warning. If you turn capture on while it runs, KDL starts capturing
-from that moment and MARK appears. That last part comes from the code and was not tried.
+from that moment and MARK appears. On the Android 15 emulator (11 November 2026) the tab changed to
+"Recording", the log got a **Capture resumed** row, and a send and a MARK after it were captured
+with their screenshots. From then on the session is treated as a capture session: if capture is
+lost again, the Session tab shows the **Capture is off** warning.
 
 ### What gets captured
 
