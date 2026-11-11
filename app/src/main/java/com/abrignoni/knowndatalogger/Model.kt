@@ -441,6 +441,60 @@ fun directionFor(action: String): String? = when (action.trim()) {
     else -> "out"
 }
 
+/**
+ * Direction after an edit. A changed action takes its own direction, so an entry changed from sent
+ * to received is not left "out"; an unchanged action keeps what was recorded.
+ */
+fun directionAfterEdit(oldAction: String, oldDirection: String?, newAction: String): String? =
+    if (newAction.trim() == oldAction.trim()) oldDirection ?: directionFor(newAction) else directionFor(newAction)
+
+/** Label of the counterpart field for a direction: who it went to, or who it came from. */
+fun counterpartLabel(direction: String?): String = when (direction) {
+    "in" -> "From"
+    "out" -> "To"
+    else -> "To or from"
+}
+
+/** Calendar day of a stamp, in the offset recorded with it. */
+fun localDay(s: Stamp): java.time.LocalDate =
+    Instant.ofEpochMilli(s.utcMs).atOffset(ZoneOffset.ofTotalSeconds(s.tzOffsetMin * 60)).toLocalDate()
+
+/**
+ * Entries that open a new day in a list already in display order; the first row always does.
+ * Rows are ordered by boot and monotonic time, so a clock change can open the same day twice.
+ */
+fun dayStarts(rows: List<Entry>): Set<String> {
+    val out = HashSet<String>()
+    var prev: java.time.LocalDate? = null
+    for (r in rows) {
+        val d = localDay(r.stamp)
+        if (d != prev) out += r.entryId
+        prev = d
+    }
+    return out
+}
+
+/**
+ * App preselected when logging by hand: the app under test last seen in front, else the app of the
+ * last hand entry, else the first listed app. An app that is no longer listed is never preselected.
+ */
+fun defaultLogApp(front: String?, last: String?, listed: List<String>): String? =
+    front?.takeIf { it in listed } ?: last?.takeIf { it in listed } ?: listed.firstOrNull()
+
+/** Apps (package to label) whose label or package contains the query, ignoring case; all of them when it is blank. */
+fun filterApps(all: List<Pair<String, String>>, query: String): List<Pair<String, String>> {
+    val q = query.trim()
+    if (q.isEmpty()) return all
+    return all.filter { it.second.contains(q, ignoreCase = true) || it.first.contains(q, ignoreCase = true) }
+}
+
+/**
+ * Words for an export folder, from its document id ("primary:Documents/KDL" reads "Documents/KDL").
+ * A storage root has no path, so its volume name is shown.
+ */
+fun treeFolderName(documentId: String): String =
+    documentId.substringAfter(':', "").ifBlank { documentId.substringBefore(':') }
+
 
 /**
  * Tamper evidence for the log. Each row's hash covers its own fields plus the previous row's

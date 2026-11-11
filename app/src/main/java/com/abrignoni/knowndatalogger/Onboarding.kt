@@ -39,6 +39,7 @@ fun Onboarding(repo: Repo, onDone: () -> Unit) {
     val launcher = remember { repo.launcherApps() }
     val chosen = remember { mutableStateListOf<String>().apply { addAll(repo.db.apps().map { it.pkg }) } }
     var enabled by remember { mutableStateOf(serviceEnabled(ctx)) }
+    var query by remember { mutableStateOf("") }
     // Coming back from Accessibility settings re-checks the service.
     androidx.lifecycle.compose.LifecycleResumeEffect(Unit) { enabled = serviceEnabled(ctx); onPauseOrDispose { } }
 
@@ -93,7 +94,10 @@ fun Onboarding(repo: Repo, onDone: () -> Unit) {
                     }
                     1 -> {
                         Text("Capture records only these apps, plus System UI and Settings.", color = Kdl.Muted, modifier = Modifier.padding(bottom = 8.dp))
-                        val pkgs = launcher.map { it.first }
+                        OutlinedTextField(query, { query = it }, label = { Text("Search") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        // Check all works on the apps shown, so a search narrows what it ticks.
+                        val shown = filterApps(launcher, query)
+                        val pkgs = shown.map { it.first }
                         val state = checkAllState(pkgs, chosen)
                         val toggleAll = {
                             if (state == ToggleableState.On) chosen.removeAll(pkgs.toSet())
@@ -101,11 +105,12 @@ fun Onboarding(repo: Repo, onDone: () -> Unit) {
                         }
                         Row(Modifier.fillMaxWidth().clickable { toggleAll() }.heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
                             TriStateCheckbox(state, { toggleAll() })
-                            Text("Check all", style = MaterialTheme.typography.bodyLarge)
+                            Text(if (query.isBlank()) "Check all" else "Check all shown", style = MaterialTheme.typography.bodyLarge)
                         }
                         HorizontalDivider(color = Kdl.Line)
+                        if (shown.isEmpty()) Text("No app matches.", color = Kdl.Muted, modifier = Modifier.padding(vertical = 12.dp))
                         LazyColumn {
-                            items(launcher) { (pkg, label) ->
+                            items(shown, key = { it.first }) { (pkg, label) ->
                                 Row(Modifier.fillMaxWidth().clickable { if (pkg in chosen) chosen.remove(pkg) else chosen.add(pkg) }
                                     .heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Checkbox(pkg in chosen, { if (it) chosen.add(pkg) else chosen.remove(pkg) })

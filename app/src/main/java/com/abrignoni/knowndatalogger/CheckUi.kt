@@ -130,7 +130,7 @@ private fun CheckCard(
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(listOfNotNull(e.appPackage?.let { labels[it] ?: BUILTIN_LABELS[it] ?: it }, hms(e.stamp), extraSub).joinToString(" · "),
+                Text(listOfNotNull(e.appPackage?.let { labels[it] ?: BUILTIN_LABELS[it] ?: it }, whenWords(e.stamp), extraSub).joinToString(" · "),
                     color = Kdl.Muted, style = MaterialTheme.typography.bodySmall)
                 body?.let { Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp)) }
                 // Buttons sit side by side and stack when there is not room (narrow phones, large text).
@@ -175,6 +175,8 @@ private fun TimelineList(repo: Repo, rows: List<Entry>, shots: Map<String, Shot>
             raw || ((it.kind != Kind.AUTO_EVENT || it.isMark || it.isWithheldNotification) && !it.isCapturePause)
         }.reversed()
     }
+    // The rows show a time of day only, so each day gets a header.
+    val starts = remember(current) { dayStarts(current) }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         item {
             TextButton(onClick = { raw = !raw }, contentPadding = PaddingValues(0.dp)) {
@@ -184,6 +186,8 @@ private fun TimelineList(repo: Repo, rows: List<Entry>, shots: Map<String, Shot>
         }
         if (current.isEmpty()) item { Text("Nothing recorded yet. Start a session on the Session tab.", color = Kdl.Muted, modifier = Modifier.padding(vertical = 12.dp)) }
         items(current, key = { it.entryId }) { e ->
+            if (e.entryId in starts) Text(dayWord(e.stamp), color = Kdl.Primary, style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 2.dp))
             val tag = when {
                 e.isWithheldNotification -> "locked"
                 e.kind == Kind.ACTION && e.source == Source.AUTO_RULE -> if (e.reviewed) "accepted" else "inferred"

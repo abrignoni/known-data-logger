@@ -54,15 +54,21 @@ internal fun AppPicker(repo: Repo, onDone: () -> Unit) {
     val all = remember { repo.launcherApps() }
     var chosen by remember { mutableStateOf<Pair<String, String>?>(null) }
     var account by remember { mutableStateOf("") }
+    var query by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDone,
         title = { Text(if (chosen == null) "Pick an app" else chosen!!.second) },
         text = {
             if (chosen == null) {
-                LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                    items(all) { p ->
-                        Column(Modifier.fillMaxWidth().clickable { chosen = p }.padding(vertical = 8.dp)) {
-                            Text(p.second); Text(p.first, style = MaterialTheme.typography.bodySmall)
+                Column {
+                    OutlinedTextField(query, { query = it }, label = { Text("Search") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    val shown = filterApps(all, query)
+                    if (shown.isEmpty()) Text("No app matches.", color = Kdl.Muted, modifier = Modifier.padding(vertical = 12.dp))
+                    LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                        items(shown, key = { it.first }) { p ->
+                            Column(Modifier.fillMaxWidth().clickable { chosen = p }.padding(vertical = 8.dp)) {
+                                Text(p.second); Text(p.first, style = MaterialTheme.typography.bodySmall)
+                            }
                         }
                     }
                 }
@@ -96,13 +102,18 @@ internal fun ShotThumb(repo: Repo, shot: Shot?) {
     if (shot.status != "ok") Text("Screenshot: ${shot.status}", style = MaterialTheme.typography.bodySmall)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun EditDialog(repo: Repo, e: Entry, shot: Shot?, onDone: () -> Unit) {
     val ctx = LocalContext.current
     val labellingMark = e.isMark
     val rawEvent = e.kind == Kind.AUTO_EVENT && !e.isMark
     var action by remember { mutableStateOf(if (labellingMark || rawEvent) "" else e.action) }
+    // The app can be corrected here: removing and logging again would lose the entry's time.
+    val apps = remember { repo.db.apps() }
+    var app by remember { mutableStateOf(e.appPackage) }
+    // KDL's own rows (session start and stop, snapshots) keep their fields as written.
+    val ownRow = e.kind != Kind.ACTION && e.kind != Kind.AUTO_EVENT
     var content by remember { mutableStateOf(if (labellingMark) "" else e.content ?: "") }
     var counterpart by remember { mutableStateOf(e.counterpart ?: "") }
     var conversation by remember { mutableStateOf(e.conversationId ?: "") }
@@ -133,7 +144,7 @@ internal fun EditDialog(repo: Repo, e: Entry, shot: Shot?, onDone: () -> Unit) {
     fun save() {
         if (labellingMark || rawEvent) {
             if (action.isBlank()) { toast(ctx, "Pick or type an action first"); return }
-            repo.log(Draft(appPackage = e.appPackage, action = action.trim(), content = content, counterpart = counterpart,
+            repo.log(Draft(appPackage = app, action = action.trim(), content = content, counterpart = counterpart,
                 direction = directionFor(action), conversationId = conversation, timeQuality = quality, expectedArtifacts = expectedList(), detail = note,
                 refersTo = e.entryId, source = if (labellingMark) Source.MARK else Source.MANUAL), stamp = e.stamp, detect = false)
             val src = teachSource
@@ -161,9 +172,10 @@ internal fun EditDialog(repo: Repo, e: Entry, shot: Shot?, onDone: () -> Unit) {
             }
         } else {
             repo.revise(e, Draft(
-                appPackage = e.appPackage, action = action.trim(), content = content, counterpart = counterpart,
+                appPackage = app, action = action.trim(), content = content, counterpart = counterpart,
                 // Rows inferred before directions were set on rule matches have none; fill it from the action.
-                direction = e.direction ?: directionFor(action), conversationId = conversation, timeQuality = quality,
+                direction = if (ownRow) e.direction else directionAfterEdit(e.action, e.direction, action),
+                conversationId = conversation, timeQuality = quality,
                 expectedArtifacts = expectedList(), detail = note,
             ))
         }
@@ -191,11 +203,23 @@ internal fun EditDialog(repo: Repo, e: Entry, shot: Shot?, onDone: () -> Unit) {
             if (rawEvent && !e.isWithheldNotification) Text("Captured: ${templateLabel(e.action)} ${e.content?.let { "\"$it\"" } ?: ""}",
                 color = Kdl.Muted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
             ShotThumb(repo, shot)
+            // The common actions one tap away; the full list is in the field below.
+            if (labellingMark || rawEvent || e.needsDetail) FlowRow(Modifier.padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                QUICK.forEach { (key, label) -> FilterChip(selected = action == key, onClick = { action = key }, label = { Text(label) }) }
+            }
             FieldPicker("Action", value = action.ifBlank { "Pick an action" }.let { templateLabel(it) },
                 options = ACTION_TEMPLATES.map { it to templateLabel(it) }, onPick = { action = it })
-            OutlinedTextField(action, { action = it }, label = { Text("Or type an action") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(action, { action = it }, label = { Text("Or type an action") }, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
+            if (!ownRow) {
+                // An app that is not on the Setup list (System UI, or one seen under Capture all apps) stays pickable.
+                val known = apps.map { it.pkg to it.label }
+                val extra = listOfNotNull(e.appPackage?.takeIf { p -> known.none { it.first == p } }?.let { it to (BUILTIN_LABELS[it] ?: it) })
+                FieldPicker("App", value = (known + extra).firstOrNull { it.first == app }?.second ?: "No app (device)",
+                    options = listOf<Pair<String?, String>>(null to "No app (device)") + known + extra, onPick = { app = it })
+            }
+            val shownDirection = if (labellingMark || rawEvent) directionFor(action) else directionAfterEdit(e.action, e.direction, action)
             OutlinedTextField(content, { content = it }, label = { Text("Content") }, supportingText = { Text(NO_SECRETS) }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(counterpart, { counterpart = it }, label = { Text("Counterpart") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(counterpart, { counterpart = it }, label = { Text(if (ownRow) "Counterpart" else counterpartLabel(shownDirection)) }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(conversation, { conversation = it }, label = { Text("Conversation") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(expected, { expected = it }, label = { Text("Expected artifacts") }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
             OutlinedTextField(note, { note = it }, label = { Text("Note") }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))

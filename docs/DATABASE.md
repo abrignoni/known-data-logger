@@ -7,8 +7,13 @@ Path on the device: `/data/data/com.abrignoni.knowndatalogger/databases/kl.db`.
 
 | column | meaning |
 |---|---|
-| key | `scenario_id` or `device_label` |
-| value | text typed by the user |
+| key | `scenario_id`, `device_label`, or one of the app's own state keys below |
+| value | text typed by the user, or the state value |
+
+State keys: `onboarded`, `capture_session_active`, `session_start` and `window_start` (clock
+readings as JSON), `capture_all_apps`, `shot_on_auto_action`, `shot_on_every_tap`,
+`mask_notification_codes`, `mark_y` (where MARK was left), `known_version:<package>`, and
+`export_tree` (the export folder picked last, as a content URI).
 
 ## profiles
 

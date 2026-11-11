@@ -381,6 +381,30 @@ class Repo private constructor(private val context: Context) {
 
     // ---- Export ----
 
+    /**
+     * The export folder picked last, while Android still holds KDL's grant on it and the folder is
+     * still there. Null sends the next export through the folder picker.
+     */
+    fun exportTree(): Uri? {
+        val saved = db.setting("export_tree")?.takeIf { it.isNotBlank() }?.let { Uri.parse(it) } ?: return null
+        if (resolver.persistedUriPermissions.none { it.uri == saved && it.isWritePermission }) return null
+        return try {
+            val doc = DocumentsContract.buildDocumentUriUsingTree(saved, DocumentsContract.getTreeDocumentId(saved))
+            val there = resolver.query(doc, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID), null, null, null)
+                ?.use { it.moveToFirst() } ?: false
+            if (there) saved else null
+        } catch (e: Exception) { null }
+    }
+
+    /** Keeps the picked folder for the next export, and gives up the grant on the folder it replaces. */
+    fun rememberExportTree(uri: Uri) {
+        val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        try { resolver.takePersistableUriPermission(uri, flags) } catch (e: SecurityException) { return }
+        val old = db.setting("export_tree")
+        if (!old.isNullOrBlank() && old != uri.toString()) runCatching { resolver.releasePersistableUriPermission(Uri.parse(old), flags) }
+        db.putSetting("export_tree", uri.toString())
+    }
+
     private fun appJson(a: AppUnderTest): JSONObject = JSONObject().apply {
         put("package", a.pkg); put("label", a.label)
         put("version_name_at_add", a.versionName ?: JSONObject.NULL)
