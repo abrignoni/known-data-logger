@@ -10,7 +10,8 @@ Author: Alexis Brignoni.
 
 This manual describes KDL 0.5.0, the v0.5.0 release on GitHub. Every screenshot comes from an
 Android 15 emulator (Google APIs image, API 35, 1080 x 2400, no Play Store) running a debug build of
-0.3.0 or of the code that became a later release, with made-up test data: the
+0.3.0 or of the code that became a later release, or the signed 0.5.0 release (Setup and the label
+form, 12 November 2026), with made-up test data: the
 phone numbers are 555 numbers and the scenario is called `msg-demo-01`. The emulator's time zone
 was America/New_York (UTC-05:00), so the times you see are local to that zone.
 
@@ -384,9 +385,27 @@ When nothing is left, the view says "Nothing to check."
 
 ### Label a mark
 
-![Label this mark](manual/check-label-mark.png)
+![Label this mark, with the text on the marked screen](manual/check-label-mark.png)
 
-The sheet shows the mark's screenshot and its time. Tap one of the chips for the common actions
+The sheet shows the mark's screenshot and its time. Under the screenshot, **Text on this screen**
+lists the text that was on the screen when you tapped MARK, top to bottom, from the view tree KDL
+saved with the screenshot (see [View tree](#view-tree)):
+
+- Tap a line to use it as **Content**.
+- Press and hold a line to use it as the counterpart (**To**, **From** or **To or from**).
+- The first six lines show at first. **Show all** lists the rest, **Show fewer** shortens it again.
+  The first lines are often the app's own title, buttons and banners; the messages come after them.
+- Nothing is filled in without a tap, and you can still type or change what a tap filled in.
+
+| All the lines | Content and From filled from the lines |
+|---|---|
+| ![Text on this screen, all 16 lines](manual/check-label-screen-text.png) | ![Received message, with Content and From filled in](manual/check-label-filled.png) |
+
+The list is there when a view tree was saved: the setting is on, the app was one of yours, and the
+phone was unlocked. A mark from before 0.5.0 has none. An app that reports little in its view tree
+gives a short list or none.
+
+Tap one of the chips for the common actions
 (the same six as on the Session tab), or pick or type the action, and fill in what you know.
 **App** starts on the app the mark was filed under; change it if the mark landed on the wrong one.
 **Save label** adds an action at the mark's time that points back at the mark.
@@ -711,7 +730,7 @@ The hash of the newest row in the log, with a copy button. Write it in your docu
 2. Android's folder picker opens. Pick a folder or make a new one, then tap **Use this folder**.
 3. Android asks whether KDL may access files in that folder. Tap **Allow**.
 4. While it runs, a progress bar replaces the button and counts the files: "Exporting: 14 of 28
-   files". The files are the screenshots and the three log files.
+   files". The files are the screenshots, the view trees and the three log files.
 5. KDL says "Exported" and shows the folder name under the button.
 
 ![Exporting: 14 of 28 files](manual/export-progress.png)
@@ -731,10 +750,11 @@ dots, dashes and underscores become `_`. Inside:
 
 | File | What it is |
 |---|---|
-| `manifest.json` | Device snapshots, apps under test (version when added and at export), the rules in effect, checker tolerances, the export time, the SHA-256 of `actions.jsonl`, the end of the hash chain, and every screenshot with its hash at capture and at export |
+| `manifest.json` | Device snapshots, apps under test (version when added and at export), the rules in effect, checker tolerances, the export time, the SHA-256 of `actions.jsonl`, the end of the hash chain, and every screenshot and view tree with its hash at capture and at export |
 | `actions.jsonl` | Every row, every revision, one JSON object per line |
 | `actions.csv` | The same rows for a spreadsheet. Filter `is_current` to TRUE for the latest version of each entry |
 | `screens/` | The screenshots |
+| `trees/` | The view trees, one `.xml` file per screenshot that has one (0.5.0 and later) |
 
 **Export everything** shows only when no session is running. Stop the session first.
 
@@ -747,6 +767,13 @@ Copy the export off the phone with `adb pull`. The demo export went to `Document
 ```bash
 adb pull /sdcard/Documents/KDL-exports/kdl_msg-demo-01_phone_A_20261109T051237Z
 ```
+
+In `actions.jsonl` the original row of an entry carries `screenshot` and `view_tree`, each with the
+file name, its SHA-256 and a status; `actions.csv` has the same in `view_tree_file`,
+`view_tree_status` and `view_tree_sha256`. After each capture there is also a `capture_files` row
+whose detail names the entry and the SHA-256 of both files. That row is in the hash chain, so the
+chain covers the screenshots and view trees (see [section 10](#10-the-hash-chain)). On the Timeline it shows
+only with **Show captured taps, screens and pauses**.
 
 Field definitions are in [SPEC.md](SPEC.md) and the database layout in
 [DATABASE.md](DATABASE.md).
@@ -783,6 +810,10 @@ and the checks:
 - **actions.jsonl sha256**: does the file match the hash in the manifest
 - **hash chain**: intact, or where it breaks
 - **screenshots**: how many files there are and whether each still matches its hash from capture
+- **view trees**: the same for the view trees (0.5.0 and later exports)
+- **files against chained rows**: each screenshot and view tree checked against the hash in its
+  `capture_files` row. A file swapped together with its hash in the manifest passes the line above
+  and fails this one, because the manifest is not in the chain and the row is
 - **noted hash**: only when you pass `--expect-hash` (see [section 10](#10-the-hash-chain))
 - **Capture pauses**: how many times the capture service paused during a session, and for how long
 
@@ -818,6 +849,11 @@ a **Device and system** sheet.
 - **Needs review**: anything still waiting on the Check tab when you exported, and why.
 - **Captured events**: every raw event (screens, taps, typed text, cleared fields, notifications,
   marks) with its screenshot link.
+- **Screen text** (0.5.0 and later exports): every line of every saved view tree, in the order of
+  the screen, with the entry it belongs to (a mark shows the action you labelled it with), the
+  app's own description of the line when it has one, its place on the screen, and links to the
+  screenshot and the view tree file. It gives the exact text of each marked screen without reading
+  it off the picture.
 
 In the 0.3.0 script some rows reach no sheet at all: the export rows, device snapshots, and the
 `app_version_changed_since_last_seen` and `app_data_cleared` rows. Its Scenario list looks for a
@@ -831,7 +867,9 @@ Every row in the log carries two hashes:
 - `prev_hash`: the previous row's hash (empty for the first row)
 - `row_hash`: SHA-256 over the row's fields plus `prev_hash`
 
-Change one character in a row or remove a row, and the chain breaks at that row.
+Change one character in a row or remove a row, and the chain breaks at that row. From 0.5.0 the
+chain also covers the screenshots and view trees: each capture adds a `capture_files` row holding
+the SHA-256 of both files, so a changed file no longer matches a hashed row.
 `make_documentation.py` checks the whole chain on every run, and the app writes its own check into
 the manifest at export. If the two disagree, the Scenario sheet says so.
 
@@ -941,7 +979,7 @@ KDL is part of the test, and an extraction of the phone will show it:
 - `Android/data/com.abrignoni.knowndatalogger/files/actions-live.jsonl`, a copy of every row,
   typed text included, which stays on the phone after an export
 - `rules.json` in the same folder, if you taught rules
-- screenshots in the app's private folder
+- screenshots and view trees in the app's private folder (`files/screens/` and `files/trees/`)
 - MediaStore entries for the export folder you pick
 - Android's record that KDL may use that folder. On the Android 15 emulator (11 November 2026) it
   was listed by `dumpsys activity permissions` and `/data/system/urigrants.xml` held KDL's package
