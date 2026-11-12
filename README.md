@@ -100,7 +100,7 @@ permission and no prompt (none appeared on the emulator). They are stored in the
 sha256 taken at capture, copied to `screens/` on export and checked again. A black frame from an app
 that blocks screenshots is recorded as `blank`.
 
-With each screenshot KDL also saves the view tree of the app in front (not in a release yet; on by default, a switch
+With each screenshot KDL also saves the view tree of the app in front (0.5; on by default, a switch
 on the Setup tab): the text the app reports is on the screen, with its place and type, as an `.xml`
 file in `trees/`. What was typed into a password field is left out; every other text is kept as
 shown, and "Hide verification codes" does not apply to it. No tree is saved for System UI or while
@@ -293,10 +293,12 @@ built and signed by this workflow.
 
 ## Status
 
-Version 0.4.0, Android only. Tested, with 0.3.0 and earlier builds, on an Android 15 emulator and
+Version 0.5.0, Android only. Tested, with 0.3.0 and earlier builds, on an Android 15 emulator and
 on a Pixel 7a with Android 17
 (8 November 2026), installed with `adb` into a separate user profile on that phone. The changes in
-0.3.2 and 0.4.0 were tried on the Android 15 emulator only (11 November 2026). On the Pixel:
+0.3.2, 0.4.0 and 0.5.0 were tried on the Android 15 emulator only (11 November 2026). An upgrade from
+0.4.0 to 0.5.0 on that emulator, done during a session, kept the log, its mark and the hash chain, and
+the next mark got its view tree. On the Pixel:
 - installing with `adb install --user` and turning the service on did not ask for "Allow
   restricted settings"; installing the same APK from the Files app did (Android recorded it as a
   local-file install), and Allow restricted settings in App info cleared it

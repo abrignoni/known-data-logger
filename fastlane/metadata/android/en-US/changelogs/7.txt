@@ -1,0 +1,1 @@
+With each screenshot KDL saves the view tree of the app in front: the screen's text as the app reports it. What was typed into a password field is left out; other text is kept as shown. The label form lists that text: tap a line for Content, hold for the counterpart. The hash chain now covers screenshots and view trees. A switch in Setup turns the view tree off.
