@@ -8,7 +8,7 @@ forensic tool can then check each action against what the tool reports.
 
 Author: Alexis Brignoni.
 
-This manual describes KDL 0.4.0, the v0.4.0 release on GitHub. Every screenshot comes from an
+This manual describes KDL 0.5.0, the v0.5.0 release on GitHub. Every screenshot comes from an
 Android 15 emulator (Google APIs image, API 35, 1080 x 2400, no Play Store) running a debug build of
 0.3.0 or of the code that became a later release, with made-up test data: the
 phone numbers are 555 numbers and the scenario is called `msg-demo-01`. The emulator's time zone
@@ -42,26 +42,26 @@ was America/New_York (UTC-05:00), so the times you see are local to that zone.
 - Python 3 with `openpyxl` to make the spreadsheet (`python3 -m pip install openpyxl`). The script,
   `tools/make_documentation.py`, is in the release's source code download and in the repository.
   The APK alone does not include it.
-- The APK: `KDL-0.4.0.apk` from the v0.4.0 release on GitHub, and the release's `SHA256SUMS` file.
+- The APK: `KDL-0.5.0.apk` from the v0.5.0 release on GitHub, and the release's `SHA256SUMS` file.
 
 ### Check the download
 
-Compare the APK's SHA-256 with the line for `KDL-0.4.0.apk` in `SHA256SUMS`. They must match.
+Compare the APK's SHA-256 with the line for `KDL-0.5.0.apk` in `SHA256SUMS`. They must match.
 
 ```bash
-shasum -a 256 KDL-0.4.0.apk
+shasum -a 256 KDL-0.5.0.apk
 ```
 
-On Linux, `sha256sum KDL-0.4.0.apk` works too. On Windows:
+On Linux, `sha256sum KDL-0.5.0.apk` works too. On Windows:
 
 ```
-certutil -hashfile KDL-0.4.0.apk SHA256
+certutil -hashfile KDL-0.5.0.apk SHA256
 ```
 
 You can also check who signed it. `apksigner` comes with the Android SDK build tools:
 
 ```bash
-apksigner verify --print-certs KDL-0.4.0.apk
+apksigner verify --print-certs KDL-0.5.0.apk
 ```
 
 The line `Signer #1 certificate SHA-256 digest:` must read
@@ -91,14 +91,14 @@ Other phones and versions have not been tried.
 Connect the phone with USB debugging on and run:
 
 ```bash
-adb install KDL-0.4.0.apk
+adb install KDL-0.5.0.apk
 ```
 
 On a phone with more than one user profile, install into the test profile only. For example, for
 user 10:
 
 ```bash
-adb install --user 10 KDL-0.4.0.apk
+adb install --user 10 KDL-0.5.0.apk
 ```
 
 On the Pixel 7a with Android 17 (8 November 2026), an `adb install` did not trigger Android's
@@ -603,6 +603,39 @@ never finished), `unsupported` (Android 10 and earlier) and `failed:` with the r
 
 While a session runs, Setup reminds you that changes to these switches and to the app list apply
 when the next session starts.
+
+### View tree
+
+- **Save the view tree with screenshots** (on by default): with each screenshot, KDL also saves the
+  view tree of the app in front, as an `.xml` file. The view tree is what the app reports is on the
+  screen: each piece of text, its place on the screen and its type. It gives the exact text of a
+  screen without reading it off the picture.
+- What was typed into a password field is left out: that field is listed with empty text. Every
+  other text is saved as shown, including a message that mentions a password or carries a code.
+  "Hide verification codes" does not apply to view trees.
+- A tree is saved only for an app that is being captured. System UI is never saved, because its
+  tree holds the whole notification shade, and nothing is saved while the phone is locked. The
+  status then reads `not_captured:` with the reason.
+- The tree is what the app reports, not what a person saw. An app can report more than the screen
+  shows, less, or nothing.
+- After each capture KDL writes a `capture_files` row with the SHA-256 of the screenshot and of the
+  view tree. That row is in the hash chain, so the chain covers both files.
+
+What KDL does with a saved view tree:
+
+- **When you label a mark or a captured event**, the form lists the text that was on that screen,
+  top to bottom, under the screenshot. Tap a line to use it as Content. Press and hold a line to use
+  it as the counterpart. Nothing is filled in without a tap, and you can still type. The first lines
+  are often the app's own buttons and banners; "Show all" lists the rest.
+- **In the spreadsheet**, a Screen text sheet lists every line of every saved tree in screen order,
+  with the entry it belongs to and links to the screenshot and the tree file.
+- **In `kdl_locate.py`**, a Screen text sheet lists the lines that were on a marked screen and that
+  you did not log, and says whether each was found in one of the app's stores and where. Lines under
+  4 characters are left out, and at most 400 lines are searched.
+
+Tried on an Android 15 emulator (11 November 2026) with Google Messages and Settings: a message
+holding the words "PIN" and "password" and one holding a verification code were in the saved tree
+as shown, and digits typed into the Settings confirm-PIN field were not.
 
 ### Rules
 

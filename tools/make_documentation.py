@@ -118,7 +118,67 @@ def load_export(folder):
         shots[s["entry_id"]] = {"path": path, "status": status}
     ok = sum(1 for s in shots.values() if s["path"])
     checks.append(("screenshots", f"{ok} file(s), {len(shots)} listed"))
-    return {"folder": folder, "manifest": manifest, "rows": rows, "checks": checks, "shots": shots}
+    # View trees (schema 4): the screen's text as the app reported it, saved beside a screenshot.
+    tree_hash = {}
+    tree_paths = {}
+    trees = manifest.get("view_trees", [])
+    for s in trees:
+        path = os.path.join(folder, "trees", os.path.basename(s["file"])) if s.get("file") else None
+        if path and os.path.exists(path):
+            tree_paths[s["entry_id"]] = path
+            with open(path, "rb") as f:
+                tree_hash[s["entry_id"]] = hashlib.sha256(f.read()).hexdigest()
+            if tree_hash[s["entry_id"]] != s.get("sha256_at_capture"):
+                checks.append((f"view tree {s['file']}", "MISMATCH with hash taken at capture"))
+        elif path:
+            checks.append((f"view tree {s['file']}", "listed in manifest but missing from trees/"))
+    if trees:
+        checks.append(("view trees", f"{len(tree_hash)} file(s), {len(trees)} listed"))
+    # capture_files rows put the file hashes inside the row hash chain. Each is checked against the file.
+    chained = bad = 0
+    for r in rows:
+        if r.get("action") != "capture_files":
+            continue
+        try:
+            d = json.loads(r.get("detail") or "{}")
+        except ValueError:
+            d = {}
+        for key, sub in (("screenshot", "screens"), ("view_tree", "trees")):
+            part = d.get(key) or {}
+            if not part.get("file"):
+                continue
+            chained += 1
+            path = os.path.join(folder, sub, os.path.basename(part["file"]))
+            if not os.path.exists(path):
+                bad += 1
+                checks.append((f"chained {key} {part['file']}", "named in a chained row but missing from the export"))
+                continue
+            with open(path, "rb") as f:
+                if hashlib.sha256(f.read()).hexdigest() != part.get("sha256"):
+                    bad += 1
+                    checks.append((f"chained {key} {part['file']}", "MISMATCH with the hash in its chained row"))
+    if chained:
+        checks.append(("files against chained rows", f"{chained - bad} of {chained} match"))
+    return {"folder": folder, "manifest": manifest, "rows": rows, "checks": checks, "shots": shots, "trees": tree_paths}
+
+
+def tree_lines(path, package=None):
+    """Text lines of a saved view tree, top to bottom then left to right: (text, description, bounds).
+    The tree is what the app reported was on the screen, not a reading of the picture."""
+    import xml.etree.ElementTree as ET
+    out = []
+    try:
+        root = ET.parse(path).getroot()
+    except (ET.ParseError, OSError):
+        return out
+    for n in root.iter("node"):
+        text = (n.get("text") or "").strip()
+        if not text or (package and n.get("package") != package):
+            continue
+        m = re.match(r"\[(-?\d+),(-?\d+)\]", n.get("bounds") or "")
+        x, y = (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+        out.append((y, x, text, n.get("content-desc") or "", n.get("bounds") or ""))
+    return [(t, d, b) for _, _, t, d, b in sorted(out)]
 
 
 def current(rows):
@@ -380,8 +440,39 @@ def build(exports, out_path):
             c = ws.cell(row=i, column=9)
             c.hyperlink = v[8]
             c.font = Font(color="0563C1", underline="single")
+    # Screen text: what each saved view tree says was on the screen, so content does not have to be
+    # retyped from the screenshots. One row per text line, in the order of the screen.
+    text_rows, links = [], []
+    for e in exports:
+        if not e.get("trees"):
+            continue
+        dev = e["manifest"].get("device_label", "")
+        cur = current(e["rows"])
+        label_for = {r["refers_to"]: r for r in cur if r.get("refers_to") and r["kind"] == "action"}
+        for r in cur:
+            path = e["trees"].get(r["entry_id"])
+            if not path:
+                continue
+            d, t, off = local_time(r)
+            named = label_for.get(r["entry_id"], r)
+            shot = e["shots"].get(r["entry_id"])
+            shot_link = os.path.relpath(shot["path"], out_dir) if shot and shot["path"] else None
+            tree_link = os.path.relpath(path, out_dir)
+            for text, desc, bounds in tree_lines(path):
+                text_rows.append([dev, d, t, off, labels.get(r.get("app_package"), r.get("app_package")),
+                                  named["action"], text, desc, bounds, shot_link, tree_link, r["entry_id"]])
+    if text_rows:
+        ws = wb.create_sheet(sheet_name("Screen text", used))
+        write_table(ws, ["Device", "Date", "Time", "UTC offset", "App", "Entry", "Text on screen", "App's description",
+                         "Place on screen", "Screenshot", "View tree", "Entry id"], text_rows)
+        for i, v in enumerate(text_rows, 2):
+            for col in (10, 11):
+                if v[col - 1]:
+                    c = ws.cell(row=i, column=col)
+                    c.hyperlink = v[col - 1]
+                    c.font = Font(color="0563C1", underline="single")
     wb.save(out_path)
-    return {"sheets": wb.sheetnames, "review": len(review_rows), "events": len(event_rows),
+    return {"sheets": wb.sheetnames, "screen_text": len(text_rows), "review": len(review_rows), "events": len(event_rows),
             "actions": sum(len(v) for v in per_app.values())}
 
 

@@ -72,6 +72,10 @@ class CaptureService : AccessibilityService() {
     private var allApps = false
     private var shotAuto = true
     private var shotTap = false
+    private var saveTree = true
+    /** View trees taken at a screenshot, waiting for that screenshot's result so both go in one chained row. */
+    private val pendingTrees = HashMap<String, TreeFile>()
+    private val shotApps = HashMap<String, String?>()
     private var pkgs: Set<String> = emptySet()
     /** Apps on the Setup list, without the always-captured System UI and Settings. */
     private var listed: Set<String> = emptySet()
@@ -98,6 +102,7 @@ class CaptureService : AccessibilityService() {
         allApps = repo.flag(Repo.KEY_ALL_APPS, false)
         shotAuto = repo.flag(Repo.KEY_SHOT_AUTO, true)
         shotTap = repo.flag(Repo.KEY_SHOT_TAP, false)
+        saveTree = repo.flag(Repo.KEY_TREE, true)
         pkgs = repo.capturePackages()
         listed = repo.db.apps().map { it.pkg }.toSet()
         // Forgotten when the session ends, not when the service reconnects in the middle of one.
@@ -375,11 +380,59 @@ class CaptureService : AccessibilityService() {
         main.postDelayed({ takeNow(entryId) }, 150)
     }
 
+    /**
+     * The view tree of the window in front, taken at the screenshot. Only for an app that is being
+     * captured, never System UI (its tree holds the whole notification shade) and never while the
+     * phone is locked. What was typed in a password field is left out; every other text is kept.
+     */
+    private fun captureTree(entryId: String): TreeFile {
+        val now = System.currentTimeMillis()
+        fun none(why: String) = TreeFile(entryId, null, null, "not_captured:$why", now)
+        return try {
+            if (getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true) return none("phone locked")
+            val root = rootInActiveWindow ?: return none("no window")
+            val pkg = root.packageName?.toString() ?: return none("no package")
+            if (pkg == SYSTEM_UI || !wanted(pkg)) return none("$pkg is not an app under test")
+            var count = 0
+            fun walk(n: AccessibilityNodeInfo, depth: Int): VNode {
+                count++
+                val id = n.viewIdResourceName
+                val r = android.graphics.Rect().also { n.getBoundsInScreen(it) }
+                val secret = isSecret(null, n) || "${n.packageName}|${id ?: n.className}" in secretKeys
+                val kids = ArrayList<VNode>()
+                if (depth < 80) for (i in 0 until n.childCount) {
+                    if (count >= 6000) break
+                    val c = try { n.getChild(i) } catch (e: Exception) { null } ?: continue
+                    kids += walk(c, depth + 1)
+                }
+                return VNode(n.className?.toString(), n.packageName?.toString(), id, n.text?.toString(),
+                    n.contentDescription?.toString(), "[${r.left},${r.top}][${r.right},${r.bottom}]",
+                    n.isClickable, n.isScrollable, secret, n.isChecked, n.isSelected, kids)
+            }
+            val bytes = ViewTree.xml(walk(root, 0)).toByteArray(Charsets.UTF_8)
+            val name = "$entryId.xml"
+            File(repo.treesDir(), name).writeBytes(bytes)
+            TreeFile(entryId, name, sha256Hex(bytes), if (count >= 6000) "ok_cut_at_6000_nodes" else "ok", now)
+        } catch (e: Exception) {
+            TreeFile(entryId, null, null, "failed:${e.javaClass.simpleName}", now)
+        }
+    }
+
+    /** Stores the screenshot and the tree, then one chained row with the hashes of both files. */
+    private fun finishCapture(shot: Shot) {
+        if (!kdlInFront) mark?.visibility = View.VISIBLE
+        val tree = pendingTrees.remove(shot.entryId)
+        repo.recordShot(shot)
+        tree?.let { repo.recordTree(it) }
+        repo.logCaptureFiles(shot.entryId, shotApps.remove(shot.entryId), shot, tree)
+    }
+
     private fun takeNow(entryId: String) {
         if (Build.VERSION.SDK_INT < 30) return
+        shotApps[entryId] = lastApp ?: lastScreen?.first
+        if (saveTree) pendingTrees[entryId] = captureTree(entryId)
         takeScreenshot(Display.DEFAULT_DISPLAY, io, object : TakeScreenshotCallback {
             override fun onSuccess(result: ScreenshotResult) {
-                main.post { if (!kdlInFront) mark?.visibility = View.VISIBLE }
                 val shot = try {
                     val hw = Bitmap.wrapHardwareBuffer(result.hardwareBuffer, result.colorSpace)
                     val bmp = hw!!.copy(Bitmap.Config.ARGB_8888, false)
@@ -393,14 +446,11 @@ class CaptureService : AccessibilityService() {
                 } catch (e: Exception) {
                     Shot(entryId, null, null, "failed:${e.javaClass.simpleName}", System.currentTimeMillis())
                 }
-                main.post { repo.recordShot(shot) }
+                main.post { finishCapture(shot) }
             }
 
             override fun onFailure(errorCode: Int) {
-                main.post {
-                    if (!kdlInFront) mark?.visibility = View.VISIBLE
-                    repo.recordShot(Shot(entryId, null, null, "failed:code_$errorCode", System.currentTimeMillis()))
-                }
+                main.post { finishCapture(Shot(entryId, null, null, "failed:code_$errorCode", System.currentTimeMillis())) }
             }
         })
     }

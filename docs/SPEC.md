@@ -254,6 +254,31 @@ value as text so content cannot run as a formula.
   same text. The generator checks a noted hash with `--expect-hash` and warns when its chain
   result differs from the app's.
 
+## View tree with screenshots (schema 4)
+
+- With each screenshot the app saves the view tree of the window in front as XML, with the element
+  and attribute names `uiautomator dump` writes (`hierarchy`, `node`, `text`, `resource-id`, `class`,
+  `package`, `content-desc`, `bounds`, `password` and the state flags).
+- Withheld: the text and description of a password field (by flag or input type, and fields seen as
+  password fields earlier in the session). Nothing else. The verification-code filter is not
+  applied: the tree is a record of the screen's text as shown.
+- Saved only for an app under capture, never for System UI, never while the phone is locked.
+  Otherwise the row says `not_captured:<why>` and there is no file.
+- Files are in the app's private `files/trees/`, named after the entry, hashed at capture. The export
+  copies them to `trees/`, lists them in the manifest under `view_trees` (hash at capture, at export,
+  match) and puts `view_tree` (file, sha256, status) on the entry's original row beside `screenshot`.
+- `capture_files` rows: after a screenshot and its tree are written, a `system_event` row with
+  a JSON `detail` naming the entry (`entry_id`) and each file with its sha256 and status. `refers_to`
+  is left empty on purpose: a row that refers to a mark counts as the mark's label. The
+  row is hashed like any other, so the chain covers the files. The hashed field list of a row is
+  unchanged, so exports from schema 3 and from the iOS app verify as before. The iOS app has no view
+  tree and writes neither.
+- Uses of the tree: the label form offers its text lines (top to bottom, each once, never from a
+  password field) for Content and counterpart; `make_documentation.py` writes a Screen text sheet;
+  `kdl_locate.py` searches the app's stores for the lines the tester did not log.
+- `make_documentation.py` checks each tree against the manifest and each file named in a
+  `capture_files` row against the hash in that row.
+
 ## Locator and checker (tools)
 
 `tools/kdl_locate.py` finds where an app stored the logged values and times in an extraction;

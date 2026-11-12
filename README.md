@@ -100,8 +100,26 @@ permission and no prompt (none appeared on the emulator). They are stored in the
 sha256 taken at capture, copied to `screens/` on export and checked again. A black frame from an app
 that blocks screenshots is recorded as `blank`.
 
+With each screenshot KDL also saves the view tree of the app in front (0.5; on by default, a switch
+on the Setup tab): the text the app reports is on the screen, with its place and type, as an `.xml`
+file in `trees/`. What was typed into a password field is left out; every other text is kept as
+shown, and "Hide verification codes" does not apply to it. No tree is saved for System UI or while
+the phone is locked. After each capture a `capture_files` row puts the SHA-256 of the screenshot and
+of the tree into the hash chain. Tried on an Android 15 emulator (11 November 2026): two messages
+with the words "PIN", "password" and a verification code were in the saved tree as shown, digits
+typed into the Settings confirm-PIN field were not, and the export passed `make_documentation.py`.
+
+The saved tree is used in three places. The label form lists the screen's text under the screenshot:
+tap a line for Content, press and hold for the counterpart. `make_documentation.py` adds a Screen text
+sheet with every line of every tree and links to the picture and the tree. `kdl_locate.py` adds a
+Screen text sheet for the lines on a marked screen that were not logged, with where each was found in
+the app's stores. On the emulator, a tap filled Content with a three-line message exactly and a hold
+filled the counterpart with the thread's number.
+
 Known limits:
 
+- A view tree is what the app reports, not what a person saw. An app can report more than the screen
+  shows, less, or nothing.
 - Tools that drive the phone through UiAutomation (uiautomator, Puma and similar) pause every
   accessibility service while they run. On the emulator each `uiautomator dump` showed up as a
   `capture_service_disconnected` and `capture_service_connected` pair in the log.
@@ -161,6 +179,7 @@ A folder named `kdl_<scenario>_<device>_<UTC time>` with:
   (action, app, content, counterpart), status (current, reviewed, source), screenshot, context,
   then clock internals and identifiers. Filter `is_current` to TRUE for the live version of each entry.
 - `screens/`: the screenshots, listed with their hashes in the manifest.
+- `trees/`: the view trees saved with screenshots, listed with their hashes in the manifest.
 
 ## Documentation (.xlsx)
 
@@ -274,10 +293,12 @@ built and signed by this workflow.
 
 ## Status
 
-Version 0.4.0, Android only. Tested, with 0.3.0 and earlier builds, on an Android 15 emulator and
+Version 0.5.0, Android only. Tested, with 0.3.0 and earlier builds, on an Android 15 emulator and
 on a Pixel 7a with Android 17
 (8 November 2026), installed with `adb` into a separate user profile on that phone. The changes in
-0.3.2 and 0.4.0 were tried on the Android 15 emulator only (11 November 2026). On the Pixel:
+0.3.2, 0.4.0 and 0.5.0 were tried on the Android 15 emulator only (11 November 2026). An upgrade from
+0.4.0 to 0.5.0 on that emulator, done during a session, kept the log, its mark and the hash chain, and
+the next mark got its view tree. On the Pixel:
 - installing with `adb install --user` and turning the service on did not ask for "Allow
   restricted settings"; installing the same APK from the Files app did (Android recorded it as a
   local-file install), and Allow restricted settings in App info cleared it

@@ -41,6 +41,7 @@ class Repo private constructor(private val context: Context) {
         const val KEY_SESSION = "capture_session_active"
         const val KEY_SHOT_AUTO = "shot_on_auto_action"
         const val KEY_SHOT_TAP = "shot_on_every_tap"
+        const val KEY_TREE = "view_tree_with_screenshot"
         const val KEY_ALL_APPS = "capture_all_apps"
         const val KEY_MASK_CODES = "mask_notification_codes"
         /** Set while a session that was started without the capture service is running. */
@@ -96,7 +97,7 @@ class Repo private constructor(private val context: Context) {
         val allApps = flag(KEY_ALL_APPS, false)
         log(Draft(action = "capture_session_start", source = Source.SYSTEM,
             detail = "apps: " + (if (allApps) "all" else capturePackages().sorted().joinToString(" ")) +
-                "; screenshots: auto=${flag(KEY_SHOT_AUTO, true)} every_tap=${flag(KEY_SHOT_TAP, false)}" +
+                "; screenshots: auto=${flag(KEY_SHOT_AUTO, true)} every_tap=${flag(KEY_SHOT_TAP, false)} view_tree=${flag(KEY_TREE, true)}" +
                 "; capture=${if (capture) "on" else "off"}"),
             s, kind = Kind.SYSTEM_EVENT)
     }
@@ -184,6 +185,27 @@ class Repo private constructor(private val context: Context) {
 
     fun recordShot(shot: Shot) = db.putShot(shot)
 
+    fun treesDir(): File = File(context.filesDir, "trees").apply { mkdirs() }
+
+    fun recordTree(tree: TreeFile) = db.putTree(tree)
+
+    /** Text lines of the view tree saved for an entry, or for the event it labels; empty when there is none. */
+    fun treeTexts(e: Entry): List<String> = try {
+        val trees = db.trees()
+        val t = trees[e.entryId] ?: e.refersTo?.let { trees[it] }
+        t?.file?.let { File(treesDir(), it) }?.takeIf { it.exists() }?.let { ViewTree.texts(it.readText(Charsets.UTF_8)) } ?: emptyList()
+    } catch (ex: Exception) { emptyList() }
+
+    /**
+     * Puts the hashes of an entry's screenshot and view tree into the chain, as a row of its own:
+     * the files are written after the entry's row, so that row cannot carry them.
+     */
+    fun logCaptureFiles(entryId: String, appPackage: String?, shot: Shot?, tree: TreeFile?) {
+        if (shot?.file == null && tree?.file == null) return
+        log(Draft(appPackage = appPackage, action = "capture_files", source = Source.SYSTEM,
+            detail = ViewTree.filesDetail(entryId, shot, tree)), kind = Kind.SYSTEM_EVENT)
+    }
+
     /** Start stamp of an open Start/Done window, kept in the database so a killed app keeps it. */
     fun saveWindowStart(s: Stamp?) = saveStamp("window_start", s)
 
@@ -219,6 +241,7 @@ class Repo private constructor(private val context: Context) {
         val carrier = db.profiles().lastOrNull()?.carrier
         db.eraseLog()
         screensDir().listFiles()?.forEach { it.delete() }
+        treesDir().listFiles()?.forEach { it.delete() }
         liveFile().delete()
         lastHash = null
         lastStamp = null
@@ -551,8 +574,10 @@ class Repo private constructor(private val context: Context) {
     private fun writeExport(treeUri: Uri, name: String, s: Stamp, progress: (Int, Int) -> Unit): String {
         val rows = db.entries()
         val shots = db.shots()
-        // Progress counts files: each screenshot that is still on disk, then the three log files.
-        val total = shots.values.count { sh -> sh.file?.let { File(screensDir(), it).exists() } == true } + 3
+        val trees = db.trees()
+        // Progress counts files: each screenshot and view tree that is still on disk, then the three log files.
+        val total = shots.values.count { sh -> sh.file?.let { File(screensDir(), it).exists() } == true } +
+            trees.values.count { t -> t.file?.let { File(treesDir(), it).exists() } == true } + 3
         var done = 0
         progress(done, total)
         val parent = DocumentsContract.buildDocumentUriUsingTree(treeUri, DocumentsContract.getTreeDocumentId(treeUri))
@@ -588,10 +613,28 @@ class Repo private constructor(private val context: Context) {
             progress(++done, total)
         }
 
-        val jsonlBytes = jsonl(rows, shots).toByteArray(Charsets.UTF_8)
+        val treeHash = HashMap<String, String>()
+        var treesFolder: Uri? = null
+        trees.values.sortedBy { it.utcMs }.forEach { t ->
+            val f = t.file?.let { File(treesDir(), it) } ?: return@forEach
+            if (!f.exists()) return@forEach
+            if (treesFolder == null) {
+                treesFolder = DocumentsContract.createDocument(resolver, dir, DocumentsContract.Document.MIME_TYPE_DIR, "trees")
+                    ?: error("Could not create trees folder")
+            }
+            // text/xml with the full name: the provider keeps a name that already ends in .xml.
+            val doc = DocumentsContract.createDocument(resolver, treesFolder!!, "text/xml", f.name)
+                ?: error("Could not create ${f.name}")
+            val bytes = f.readBytes()
+            resolver.openOutputStream(doc, "w")!!.use { it.write(bytes) }
+            treeHash[t.entryId] = sha256Hex(bytes)
+            progress(++done, total)
+        }
+
+        val jsonlBytes = jsonl(rows, shots, trees).toByteArray(Charsets.UTF_8)
         put("actions.jsonl", "application/octet-stream", jsonlBytes)
         progress(++done, total)
-        put("actions.csv", "text/csv", Csv.document(rows, shots).toByteArray(Charsets.UTF_8))
+        put("actions.csv", "text/csv", Csv.document(rows, shots, trees).toByteArray(Charsets.UTF_8))
         progress(++done, total)
         val shotList = JSONArray(shots.values.sortedBy { it.utcMs }.map { sh ->
             val now = exportHash[sh.entryId]
@@ -606,8 +649,21 @@ class Repo private constructor(private val context: Context) {
                 })
             }
         })
+        val treeList = JSONArray(trees.values.sortedBy { it.utcMs }.map { t ->
+            val now = treeHash[t.entryId]
+            JSONObject().apply {
+                put("entry_id", t.entryId); put("file", t.file ?: JSONObject.NULL); put("status", t.status)
+                put("sha256_at_capture", t.sha256 ?: JSONObject.NULL); put("sha256_at_export", now ?: JSONObject.NULL)
+                put("hash_match", when {
+                    t.sha256 == null -> JSONObject.NULL
+                    now == null -> false
+                    else -> t.sha256 == now
+                })
+            }
+        })
         put("manifest.json", "application/json",
-            manifest(rows, jsonlBytes, s).apply { put("screenshots", shotList) }.toString(2).toByteArray(Charsets.UTF_8))
+            manifest(rows, jsonlBytes, s).apply { put("screenshots", shotList); put("view_trees", treeList) }
+                .toString(2).toByteArray(Charsets.UTF_8))
         progress(++done, total)
         return name
     }

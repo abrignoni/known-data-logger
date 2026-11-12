@@ -59,12 +59,14 @@ class Db(context: Context) : SQLiteOpenHelper(context, NAME, null, SCHEMA_VERSIO
         db.execSQL("CREATE INDEX entries_entry_id ON entries(entry_id)")
         upgradeTo2(db)
         upgradeTo3(db)
+        upgradeTo4(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         // Migrations only add; they never drop or rewrite data.
         if (oldVersion < 2) upgradeTo2(db)
         if (oldVersion < 3) upgradeTo3(db)
+        if (oldVersion < 4) upgradeTo4(db)
     }
 
     /** Schema 2: row source, review flag, screenshots. Existing rows become manual and reviewed. */
@@ -83,6 +85,32 @@ class Db(context: Context) : SQLiteOpenHelper(context, NAME, null, SCHEMA_VERSIO
         db.execSQL("ALTER TABLE entries ADD COLUMN prev_hash TEXT")
         db.execSQL("ALTER TABLE entries ADD COLUMN row_hash TEXT")
     }
+
+    /** Schema 4: view trees saved with screenshots. */
+    private fun upgradeTo4(db: SQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE view_trees (
+                entry_id TEXT PRIMARY KEY, file TEXT, sha256 TEXT, status TEXT NOT NULL,
+                utc_ms INTEGER NOT NULL)"""
+        )
+    }
+
+    fun putTree(t: TreeFile) {
+        writableDatabase.insertWithOnConflict("view_trees", null, ContentValues().apply {
+            put("entry_id", t.entryId); put("file", t.file); put("sha256", t.sha256)
+            put("status", t.status); put("utc_ms", t.utcMs)
+        }, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+    fun trees(): Map<String, TreeFile> =
+        readableDatabase.rawQuery("SELECT * FROM view_trees", null).use { c ->
+            val out = HashMap<String, TreeFile>()
+            while (c.moveToNext()) {
+                val id = c.str("entry_id")!!
+                out[id] = TreeFile(id, c.str("file"), c.str("sha256"), c.str("status")!!, c.long("utc_ms") ?: 0)
+            }
+            out
+        }
 
     fun setHash(seq: Long, prev: String, row: String) {
         writableDatabase.update("entries", ContentValues().apply { put("prev_hash", prev); put("row_hash", row) },
@@ -167,6 +195,7 @@ class Db(context: Context) : SQLiteOpenHelper(context, NAME, null, SCHEMA_VERSIO
         try {
             w.delete("entries", null, null)
             w.delete("screenshots", null, null)
+            w.delete("view_trees", null, null)
             w.delete("profiles", null, null)
             w.delete("sqlite_sequence", "name IN ('entries','profiles')", null)
             w.delete("settings", "key IN ('session_start','window_start') OR key LIKE 'known_version:%'", null)
