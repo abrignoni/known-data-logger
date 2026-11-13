@@ -32,6 +32,10 @@ was America/New_York (UTC-05:00), so the times you see are local to that zone.
 10. [The hash chain](#10-the-hash-chain)
 11. [What KDL does not do](#11-what-kdl-does-not-do)
 12. [Quick answers](#12-quick-answers)
+13. [Where an app keeps it (kdl_locate.py)](#13-where-an-app-keeps-it-kdl_locatepy)
+14. [Check a LEAPP artifact (kdl_check.py)](#14-check-a-leapp-artifact-kdl_checkpy)
+15. [Tested on](#15-tested-on)
+16. [Building and releasing](#16-building-and-releasing)
 
 ## 1. What you need
 
@@ -80,10 +84,11 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew assembleDebug
 
 The APK lands in `app/build/outputs/apk/debug/app-debug.apk`, signed with your own debug key, not the
 release key. See [the warning in section 2](#a-build-and-the-release-do-not-mix) before you put it on
-a phone that has the release.
+a phone that has the release. [Section 16](#16-building-and-releasing) has the full build and the
+release steps.
 
 KDL has been tried on an Android 15 emulator and on a Pixel 7a with Android 17 (8 November 2026).
-Other phones and versions have not been tried.
+Other phones and versions have not been tried. [Section 15](#15-tested-on) lists what was tried.
 
 ## 2. Install the app
 
@@ -106,7 +111,7 @@ On the Pixel 7a with Android 17 (8 November 2026), an `adb install` did not trig
 "restricted settings" block. Other phones were not tried. Go on to the [first run](#3-first-run).
 
 The release key is registered with Google's Android developer verification for KDL's package name
-(9 November 2026). Google says verification expands globally in 2027 and does not cover installs
+(in the Android Developer Console, 9 November 2026). Google says verification expands globally in 2027 and does not cover installs
 from a file yet. Once it does, an unregistered app can only be installed through Android's
 "advanced flow" or with `adb`, so the registration keeps the release installable from a file.
 Apps installed with `adb` do not need verification at all.
@@ -290,7 +295,8 @@ In the apps under test, System UI and Settings, while the phone is unlocked:
 - **notifications** from the apps under test, with title (usually the sender) and text, even
   while the phone is locked
 - **app changes** during the session: an app under test installed, updated, removed or with its
-  data cleared, with versions
+  data cleared, with versions. At session start, an app whose version differs from the last one
+  the log accounted for is flagged once.
 
 Password fields are never recorded. See [section 11](#11-what-kdl-does-not-do) for the rest of the
 rules.
@@ -448,11 +454,16 @@ The code in the second received message reads `[code withheld]`. That is the
     `messages.android_20240528_00_RC01` on an Android 15 emulator.
   - AOSP Camera: a tap on the shutter button becomes `took_photo`. Checked against Camera 2.0.002
     on an Android 15 emulator.
+
+  The shipped rules are in `app/src/main/assets/rules/` in the repository.
 - **Notifications** from the apps under test, by the category the app gave the notification:
   - a message notification becomes `received_message`
   - a missed-call notification becomes `missed_call`
   - a call notification becomes `incoming_call` only when the app marks it as an incoming call
     (Android 12 and later), because dialers post ongoing calls in the same category
+
+This was tried on an Android 15 emulator (8 November 2026) with an SMS and a call sent from the
+emulator console.
 
 Notifications in any other category (for example "Messages is doing work in the background") are
 kept as raw events and show up on the Captured events sheet, but no action is inferred from them.
@@ -604,6 +615,8 @@ On by default. In notifications, screen titles and tap labels, a run of 4 to 8 d
 mentions a code, OTP, passcode, PIN, verification, verify, 2FA or one-time is replaced with
 `[code withheld]`. A notification that had a code withheld says so in its detail.
 
+On the emulator, an SMS code was absent from the database file and from the live copy afterwards.
+
 It does not touch typed text, and codes in other wording are not caught. Keep real accounts off
 test phones.
 
@@ -654,7 +667,9 @@ What KDL does with a saved view tree:
 
 Tried on an Android 15 emulator (11 November 2026) with Google Messages and Settings: a message
 holding the words "PIN" and "password" and one holding a verification code were in the saved tree
-as shown, and digits typed into the Settings confirm-PIN field were not.
+as shown, and digits typed into the Settings confirm-PIN field were not. The export passed
+`make_documentation.py`. On the label form, a tap filled Content with a three-line message exactly,
+and a hold filled the counterpart with the thread's number.
 
 ### Rules
 
@@ -752,15 +767,14 @@ dots, dashes and underscores become `_`. Inside:
 |---|---|
 | `manifest.json` | Device snapshots, apps under test (version when added and at export), the rules in effect, checker tolerances, the export time, the SHA-256 of `actions.jsonl`, the end of the hash chain, and every screenshot and view tree with its hash at capture and at export |
 | `actions.jsonl` | Every row, every revision, one JSON object per line |
-| `actions.csv` | The same rows for a spreadsheet. Filter `is_current` to TRUE for the latest version of each entry |
+| `actions.csv` | The same rows for a spreadsheet, columns in reading order: time, what happened (action, app, content, counterpart), status (current, reviewed, source), screenshot, context, then clock internals and identifiers. Filter `is_current` to TRUE for the latest version of each entry |
 | `screens/` | The screenshots |
 | `trees/` | The view trees, one `.xml` file per screenshot that has one (0.5.0 and later) |
 
 **Export everything** shows only when no session is running. Stop the session first.
 
 On a phone where KDL runs in a second user profile, the shell could not list that profile's
-storage on the Pixel 7a (8 November 2026). The README describes reading those files with
-`adb shell content query` and `content read` with `--user`.
+storage on the Pixel 7a (8 November 2026). This manual does not describe a way around that.
 
 Copy the export off the phone with `adb pull`. The demo export went to `Documents/KDL-exports`:
 
@@ -873,6 +887,9 @@ the SHA-256 of both files, so a changed file no longer matches a hashed row.
 `make_documentation.py` checks the whole chain on every run, and the app writes its own check into
 the manifest at export. If the two disagree, the Scenario sheet says so.
 
+Rows written before 0.3 are hashed the first time the upgraded app writes a row or opens the Setup
+tab, and a `hash_chain_backfilled` row says so.
+
 There is one thing the chain cannot catch on its own. Someone who cuts rows off the end and then
 rewrites the manifest to match leaves an intact chain behind. That is what the **Latest row hash**
 on the Setup tab is for.
@@ -944,7 +961,11 @@ tested on.
 - There is no field anywhere in KDL for a password or passcode. Keep those in your private notes.
 
 On the Pixel 7a with a test PIN set (8 November 2026), the PIN never reached the log, not even the database file's
-bytes.
+bytes. No keypad taps or System UI rows were recorded while the phone was locked, and a text that
+arrived while it was locked was kept as a withheld notification for review.
+
+In a test of the Wi-Fi dialog, the network name typed beside the password was captured. The
+password, hidden or shown, was not, not even in the database file.
 
 A keypad made of plain buttons, in an app with no password field (some banking and vault apps),
 is recorded tap by tap. Use test personas and test PINs only.
@@ -953,7 +974,9 @@ is recorded tap by tap. Use test personas and test PINs only.
 
 - **Other tools pause it.** Anything that drives the phone through UiAutomation (`uiautomator`,
   Puma and similar) pauses every accessibility service while it runs. Each pause shows up as a
-  disconnect and reconnect in the log and on the Capture pauses sheet.
+  disconnect and reconnect in the log and on the Capture pauses sheet. On the emulator each
+  `uiautomator dump` showed up as a `capture_service_disconnected` and `capture_service_connected`
+  pair.
 - **Some apps behave differently** when an accessibility service is on.
 - **Rules break** when an app changes its screens or runs in another language. Review catches it.
 - **Text still being typed when the app is killed is lost.** It is written when the field is left.
@@ -963,10 +986,14 @@ is recorded tap by tap. Use test personas and test PINs only.
   same post time, re-posted within 60 seconds is logged once.
 - **Code hiding is narrow.** See [Hide verification codes](#hide-verification-codes).
 - **Times are the device's clock.** That is what parsers report, so it is what KDL records. Each
-  row also carries the time zone, the time since boot, the boot count, and the system's last
+  row also carries the time zone, the time since boot, the boot count (from
+  `Settings.Global.BOOT_COUNT`), and the system's last
   network and GNSS time when the phone has them. KDL notices reboots and clock or time zone changes
   and logs them as their own rows. Clock and reboot detection were tried on the emulator; time zone
   detection is covered by unit tests only.
+- **KDL takes no video.** For full video, record from the computer over USB with
+  `scrcpy --record`, so nothing is written to the phone, and line it up with the log using the
+  network time column.
 - **This manual covers Android.** The iOS version is a separate app, in
   [known-data-logger-ios](https://github.com/abrignoni/known-data-logger-ios).
 
@@ -985,14 +1012,18 @@ KDL is part of the test, and an extraction of the phone will show it:
   was listed by `dumpsys activity permissions` and `/data/system/urigrants.xml` held KDL's package
   name. The folder's address is also in KDL's own `settings` table, under `export_tree`.
 
-KDL has no network permission and asks for no runtime permissions. Backup is off. The package name
+KDL has no network permission and asks for no runtime permissions. Its manifest has a `<queries>`
+element for launcher apps, so you can pick the apps under test. It has one accessibility service,
+which only the system can bind, and no receivers, providers or notifications. Backup is off
+(`allowBackup="false"`, and the backup and data extraction rules exclude everything). The package name
 is fixed, `com.abrignoni.knowndatalogger`, so you can filter KDL out of usage and recent-task
 artifacts.
 
 ### It is not the tool's answer
 
 KDL records what you did. It does not check what a forensic tool found. Compare the spreadsheet
-with the tool's output yourself. A checker script that reads both is planned.
+with the tool's output yourself, or let `kdl_check.py` grade it
+([section 14](#14-check-a-leapp-artifact-kdl_checkpy)).
 
 ## 12. Quick answers
 
@@ -1045,3 +1076,133 @@ On the Android 15 emulator (9 November 2026), clearing KDL's storage:
 - left the export folders in Documents as they were
 
 Opening KDL then started the first run again with empty fields. Turn capture back on at step 3.
+
+## 13. Where an app keeps it (kdl_locate.py)
+
+For an app no LEAPP parses yet. Give the locator the export, an extraction of the same phone
+(folder, zip or tar) and the app's package name:
+
+```bash
+python3 tools/kdl_locate.py --export kdl_scenario_phoneA_... --extraction phoneA.tar \
+    --package com.example.app -o locate.xlsx
+```
+
+It copies out every file the app owns (`data/data`, `data/user*/N`, `Android/data|media|obb`, and
+media that MediaStore lists as the app's), opens each store with its own reader and looks for each
+logged value and time. Readers: SQLite, including the earlier states a write-ahead log still holds
+(`sqlite_wal`), XML and JSON, MMKV (`mmkv_parser`), LevelDB and IndexedDB (`ccl`), plain text, and
+protobuf without a schema (every protobuf hit is marked as a guess). The readers are copied into
+`tools/vendor` from their upstream commits, and `vendored.json` records each file's hash.
+
+The workbook has:
+
+- a sheet of hits per entry: store, table, row, column, how the text matched, and any field of the
+  same row that reads as a time near the entry
+- a column profile per table: which column holds the text, which holds the time and in what
+  epoch, and which columns stay constant
+- a Time only sheet for entries with no text
+- the deletions, with what became of the deleted value
+- an inventory of every file with its hash
+- every store it could not read, with the reason
+- a Screen text sheet for 0.5.0 exports (see [View tree](#view-tree))
+
+Times are read as Unix seconds, milliseconds, microseconds and nanoseconds, Cocoa, WebKit and
+FILETIME, and as milliseconds since boot against the entry's `elapsed_ms`.
+
+What it does not do: it reads no SQLite freelist pages, freeblocks or rollback journals, has no
+reader for Android binary XML, and does not follow a time kept in another table joined by an id.
+A value it does not find may still be on the phone. It writes no LEAPP artifact. The workbook is
+evidence for a person writing one.
+
+Tried on an Android 15 emulator (9 November 2026) with Google Clock and Google Messages:
+
+- an alarm label, found in two tables
+- a world clock city that the app stores with an accent the tester did not type
+- a deleted alarm, reported as not found, with the database's freelist count
+- a running timer, listed on the Time only sheet by its wall clock and its since-boot time
+- the two text messages, with a candidate time column (`parts.timestamp`, Unix milliseconds)
+
+The hits named here were checked by opening the stores by hand. On the same image the LevelDB
+reader read the Google app's and Play services' LevelDB folders. The MMKV reader has run on test
+fixtures only, and the IndexedDB reader has not run on any store yet. Gzip files are listed as not
+read.
+
+## 14. Check a LEAPP artifact (kdl_check.py)
+
+```bash
+python3 tools/kdl_check.py --export kdl_scenario_phoneA_... --leapp-output phoneA=ALEAPP_Output_... \
+    [--artifact artifact_key --package com.example.app] -o check.xlsx
+```
+
+It reads the LEAPP output the way LEAPP writes it (`_lava_data.lava` and `_lava_artifacts.db`) and
+grades each labelled action against the artifacts named in its `expected_artifacts`, or against the
+artifacts given with `--artifact`. The grades:
+
+- found
+- found with a caveat: time only, time not checked, direction not stored, or weak match
+- ambiguous
+- mismatched: the text is there, but the time is outside the tolerance or the direction column
+  contradicts the log
+- missing
+- not gradable: no text and no datetime column, or an output from another core
+
+It adds coverage per artifact, the artifact rows inside a capture session that no entry accounts
+for, and, with two phones, each sent message paired with its received copy. Captured raw events
+are not graded.
+
+On an emulator run, ALEAPP's Google Messages artifact was graded found for both messages.
+
+## 15. Tested on
+
+KDL 0.3.0 and earlier builds were tried on an Android 15 emulator and on a Pixel 7a with Android 17
+(8 November 2026). On the Pixel, KDL was installed with `adb` into a separate user profile. The
+changes in 0.3.2, 0.4.0 and 0.5.0 were tried on the Android 15 emulator only (11 November 2026).
+An upgrade from 0.4.0 to 0.5.0 on that emulator, done during a session, kept the log, its mark and
+the hash chain, and the next mark got its view tree.
+
+On the Pixel:
+
+- Installing with `adb install --user` and turning the service on did not ask for "Allow
+  restricted settings". Installing the same APK from the Files app did (Android recorded it as a
+  local-file install), and Allow restricted settings in App info cleared it.
+- Sends in Google Messages (October 2026 build), an incoming call, a missed call, a MARK with its
+  screenshot, an export, the hash chain and the spreadsheet all worked.
+- Incoming texts showed only "New message" on the phone itself in that profile, and the log
+  recorded the same. Message content depends on the profile's notification settings.
+- With a test PIN set, the PIN never reached the log (not even in the database file's bytes), no
+  keypad taps or System UI rows were recorded while locked, and a text arriving while locked was
+  kept as a withheld notification for review.
+- Two texts that both showed only "New message." and arrived less than a minute apart while
+  unlocked were recorded as two notifications and two `received_message` entries.
+- The app icon's one-colour layer showed correctly with the launcher's themed (Minimal) icon style,
+  which this launcher applies to the home screen only.
+
+Other results are next to the feature they test, each with its date and device. Other phones and
+Android versions were not tried.
+
+## 16. Building and releasing
+
+It needs JDK 17 and the Android SDK with platform 37.2. Gradle finds the SDK through `sdk.dir` in
+`local.properties` (not committed) or the `ANDROID_HOME` variable.
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew testDebugUnitTest assembleDebug
+python3 -m unittest discover -s tools
+```
+
+The APK is in `app/build/outputs/apk/debug/`. Install it with `adb install`. The Python tests use
+fictional fixtures for every reader except IndexedDB.
+
+`./gradlew assembleRelease` signs with the release key when these four settings are in the
+builder's own `~/.gradle/gradle.properties` (never in the repository): `KDL_RELEASE_STORE_FILE`,
+`KDL_RELEASE_STORE_PASSWORD`, `KDL_RELEASE_KEY_ALIAS` and `KDL_RELEASE_KEY_PASSWORD`. Without them
+the build produces `app-release-unsigned.apk`. Updates only install over a copy signed with the same
+key, so keep the keystore and its password backed up. Debug builds are signed with a different key
+and are meant for `adb` installs.
+
+`.github/workflows/release.yml` runs the tests and a debug build when started by hand. On a `v*` tag
+it also builds the signed APK in the `release` environment (owner approval, `v*` tags only, the
+keystore and passwords stored as that environment's secrets), checks the version against the tag
+and the signer against the fingerprint in [Check the download](#check-the-download), and creates a
+draft release with `KDL-<version>.apk` and `SHA256SUMS`. Version 0.3.0 was built and signed on the
+author's computer. Later versions are built and signed by this workflow.
