@@ -29,7 +29,7 @@ Download `KDL-<version>.apk` and `SHA256SUMS` from
 it with adb:
 
 ```bash
-adb install KDL-0.5.0.apk
+adb install KDL-<version>.apk
 ```
 
 The manual has the signer check, the install from a file on the phone, and how to install into a
@@ -53,8 +53,8 @@ catches rows cut off the end.
 KDL ships rules for Google Messages and the AOSP Camera. For other apps, teach a rule from a capture
 in the app, or log by hand. Rules can be exported and shared.
 
-Two more scripts help with apps no LEAPP parses yet: `kdl_locate.py` looks for where an app
-stored what you logged, and `kdl_check.py` grades LEAPP output against the log.
+For an app no LEAPP parses yet, `kdl_locate.py` looks for where the app stored what you logged.
+For one a LEAPP does parse, `kdl_check.py` grades the LEAPP output against the log.
 
 ## Learn more
 

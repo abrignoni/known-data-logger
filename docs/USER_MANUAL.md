@@ -111,7 +111,7 @@ On the Pixel 7a with Android 17 (8 November 2026), an `adb install` did not trig
 "restricted settings" block. Other phones were not tried. Go on to the [first run](#3-first-run).
 
 The release key is registered with Google's Android developer verification for KDL's package name
-(9 November 2026). Google says verification expands globally in 2027 and does not cover installs
+(in the Android Developer Console, 9 November 2026). Google says verification expands globally in 2027 and does not cover installs
 from a file yet. Once it does, an unregistered app can only be installed through Android's
 "advanced flow" or with `adb`, so the registration keeps the release installable from a file.
 Apps installed with `adb` do not need verification at all.
