@@ -1,0 +1,1 @@
+KDL now logs a cleared field when an app empties its message field without reporting a text change, which is how apps built with Android views report a send. A rule can be taught from that row, as with Google Messages. A rule for Instagram sends ships with the app.

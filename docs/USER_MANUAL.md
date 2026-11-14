@@ -8,7 +8,7 @@ forensic tool can then check each action against what the tool reports.
 
 Author: Alexis Brignoni.
 
-This manual describes KDL 0.5.0, the v0.5.0 release on GitHub. Every screenshot comes from an
+This manual describes KDL 0.5.1, the v0.5.1 release on GitHub. Every screenshot comes from an
 Android 15 emulator (Google APIs image, API 35, 1080 x 2400, no Play Store) running a debug build of
 0.3.0 or of the code that became a later release, or the signed 0.5.0 release (Setup and the label
 form, 12 November 2026), with made-up test data: the
@@ -47,26 +47,26 @@ was America/New_York (UTC-05:00), so the times you see are local to that zone.
 - Python 3 with `openpyxl` to make the spreadsheet (`python3 -m pip install openpyxl`). The script,
   `tools/make_documentation.py`, is in the release's source code download and in the repository.
   The APK alone does not include it.
-- The APK: `KDL-0.5.0.apk` from the v0.5.0 release on GitHub, and the release's `SHA256SUMS` file.
+- The APK: `KDL-0.5.1.apk` from the v0.5.1 release on GitHub, and the release's `SHA256SUMS` file.
 
 ### Check the download
 
-Compare the APK's SHA-256 with the line for `KDL-0.5.0.apk` in `SHA256SUMS`. They must match.
+Compare the APK's SHA-256 with the line for `KDL-0.5.1.apk` in `SHA256SUMS`. They must match.
 
 ```bash
-shasum -a 256 KDL-0.5.0.apk
+shasum -a 256 KDL-0.5.1.apk
 ```
 
-On Linux, `sha256sum KDL-0.5.0.apk` works too. On Windows:
+On Linux, `sha256sum KDL-0.5.1.apk` works too. On Windows:
 
 ```
-certutil -hashfile KDL-0.5.0.apk SHA256
+certutil -hashfile KDL-0.5.1.apk SHA256
 ```
 
 You can also check who signed it. `apksigner` comes with the Android SDK build tools:
 
 ```bash
-apksigner verify --print-certs KDL-0.5.0.apk
+apksigner verify --print-certs KDL-0.5.1.apk
 ```
 
 The line `Signer #1 certificate SHA-256 digest:` must read
@@ -97,14 +97,14 @@ Other phones and versions have not been tried. [Section 15](#15-tested-on) lists
 Connect the phone with USB debugging on and run:
 
 ```bash
-adb install KDL-0.5.0.apk
+adb install KDL-0.5.1.apk
 ```
 
 On a phone with more than one user profile, install into the test profile only. For example, for
 user 10:
 
 ```bash
-adb install --user 10 KDL-0.5.0.apk
+adb install --user 10 KDL-0.5.1.apk
 ```
 
 On the Pixel 7a with Android 17 (8 November 2026), an `adb install` did not trigger Android's
@@ -292,7 +292,7 @@ In the apps under test, System UI and Settings, while the phone is unlocked:
   change. Apps built with Jetpack
   Compose (Google Messages, for example) report no tap on their Send button, so a cleared
   message field is how KDL sees a send.
-  In builds after 0.5.0, a field that KDL holds typed text for and then finds empty, with no text
+  From 0.5.1, a field that KDL holds typed text for and then finds empty, with no text
   change reported, is logged as a cleared field too. The row's detail ends with
   `no text change reported`. Apps built with Android views do this when they replace the field's
   text on a send: Android reports that as a content change and a selection change (`setText` in
@@ -459,7 +459,7 @@ The code in the second received message reads `[code withheld]`. That is the
     `messages.android_20240528_00_RC01` on an Android 15 emulator.
   - AOSP Camera: a tap on the shutter button becomes `took_photo`. Checked against Camera 2.0.002
     on an Android 15 emulator.
-  - Instagram (builds after 0.5.0): the message field found empty after a send becomes
+  - Instagram (from 0.5.1): the message field found empty after a send becomes
     `sent_message`, with the typed text as its content. A rule taught with the same app, event and
     view id inferred a send in Instagram 455.0.0.51.72 on a Pixel 7a with Android 17
     (14 November 2026).
@@ -1000,7 +1000,7 @@ is recorded tap by tap. Use test personas and test PINs only.
   keystroke, then at the send no click and no text change. Instagram reported the send as an
   announcement reading "Message sent" and a selection change on the field, which then showed its
   hint. KDL 0.5.0 does not listen for either kind of event. Use MARK or log the send by hand.
-  Builds after 0.5.0 listen for the selection change and log the cleared field (see
+  From 0.5.1, KDL listens for the selection change and logs the cleared field (see
   [What gets captured](#what-gets-captured)), so a rule can be taught from it. That was tried on an
   Android 15 emulator (14 November 2026) with Fossify Messages 1.10.2, an app built with Android
   views. On the Pixel 7a the same day, a test build gave a cleared-field row for an Instagram send
@@ -1070,7 +1070,7 @@ It shows only during a session, and never over KDL itself.
 
 ### A send in my app was not inferred
 
-KDL ships rules for Google Messages and the AOSP Camera, and after 0.5.0 for Instagram. Find the tap or cleared field in the
+KDL ships rules for Google Messages and the AOSP Camera, and from 0.5.1 for Instagram. Find the tap or cleared field in the
 Timeline (show captured events) and [teach a rule](#teach-a-rule), or use MARK and label it. If the
 Timeline shows neither for that send, the app reported none (see [It has limits](#it-has-limits)),
 so MARK or a hand-logged entry is the way.
@@ -1211,8 +1211,8 @@ session of 16 captured events. Typed text was logged for each of five sends. No 
 and messages received with the conversation open were not logged. Both are described under
 [It has limits](#it-has-limits).
 
-The cleared field logged without a text change (builds after 0.5.0) was tried on the Android 15
-emulator (14 November 2026):
+The cleared field logged without a text change (from 0.5.1) was tried on the Android 15 emulator
+(14 November 2026), with a debug build of that code:
 
 - Three sends in Fossify Messages 1.10.2 each gave a cleared-field row with the typed text, marked
   `no text change reported`.

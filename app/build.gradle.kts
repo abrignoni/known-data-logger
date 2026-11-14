@@ -13,8 +13,8 @@ android {
         applicationId = "com.abrignoni.knowndatalogger"
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
-        versionName = "0.5.0"
+        versionCode = 8
+        versionName = "0.5.1"
     }
 
     // Release signing reads the keystore from the builder's own ~/.gradle/gradle.properties, never
