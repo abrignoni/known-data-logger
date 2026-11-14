@@ -978,6 +978,16 @@ is recorded tap by tap. Use test personas and test PINs only.
   `uiautomator dump` showed up as a `capture_service_disconnected` and `capture_service_connected`
   pair.
 - **Some apps behave differently** when an accessibility service is on.
+- **A message that arrives while its conversation is open can leave no row.** KDL takes received
+  messages from notifications. In a test with Instagram 455.0.0.51.72 on a Pixel 7a with Android 17
+  (13 November 2026), seven of eight received items came in with the conversation on screen. They
+  posted no notification and left no row. The eighth, a shared reel, posted one and was logged.
+  Tap MARK when a message arrives and label it afterwards.
+- **Some sends report neither a tap nor a cleared field.** In the same test, five sends left the
+  typed text in the log and nothing else: no tap on a send button and no cleared field. With
+  neither, KDL cannot infer the send, and there is nothing to teach a rule from. The text was
+  typed and the send button tapped with `adb shell input`. Typing by hand was not tried. Use MARK
+  or log the send by hand.
 - **Rules break** when an app changes its screens or runs in another language. Review catches it.
 - **Text still being typed when the app is killed is lost.** It is written when the field is left.
 - **Screen titles are the window's title only.** System UI also reports the whole notification
@@ -1044,7 +1054,9 @@ It shows only during a session, and never over KDL itself.
 ### A send in my app was not inferred
 
 KDL ships rules for Google Messages and the AOSP Camera only. Find the tap or cleared field in the
-Timeline (show captured events) and [teach a rule](#teach-a-rule), or use MARK and label it.
+Timeline (show captured events) and [teach a rule](#teach-a-rule), or use MARK and label it. If the
+Timeline shows neither for that send, the app reported none (see [It has limits](#it-has-limits)),
+so MARK or a hand-logged entry is the way.
 
 ### Times in the spreadsheet differ from my watch
 
@@ -1176,6 +1188,11 @@ On the Pixel:
   unlocked were recorded as two notifications and two `received_message` entries.
 - The app icon's one-colour layer showed correctly with the launcher's themed (Minimal) icon style,
   which this launcher applies to the home screen only.
+
+KDL 0.5.0 was tried on the same Pixel with Instagram 455.0.0.51.72 (13 November 2026), in one
+session of 16 captured events. Typed text was logged for each of five sends. No send was inferred,
+and messages received with the conversation open were not logged. Both are described under
+[It has limits](#it-has-limits).
 
 Other results are next to the feature they test, each with its date and device. Other phones and
 Android versions were not tried.
