@@ -986,8 +986,11 @@ is recorded tap by tap. Use test personas and test PINs only.
 - **Some sends report neither a tap nor a cleared field.** In the same test, five sends left the
   typed text in the log and nothing else: no tap on a send button and no cleared field. With
   neither, KDL cannot infer the send, and there is nothing to teach a rule from. The text was
-  typed and the send button tapped with `adb shell input`. Typing by hand was not tried. Use MARK
-  or log the send by hand.
+  typed and the send button tapped with `adb shell input`. One send typed by hand (14 November
+  2026), watched with `adb shell uiautomator events`, reported the same: a text change for each
+  keystroke, then at the send no click and no text change. Instagram reported the send as an
+  announcement reading "Message sent" and a selection change on the field, which then showed its
+  hint. KDL does not listen for either kind of event. Use MARK or log the send by hand.
 - **Rules break** when an app changes its screens or runs in another language. Review catches it.
 - **Text still being typed when the app is killed is lost.** It is written when the field is left.
 - **Screen titles are the window's title only.** System UI also reports the whole notification
