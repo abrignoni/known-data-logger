@@ -169,11 +169,11 @@ Capture runs only between Start session and Stop session, both logged. A package
   `field_cleared`, by package plus view id and/or a label regex. `field_cleared` means one text
   change removed all of a field's text (two or more characters); it is the signal for sends in
   Jetpack Compose apps, which report no tap events (seen with Google Messages on the emulator).
-  After 0.5.0 it is also logged when a selection change finds a field empty, or showing its hint,
+  From 0.5.1 it is also logged when a selection change finds a field empty, or showing its hint,
   while two or more typed characters are still pending for that field; the detail then ends
   with `no text change reported` (seen with Fossify Messages on the emulator).
   Rules are data files, so they can change without a new APK. Shipped rules: Google Messages
-  send (field_cleared) and AOSP Camera shutter (tap), each checked on the emulator, and after 0.5.0
+  send (field_cleared) and AOSP Camera shutter (tap), each checked on the emulator, and from 0.5.1
   Instagram send (field_cleared), from a rule taught on a Pixel 7a.
 - The review list (Timeline, To review) holds marks without a label, auto labels nobody has
   accepted and stamped entries with no action. Raw events are under Everything and can be

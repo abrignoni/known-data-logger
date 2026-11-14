@@ -50,7 +50,7 @@ turns it into a workbook with a sheet per app. Every row is hashed with the one 
 changed or removed row breaks the chain. Write down the latest row hash from the Setup tab: it
 catches rows cut off the end.
 
-KDL ships rules for Google Messages and the AOSP Camera, and after 0.5.0 for Instagram. For other
+KDL ships rules for Google Messages and the AOSP Camera, and from 0.5.1 for Instagram. For other
 apps, teach a rule from a capture in the app, or log by hand. Rules can be exported and shared.
 
 For an app no LEAPP parses yet, `kdl_locate.py` looks for where the app stored what you logged.
