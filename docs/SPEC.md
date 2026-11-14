@@ -173,7 +173,8 @@ Capture runs only between Start session and Stop session, both logged. A package
   while two or more typed characters are still pending for that field; the detail then ends
   with `no text change reported` (seen with Fossify Messages on the emulator).
   Rules are data files, so they can change without a new APK. Shipped rules: Google Messages
-  send (field_cleared) and AOSP Camera shutter (tap), each checked on the emulator.
+  send (field_cleared) and AOSP Camera shutter (tap), each checked on the emulator, and after 0.5.0
+  Instagram send (field_cleared), from a rule taught on a Pixel 7a.
 - The review list (Timeline, To review) holds marks without a label, auto labels nobody has
   accepted and stamped entries with no action. Raw events are under Everything and can be
   labelled from there. Accepted labels are normal `action` rows with `refers_to` pointing at the
