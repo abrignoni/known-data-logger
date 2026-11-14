@@ -453,12 +453,16 @@ The code in the second received message reads `[code withheld]`. That is the
 
 ### Where inferred actions come from
 
-- **Rules** (see [Rules](#rules)). The app ships two:
+- **Rules** (see [Rules](#rules)). The app ships three:
   - Google Messages: the message field cleared in one change becomes `sent_message`, with the
     text that was in the field as its content. Checked against Messages
     `messages.android_20240528_00_RC01` on an Android 15 emulator.
   - AOSP Camera: a tap on the shutter button becomes `took_photo`. Checked against Camera 2.0.002
     on an Android 15 emulator.
+  - Instagram (builds after 0.5.0): the message field found empty after a send becomes
+    `sent_message`, with the typed text as its content. A rule taught with the same app, event and
+    view id inferred a send in Instagram 455.0.0.51.72 on a Pixel 7a with Android 17
+    (14 November 2026).
 
   The shipped rules are in `app/src/main/assets/rules/` in the repository.
 - **Notifications** from the apps under test, by the category the app gave the notification:
@@ -999,7 +1003,8 @@ is recorded tap by tap. Use test personas and test PINs only.
   Builds after 0.5.0 listen for the selection change and log the cleared field (see
   [What gets captured](#what-gets-captured)), so a rule can be taught from it. That was tried on an
   Android 15 emulator (14 November 2026) with Fossify Messages 1.10.2, an app built with Android
-  views. It has not been tried with Instagram yet.
+  views. On the Pixel 7a the same day, a test build gave a cleared-field row for an Instagram send
+  typed by hand, and a rule taught from that row inferred the next send.
 - **Rules break** when an app changes its screens or runs in another language. Review catches it.
 - **Text still being typed when the app is killed is lost.** It is written when the field is left.
 - **Screen titles are the window's title only.** System UI also reports the whole notification
@@ -1065,7 +1070,7 @@ It shows only during a session, and never over KDL itself.
 
 ### A send in my app was not inferred
 
-KDL ships rules for Google Messages and the AOSP Camera only. Find the tap or cleared field in the
+KDL ships rules for Google Messages and the AOSP Camera, and after 0.5.0 for Instagram. Find the tap or cleared field in the
 Timeline (show captured events) and [teach a rule](#teach-a-rule), or use MARK and label it. If the
 Timeline shows neither for that send, the app reported none (see [It has limits](#it-has-limits)),
 so MARK or a hand-logged entry is the way.
@@ -1217,6 +1222,16 @@ emulator (14 November 2026):
   one, from its text change, as before.
 - A password typed, cleared and typed again in the Settings Add network screen was in neither the
   live copy nor the database file. The network name typed beside it was in both.
+
+It was also tried on the Pixel 7a with Android 17 and Instagram 455.0.0.51.72 (14 November 2026),
+with a test build installed beside 0.5.0:
+
+- A send typed by hand gave a typed-text row and a cleared-field row marked
+  `no text change reported`.
+- A rule taught from that row inferred the next send as a sent message with its text, a screenshot
+  and a view tree. That send was typed and sent with `adb shell input`.
+- The Instagram rule the app ships has the same app, event and view id as the taught one. The
+  shipped rule itself has not run on a phone.
 
 Other results are next to the feature they test, each with its date and device. Other phones and
 Android versions were not tried.

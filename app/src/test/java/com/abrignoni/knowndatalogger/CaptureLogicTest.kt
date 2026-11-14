@@ -169,6 +169,16 @@ class CaptureLogicTest {
         assertNull(b.clearedWithoutChange("k2", true))
     }
 
+    @Test fun shippedRulesParseAndTheInstagramSendMatchesItsField() {
+        val shipped = parseRules(java.io.File("src/main/assets/rules/default.json").readText())
+        assertEquals(listOf("google_messages_send", "aosp_camera_shutter", "instagram_send"), shipped.map { it.id })
+        val field = "com.instagram.android:id/row_thread_composer_edittext"
+        val hit = Rules.match(shipped, "com.instagram.android", RuleEvent.FIELD_CLEARED, field, null)
+        assertEquals("sent_message", hit?.action); assertEquals("last_typed", hit?.content)
+        assertNull(Rules.match(shipped, "com.instagram.android", RuleEvent.TAP, field, null))
+        assertNull(Rules.match(shipped, "com.instagram.android", RuleEvent.FIELD_CLEARED, "com.instagram.android:id/search", null))
+    }
+
     @Test fun emptyTextIsNotFlushed() {
         val b = TextBuffer()
         b.update("p", "a", "k1", "", false)

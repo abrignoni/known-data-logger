@@ -20,6 +20,16 @@
       "action": "took_photo",
       "content": null,
       "verified_with": "Camera 2.0.002 on an Android 15 emulator, 2026-11-08"
+    },
+    {
+      "id": "instagram_send",
+      "package": "com.instagram.android",
+      "event": "field_cleared",
+      "view_id": "com.instagram.android:id/row_thread_composer_edittext",
+      "label_regex": null,
+      "action": "sent_message",
+      "content": "last_typed",
+      "verified_with": "Instagram 455.0.0.51.72 on a Pixel 7a with Android 17, 2026-11-14, through a rule taught there with this package, event and view id. The Send button reports no tap and the field no text change; the field found empty at a selection change is the signal, so this needs a build after 0.5.0."
     }
   ]
 }
