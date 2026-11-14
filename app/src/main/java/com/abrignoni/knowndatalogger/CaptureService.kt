@@ -186,6 +186,7 @@ class CaptureService : AccessibilityService() {
         if (getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true) return
         when (event.eventType) {
             AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> onText(event, pkg)
+            AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED -> onSelection(event, pkg)
             AccessibilityEvent.TYPE_VIEW_FOCUSED -> flushText()
             AccessibilityEvent.TYPE_VIEW_CLICKED -> onTap(event, pkg)
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> onScreen(event, pkg)
@@ -227,6 +228,25 @@ class CaptureService : AccessibilityService() {
         // An empty field reports its hint as its text; record it as empty.
         val value = if (src?.isShowingHintText == true) "" else event.text?.joinToString("")
         text.update(pkg, viewId, key, value, false, repo.stamp())?.let { writeTyped(it) }
+    }
+
+    /**
+     * A send in a view-based app often replaces the field's text in one call. Android reports that
+     * as a selection change with no text change, so the clear is read from the field itself.
+     */
+    private fun onSelection(event: AccessibilityEvent, pkg: String) {
+        if (!text.hasPending()) return
+        val src = event.source ?: return
+        val viewId = src.viewIdResourceName
+        val stableKey = "$pkg|${viewId ?: event.className}"
+        if (stableKey in secretKeys || isSecret(event, src)) return
+        val empty = src.isShowingHintText || src.text.isNullOrEmpty()
+        val typed = text.clearedWithoutChange("$stableKey|${src.hashCode()}", empty) ?: return
+        writeTyped(typed)
+        val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.FIELD_CLEARED, content = typed.text,
+            detail = listOfNotNull(viewId?.let { "view $it" }, "no text change reported").joinToString(", "),
+            source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
+        applyRule(pkg, RuleEvent.FIELD_CLEARED, viewId, null, raw, typed.text)
     }
 
     private fun flushText() { text.flush()?.let { writeTyped(it) } }

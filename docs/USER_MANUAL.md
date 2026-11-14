@@ -292,6 +292,11 @@ In the apps under test, System UI and Settings, while the phone is unlocked:
   change. Apps built with Jetpack
   Compose (Google Messages, for example) report no tap on their Send button, so a cleared
   message field is how KDL sees a send.
+  In builds after 0.5.0, a field that KDL holds typed text for and then finds empty, with no text
+  change reported, is logged as a cleared field too. The row's detail ends with
+  `no text change reported`. Apps built with Android views do this when they replace the field's
+  text on a send: Android reports that as a content change and a selection change (`setText` in
+  Android 15's `TextView`), not as a text change.
 - **notifications** from the apps under test, with title (usually the sender) and text, even
   while the phone is locked
 - **app changes** during the session: an app under test installed, updated, removed or with its
@@ -990,7 +995,11 @@ is recorded tap by tap. Use test personas and test PINs only.
   2026), watched with `adb shell uiautomator events`, reported the same: a text change for each
   keystroke, then at the send no click and no text change. Instagram reported the send as an
   announcement reading "Message sent" and a selection change on the field, which then showed its
-  hint. KDL does not listen for either kind of event. Use MARK or log the send by hand.
+  hint. KDL 0.5.0 does not listen for either kind of event. Use MARK or log the send by hand.
+  Builds after 0.5.0 listen for the selection change and log the cleared field (see
+  [What gets captured](#what-gets-captured)), so a rule can be taught from it. That was tried on an
+  Android 15 emulator (14 November 2026) with Fossify Messages 1.10.2, an app built with Android
+  views. It has not been tried with Instagram yet.
 - **Rules break** when an app changes its screens or runs in another language. Review catches it.
 - **Text still being typed when the app is killed is lost.** It is written when the field is left.
 - **Screen titles are the window's title only.** System UI also reports the whole notification
@@ -1196,6 +1205,18 @@ KDL 0.5.0 was tried on the same Pixel with Instagram 455.0.0.51.72 (13 November 
 session of 16 captured events. Typed text was logged for each of five sends. No send was inferred,
 and messages received with the conversation open were not logged. Both are described under
 [It has limits](#it-has-limits).
+
+The cleared field logged without a text change (builds after 0.5.0) was tried on the Android 15
+emulator (14 November 2026):
+
+- Three sends in Fossify Messages 1.10.2 each gave a cleared-field row with the typed text, marked
+  `no text change reported`.
+- A rule taught from one of those rows inferred the next send as a sent message with its text.
+- A send in Google Messages gave one cleared-field row and one inferred send, as before.
+- Text deleted key by key gave no cleared-field row. Text selected and deleted in one step gave
+  one, from its text change, as before.
+- A password typed, cleared and typed again in the Settings Add network screen was in neither the
+  live copy nor the database file. The network name typed beside it was in both.
 
 Other results are next to the feature they test, each with its date and device. Other phones and
 Android versions were not tried.

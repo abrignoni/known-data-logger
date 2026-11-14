@@ -106,7 +106,11 @@ fun sourceEventFor(mark: Entry, rows: List<Entry>): Entry? =
             it.stamp.elapsedMs <= mark.stamp.elapsedMs && mark.stamp.elapsedMs - it.stamp.elapsedMs <= 30_000
     }.maxWithOrNull(Timeline.ORDER)
 
-/** Events a rule can match. Compose apps report no tap events, so their sends match FIELD_CLEARED. */
+/**
+ * Events a rule can match. Compose apps report no tap events, so their sends match FIELD_CLEARED.
+ * A cleared field is logged from a text change that removes everything, or from a selection change
+ * that finds the field empty while typed text is pending (see TextBuffer.clearedWithoutChange).
+ */
 object RuleEvent {
     const val TAP = "tap"
     const val FIELD_CLEARED = "field_cleared"
@@ -421,6 +425,21 @@ class TextBuffer {
         key = null; text = null; pkg = null; viewId = null; stamp = null
         if (t.isNullOrEmpty() || p == null) return null
         return Typed(p, v, t, st).also { lastFlushed = it }
+    }
+
+    /** True while typed text is waiting to be written. */
+    fun hasPending(): Boolean = !text.isNullOrEmpty()
+
+    /**
+     * The field that holds the pending text now reads empty and no text change said so. A view-based
+     * app that replaces a field's text (TextView.setText) is reported by Android as a content change
+     * and a selection change, not as a text change. Returns what was typed and drops it; null when
+     * the field is another one, is not empty, or held fewer than two characters (as isBulkClear).
+     */
+    fun clearedWithoutChange(fieldKey: String, nowEmpty: Boolean): Typed? {
+        val t = text
+        if (!nowEmpty || key != fieldKey || t == null || t.length < 2) return null
+        return flush()
     }
 
     /** Drops anything pending without recording it (used when a field turns out to be a password). */
