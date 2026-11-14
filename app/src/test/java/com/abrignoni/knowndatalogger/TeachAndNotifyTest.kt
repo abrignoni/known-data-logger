@@ -39,6 +39,8 @@ class TeachAndNotifyTest {
     @Test fun viewIdIsReadFromDetail() {
         assertEquals("com.chat:id/send", viewIdOf(ev("a", AutoAction.TAP, 1, detail = "view com.chat:id/send, class android.widget.Button")))
         assertEquals("Compose:Draft:Send", viewIdOf(ev("b", AutoAction.FIELD_CLEARED, 1, detail = "view Compose:Draft:Send")))
+        assertEquals("com.chat:id/composer", viewIdOf(ev("e", AutoAction.FIELD_CLEARED, 1, detail = "view com.chat:id/composer, no text change reported")))
+        assertNull(viewIdOf(ev("f", AutoAction.FIELD_CLEARED, 1, detail = "no text change reported")))
         assertNull(viewIdOf(ev("c", AutoAction.TAP, 1, detail = "class android.view.View")))
         assertNull(viewIdOf(ev("d", AutoAction.TAP, 1, detail = "label withheld: a password field had focus")))
     }

@@ -128,6 +128,47 @@ class CaptureLogicTest {
         assertEquals("first", b.update("p", "b", "k2", "s", false)?.text)
     }
 
+    @Test fun fieldEmptiedWithoutATextChangeGivesWhatWasTyped() {
+        val b = TextBuffer()
+        val at = s.copy(elapsedMs = 700)
+        b.update("chat", "composer", "k1", "see you at six", false, at)
+        assertTrue(b.hasPending())
+        assertNull(b.clearedWithoutChange("k1", false))          // cursor moved, text still there
+        assertNull(b.clearedWithoutChange("k2", true))           // another field is empty
+        assertEquals(Typed("chat", "composer", "see you at six", at), b.clearedWithoutChange("k1", true))
+        assertFalse(b.hasPending())
+        assertNull(b.clearedWithoutChange("k1", true))           // reported once
+        assertNull(b.flush())                                    // nothing left to write twice
+        assertEquals("see you at six", b.currentOrLast("chat"))
+    }
+
+    @Test fun emptiedFieldNeedsTwoCharactersLikeABulkClear() {
+        val b = TextBuffer()
+        b.update("p", "f", "k1", "a", false)
+        assertNull(b.clearedWithoutChange("k1", true))
+        assertEquals("a", b.flush()?.text)                       // still written as typed text
+    }
+
+    @Test fun emptiedFieldAfterATextChangeSaidSoIsNotReportedAgain() {
+        val b = TextBuffer()
+        b.update("p", "f", "k1", "hello", false)
+        b.flush()                                                // what a bulk clear does first
+        assertNull(b.clearedWithoutChange("k1", true))
+        b.update("p", "f", "k1", "hello", false)
+        b.update("p", "f", "k1", "", false)                      // deleted key by key
+        assertFalse(b.hasPending())
+        assertNull(b.clearedWithoutChange("k1", true))
+    }
+
+    @Test fun passwordTextNeverReachesTheEmptiedFieldPath() {
+        val b = TextBuffer()
+        b.update("p", "pw", "k1", "hunter22", true)
+        assertFalse(b.hasPending())
+        assertNull(b.clearedWithoutChange("k1", true))
+        b.update("p", "f", "k2", "1234", false); b.discard()
+        assertNull(b.clearedWithoutChange("k2", true))
+    }
+
     @Test fun emptyTextIsNotFlushed() {
         val b = TextBuffer()
         b.update("p", "a", "k1", "", false)
