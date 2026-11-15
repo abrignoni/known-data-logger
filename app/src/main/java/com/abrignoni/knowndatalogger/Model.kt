@@ -39,6 +39,8 @@ object AutoAction {
     const val FIELD_CLEARED = "field_cleared"
     /** A notification posted by an app under test (incoming message, call, missed call, other). */
     const val NOTIFICATION = "notification"
+    /** A line of text that came onto a screen already open in an app under test (ChatWatch). */
+    const val TEXT_APPEARED = "text_appeared"
 }
 
 /**

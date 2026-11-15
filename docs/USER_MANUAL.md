@@ -477,8 +477,26 @@ emulator console.
 Notifications in any other category (for example "Messages is doing work in the background") are
 kept as raw events and show up on the Captured events sheet, but no action is inferred from them.
 
-When **Screenshot inferred actions** is on, a rule match also takes a screenshot. Actions inferred
-from notifications have no screenshot.
+- **Messages arriving in an open chat.** An app often posts no notification for a message that
+  arrives while you are looking at that chat. Messenger posted almost none, on a Galaxy A16 5G and a
+  moto g play (Android 16, 15 November 2026): with only notifications, 1 of 15 received messages
+  was logged on each phone. So KDL also watches the open screen of each app under test. Opening a screen
+  logs nothing. After that, a line of text that comes onto the screen is logged as
+  `text_appeared`, with its side of the screen. A line on the left becomes `received_message`, for
+  you to check, unless it is a text this phone just sent or a notification just gave. Lines that
+  come in above everything already on the screen are left out: that is a scroll revealing older
+  messages, not a message arriving. Only view text counts, not buttons or descriptions, so the
+  message box's buttons and "is typing" do not. In the same chat with both phones in it, all 5
+  received messages were logged on each phone, none twice and none that was not a received
+  message, also after scrolling up and back (one of the 5 on the moto came from a notification, and
+  the screen did not log it again). A message that arrives while the chat is scrolled up, away
+  from its newest message, is not on the screen, so it cannot be logged this way; that case was not
+  tried. Each session also logs `screen_watch_active` when
+  the watch first looks at a screen, and `screen_watch_summary` at the end (looks, new screens,
+  new lines), so an export shows whether it ran.
+
+When **Screenshot inferred actions** is on, a rule match also takes a screenshot, and so does a
+`received_message` from an open chat. Actions inferred from notifications have no screenshot.
 
 ### Locked notifications
 

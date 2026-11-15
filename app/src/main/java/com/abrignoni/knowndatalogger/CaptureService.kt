@@ -88,6 +88,17 @@ class CaptureService : AccessibilityService() {
      * are still two notifications.
      */
     private val seenNotifications = LinkedHashMap<String, Long>()
+    /** Text arriving on a screen that is already open (an incoming message in an open chat). */
+    private val chatWatch = ChatWatch()
+    /** What this phone sent or was notified of lately (text to elapsed ms), so a line on screen is not taken for a new receive. */
+    private val recentOwn = LinkedHashMap<String, Long>()
+    private val recentNotified = LinkedHashMap<String, Long>()
+    private val scan = Runnable { scanOpenScreen() }
+    /** For the session's summary row: how often the open screen was looked at, started again, and gave new lines. */
+    private var watchLooks = 0
+    private var watchBaselines = 0
+    private var watchFound = 0
+    private var watchLastKey: Any? = null
     private var maskCodes = true
     /** Version of each captured app when the session started or last changed. */
     private val versions = HashMap<String, String?>()
@@ -110,6 +121,10 @@ class CaptureService : AccessibilityService() {
         rules = repo.loadRules()
         secretKeys.clear()
         seenNotifications.clear()
+        if (!active && watchLooks > 0) repo.log(Draft(action = "screen_watch_summary", source = Source.SYSTEM,
+            detail = "looks $watchLooks, baselines $watchBaselines, new lines $watchFound"), kind = Kind.SYSTEM_EVENT)
+        chatWatch.reset(); recentOwn.clear(); recentNotified.clear()
+        watchLooks = 0; watchBaselines = 0; watchFound = 0; watchLastKey = null
         maskCodes = repo.flag(Repo.KEY_MASK_CODES, true)
         if (active) { showMark(); startPackageWatch() } else { flushText(); removeMark(); stopPackageWatch() }
     }
@@ -190,6 +205,8 @@ class CaptureService : AccessibilityService() {
             AccessibilityEvent.TYPE_VIEW_FOCUSED -> flushText()
             AccessibilityEvent.TYPE_VIEW_CLICKED -> onTap(event, pkg)
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> onScreen(event, pkg)
+            // Content changes come in bursts; one look after they settle.
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> if (pkg in listed) { main.removeCallbacks(scan); main.postDelayed(scan, 600) }
         }
     }
 
@@ -220,6 +237,7 @@ class CaptureService : AccessibilityService() {
         if (Rules.isBulkClear(before, event.addedCount, event.removedCount)) {
             // The field went from text to empty in one change: record what was there, then the clear.
             flushText()
+            remember(recentOwn, before)
             val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.FIELD_CLEARED, content = before,
                 detail = viewId?.let { "view $it" }, source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
             applyRule(pkg, RuleEvent.FIELD_CLEARED, viewId, null, raw, before)
@@ -243,6 +261,7 @@ class CaptureService : AccessibilityService() {
         val empty = src.isShowingHintText || src.text.isNullOrEmpty()
         val typed = text.clearedWithoutChange("$stableKey|${src.hashCode()}", empty) ?: return
         writeTyped(typed)
+        remember(recentOwn, typed.text)
         val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.FIELD_CLEARED, content = typed.text,
             detail = listOfNotNull(viewId?.let { "view $it" }, "no text change reported").joinToString(", "),
             source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
@@ -365,6 +384,7 @@ class CaptureService : AccessibilityService() {
         if (last != null && now - last < 60_000) return
         seenNotifications.remove(key); seenNotifications[key] = now
         if (seenNotifications.size > 100) seenNotifications.remove(seenNotifications.keys.first())
+        remember(recentNotified, body)
         val (shown, masked) = if (maskCodes) NotificationMap.maskCodes(body) else body to false
         body = shown
         val detail = "category ${category ?: "none"}" + (callType?.let { ", call type $it" } ?: "") +
@@ -375,6 +395,66 @@ class CaptureService : AccessibilityService() {
         repo.log(Draft(appPackage = pkg, action = action, content = body, counterpart = title, direction = "in",
             refersTo = raw.entryId, detail = "auto: notification category $category", source = Source.AUTO_RULE,
             reviewed = false), stamp = raw.stamp, detect = false)
+    }
+
+    private fun remember(map: LinkedHashMap<String, Long>, t: String?) {
+        val s = t?.trim()?.takeIf { it.isNotEmpty() } ?: return
+        map.remove(s); map[s] = android.os.SystemClock.elapsedRealtime()
+        while (map.size > 50) map.remove(map.keys.first())
+    }
+
+    /** True when the line holds a text this phone sent or was notified of in the last 2 minutes. */
+    private fun recentlyIn(map: Map<String, Long>, line: String): Boolean {
+        val now = android.os.SystemClock.elapsedRealtime()
+        return map.any { (t, at) -> now - at < 120_000 && line.contains(t) }
+    }
+
+    /**
+     * Looks at the open screen of an app under test and logs text that came onto it (ChatWatch). Each new
+     * line is a raw text_appeared event with its side of the screen; a line on the left, not one this phone
+     * just sent or was notified of, also gets a received_message label for review. Never while locked,
+     * never System UI, never an editable field or a password field.
+     */
+    private fun scanOpenScreen() {
+        if (!active || kdlInFront) return
+        if (getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true) return
+        val root = try { rootInActiveWindow } catch (e: Exception) { null } ?: return
+        val pkg = root.packageName?.toString() ?: return
+        if (pkg == SYSTEM_UI || pkg !in listed || !wanted(pkg)) return
+        val win = android.graphics.Rect().also { root.getBoundsInScreen(it) }
+        val lines = ArrayList<ShownText>()
+        fun walk(n: AccessibilityNodeInfo, depth: Int) {
+            if (depth > 60 || lines.size > 400) return
+            if (n.isEditable || isSecret(null, n)) return
+            // View text only: buttons, avatars and "is typing" carry a description and no text, and they come
+            // and go as the examiner types (Messenger, 15 November 2026: 7 of 7 false labels were those).
+            val cls = n.className?.toString() ?: ""
+            val t = if (cls.endsWith("Button")) null else n.text?.toString()?.trim()
+            if (!t.isNullOrEmpty() && n.isVisibleToUser) {
+                val r = android.graphics.Rect().also { n.getBoundsInScreen(it) }
+                if (r.width() > 0 && r.height() > 0) lines += ShownText(t, r.left, r.top, r.right, r.bottom)
+            }
+            for (i in 0 until n.childCount) n.getChild(i)?.let { walk(it, depth + 1) }
+        }
+        try { walk(root, 0) } catch (e: Exception) { return }
+        val key = lastScreen ?: (pkg to "")
+        if (watchLooks == 0) repo.log(Draft(appPackage = pkg, action = "screen_watch_active", source = Source.SYSTEM,
+            detail = "${lines.size} lines on the first look"), kind = Kind.SYSTEM_EVENT)
+        watchLooks++
+        if (key != watchLastKey) { watchBaselines++; watchLastKey = key }
+        val found = chatWatch.look(key, lines, win.width())
+        watchFound += found.size
+        for (a in found) {
+            if (recentlyIn(recentOwn, a.text)) continue
+            val shown = masked(a.text.take(2000))
+            val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.TEXT_APPEARED, content = shown,
+                detail = "side ${a.side}", source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
+            if (a.side != "left" || recentlyIn(recentNotified, a.text)) continue
+            val labelled = repo.log(Draft(appPackage = pkg, action = "received_message", content = shown, direction = "in",
+                refersTo = raw.entryId, detail = "auto: text appeared on the left of an open screen", source = Source.AUTO_RULE,
+                reviewed = false), stamp = raw.stamp, detect = false).last()
+            if (shotAuto) screenshot(labelled.entryId)
+        }
     }
 
     /** Mark button tap: stamp the moment, then screenshot it. */
