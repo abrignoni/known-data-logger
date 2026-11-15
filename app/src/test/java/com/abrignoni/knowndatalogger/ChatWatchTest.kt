@@ -209,10 +209,12 @@ class TextAppearedRuleTest {
         assertEquals(RuleEvent.TEXT_APPEARED, read.rules.single().event)
     }
 
-    @Test fun aMessageAuthorRuleNeedsTheAuthorView() {
+    @Test fun aMessageAuthorRuleNeedsAnAuthorViewOrPattern() {
         val ok = """{"rules":[{"id":"d","package":"com.discord","event":"message_author","view_id":"com.discord:id/author_name","action":"received_message","content":"line"}]}"""
-        val noView = """{"rules":[{"id":"d","package":"com.discord","event":"message_author","label_regex":"x","action":"received_message"}]}"""
+        val byWords = """{"rules":[{"id":"d","package":"com.snapchat.android","event":"message_author","label_regex":"ME","action":"received_message"}]}"""
+        val neither = """{"rules":[{"id":"d","package":"com.discord","event":"message_author","action":"received_message"}]}"""
         assertEquals(RuleEvent.MESSAGE_AUTHOR, readRulesForImport(ok).rules.single().event)
-        assertEquals(1, readRulesForImport(noView).skipped)
+        assertEquals(0, readRulesForImport(byWords).skipped)
+        assertEquals(1, readRulesForImport(neither).skipped)
     }
 }

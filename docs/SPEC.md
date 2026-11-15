@@ -227,11 +227,17 @@ value as text so content cannot run as a formula.
 
 ## Notification rules
 
-- A notification whose category maps to no action (`NotificationMap.actionFor` returns nothing) is matched
-  against rules with event `notification` for its package, by `label_regex` on its unmasked text. A match logs
-  the rule's action with the notification's (masked) text, the title as counterpart, detail `auto rule <id>`,
-  referring to the raw notification row. Shipped: `zangi_notification` (label_regex ".", received_message).
-  A category that maps to an action always wins over a rule.
+- When a package has rules with event `notification`, they decide and the category is not used: the first
+  rule whose `label_regex` matches the unmasked text logs its action with the notification's (masked) text,
+  the title as counterpart, detail `auto rule <id>`, referring to the raw notification row; no match, no
+  label. Shipped: `zangi_notification` (".", received_message), `snapchat_notification`
+  ("^sent you an? (chat|Snap)", received_message). Otherwise the category decides, except that a
+  received_message is not labelled when the text only says someone is typing (`NotificationMap.isTypingOnly`).
+- A `message_author` rule with no view id finds author lines by their words (`WatchJudge.authorsByText`):
+  a line in the list, all in capitals, matching `label_regex` is this phone's author; one equal to a line
+  outside the list in capitals (the chat title) is the other side's. Shipped: `snapchat_author` ("ME").
+  With any author rule, a line with no author above it is labelled sent when it holds this phone's recent
+  text, and is otherwise not labelled.
 
 ## Recorded looks (testing only)
 

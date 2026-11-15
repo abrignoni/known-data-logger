@@ -169,6 +169,33 @@ class CaptureLogicTest {
         assertNull(b.clearedWithoutChange("k2", true))
     }
 
+    @Test fun aTypingNotificationIsNotAMessage() {
+        for (t in listOf("is typing...", "Ana is typing…", "are typing", " is typing... ")) assertTrue(t, NotificationMap.isTypingOnly(t))
+        for (t in listOf("sent you a chat", "I am typing a letter", "typing", "Is typing hard?")) assertTrue(t, !NotificationMap.isTypingOnly(t))
+    }
+
+    @Test fun snapchatAuthorsComeFromTheirWords() {
+        val shipped = parseRules(java.io.File("src/main/assets/rules/default.json").readText())
+        val j = WatchJudge(); j.rules = shipped
+        val pkg = "com.snapchat.android"
+        fun l(t: String, top: Int, inList: Boolean = true) = ShownText(t, 54, top, 1000, top + 60, inList)
+        val title = l("Testing Motto", 150, inList = false)
+        j.look(0, pkg, "chat", 1080, true, listOf(title, l("TODAY", 260)), emptyList())
+        val out = j.look(1000, pkg, "chat", 1080, true, listOf(title, l("TODAY", 260),
+            l("TESTING MOTTO", 300), l("Test 12 hello", 360), l("ME", 420), l("Test 13 hi", 480)), emptyList())
+        val labels = out.filterIsInstance<WatchJudge.Out.Label>().map { it.action to it.content }
+        assertEquals(listOf("received_message" to "Test 12 hello", "sent_message" to "Test 13 hi"), labels)
+        // A send whose "ME" has scrolled off above it is still a send.
+        j.rememberOwn("Test 14 again", 2000)
+        val more = j.look(3000, pkg, "chat", 1080, true, listOf(title, l("Test 13 hi", 260), l("Test 14 again", 320)), emptyList())
+        assertEquals(listOf("sent_message" to "Test 14 again"), more.filterIsInstance<WatchJudge.Out.Label>().map { it.action to it.content })
+        val sc = shipped.filter { it.pkg == pkg && it.event == RuleEvent.NOTIFICATION }
+        assertEquals("received_message", Rules.match(sc, pkg, RuleEvent.NOTIFICATION, null, "sent you a chat")?.action)
+        assertEquals("received_message", Rules.match(sc, pkg, RuleEvent.NOTIFICATION, null, "sent you a Snap")?.action)
+        assertNull(Rules.match(sc, pkg, RuleEvent.NOTIFICATION, null, "is typing..."))
+        assertNull(Rules.match(sc, pkg, RuleEvent.NOTIFICATION, null, "This lake is unreal"))
+    }
+
     @Test fun aZangiNotificationWithNoCategoryIsAReceive() {
         val shipped = parseRules(java.io.File("src/main/assets/rules/default.json").readText())
         val r = Rules.match(shipped, "com.beint.zangi", RuleEvent.NOTIFICATION, null, "Test 11 lima mike november")
@@ -183,7 +210,7 @@ class CaptureLogicTest {
 
     @Test fun shippedRulesParseAndTheInstagramSendMatchesItsField() {
         val shipped = parseRules(java.io.File("src/main/assets/rules/default.json").readText())
-        assertEquals(listOf("google_messages_send", "aosp_camera_shutter", "instagram_send", "telegram_receive", "telegram_send", "discord_author", "zangi_send", "zangi_notification"), shipped.map { it.id })
+        assertEquals(listOf("google_messages_send", "aosp_camera_shutter", "instagram_send", "telegram_receive", "telegram_send", "discord_author", "zangi_send", "zangi_notification", "snapchat_author", "snapchat_notification"), shipped.map { it.id })
         val field = "com.instagram.android:id/row_thread_composer_edittext"
         val hit = Rules.match(shipped, "com.instagram.android", RuleEvent.FIELD_CLEARED, field, null)
         assertEquals("sent_message", hit?.action); assertEquals("last_typed", hit?.content)
