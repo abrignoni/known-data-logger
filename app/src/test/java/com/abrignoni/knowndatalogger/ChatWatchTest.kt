@@ -103,6 +103,13 @@ class ChatWatchTest {
         assertTrue(!got.single().leaf)
     }
 
+    @Test fun aPassingStatusLineIsKnown() {
+        for (t in listOf("Downloading", "Sending…", "sending...", "Uploading", "Waiting for network", "Tap to download"))
+            assertTrue(t, ChatWatch.isStatusOnly(t))
+        for (t in listOf("Downloading the file now", "I am sending it", "Loading dock", "Test 12 sending"))
+            assertTrue(t, !ChatWatch.isStatusOnly(t))
+    }
+
     @Test fun aTimeOrDateLineIsKnown() {
         for (t in listOf("8:21 AM", "8:21\u202fAM", "8:21 a.m.", "18:05", "Today", "Yesterday", "Saturday",
                 "November 15", "November 15, 2026", "Now", "Just now", "5 min", "2h", "12 mins ago")) assertTrue(t, ChatWatch.isTimeOrDate(t))
