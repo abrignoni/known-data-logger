@@ -225,6 +225,22 @@ app with Date, Time, Action, Content, Counterpart and a link to the screenshot, 
 Captured events. It uses current revisions only, keeps each device's own order, and writes every
 value as text so content cannot run as a formula.
 
+## In-app receives (after 0.5.1)
+
+- `typeWindowContentChanged` from apps on the Setup list (not System UI, not while locked, not
+  while KDL is in front) schedules one look at the active window 600 ms after the last change.
+  The look collects visible view text (not content descriptions, not Button classes, not editable
+  or password fields) with screen bounds. `ChatWatch` takes the first look at each screen (the
+  last `screen` key) as a baseline. A line is new when its text shows more often than ever before
+  on that screen and it is not above every line of old content; old content is text seen before,
+  less the frame (text at the same top as at the baseline). Each new line not matching this phone's
+  text sent in the last 2 minutes (typed or cleared field) is a `text_appeared` event with detail
+  `side left|right|across` (AppWalk's side rule). A left line not in a notification of the last 2
+  minutes adds an unreviewed `received_message` (detail "auto: text appeared on the left of an open
+  screen"), with a screenshot when inferred-action screenshots are on. System events
+  `screen_watch_active` (first look of a session) and `screen_watch_summary` (looks, baselines,
+  new lines; at session stop).
+
 ## Version 0.3
 
 - Notifications (`typeNotificationStateChanged`) from captured apps are recorded as `notification`
