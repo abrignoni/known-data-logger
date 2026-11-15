@@ -483,6 +483,8 @@ class CaptureService : AccessibilityService() {
         // An app that names each message's author (Discord): where the author lines are.
         val authorRule = rules.firstOrNull { it.pkg == pkg && it.event == RuleEvent.MESSAGE_AUTHOR }
         val authors = ArrayList<Pair<String, Int>>()
+        // Pictures with no text, named by their description (rules with event description_appeared).
+        val descRules = rules.filter { it.pkg == pkg && it.event == RuleEvent.DESCRIPTION }
         fun sideways(n: AccessibilityNodeInfo): Boolean {
             val c = n.className?.toString() ?: ""
             return c.endsWith("HorizontalScrollView") || c.endsWith("ViewPager") || c.endsWith("ViewPager2")
@@ -517,6 +519,11 @@ class CaptureService : AccessibilityService() {
             // and go as the examiner types (Messenger, 15 November 2026: 7 of 7 false labels were those).
             val cls = n.className?.toString() ?: ""
             val t = if (cls.endsWith("Button")) null else n.text?.toString()?.trim()
+            val d = if (t.isNullOrEmpty() && descRules.isNotEmpty()) n.contentDescription?.toString()?.trim() else null
+            if (!d.isNullOrEmpty() && n.isVisibleToUser && descRules.any { it.regex?.containsMatchIn(d) == true }) {
+                val r = android.graphics.Rect().also { n.getBoundsInScreen(it) }
+                if (r.width() > 0 && r.height() > 0) lines += ShownText(d, r.left, r.top, r.right, r.bottom, list == null || inList, true)
+            }
             if (!t.isNullOrEmpty() && n.isVisibleToUser) {
                 val r = android.graphics.Rect().also { n.getBoundsInScreen(it) }
                 if (r.width() > 0 && r.height() > 0) {

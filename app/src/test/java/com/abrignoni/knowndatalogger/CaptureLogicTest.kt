@@ -169,6 +169,17 @@ class CaptureLogicTest {
         assertNull(b.clearedWithoutChange("k2", true))
     }
 
+    @Test fun picturesNamedByTheirDescriptionAreLabelled() {
+        val shipped = parseRules(java.io.File("src/main/assets/rules/default.json").readText())
+        val j = WatchJudge(); j.rules = shipped
+        val gm = "com.google.android.apps.messaging"
+        fun l(t: String, top: Int, left: Int) = ShownText(t, left, top, left + 500, top + 400)
+        j.look(0, gm, "chat", 720, true, listOf(l("Test 490 hi", 100, 200)), emptyList())
+        val out = j.look(1000, gm, "chat", 720, true, listOf(l("Test 490 hi", 50, 200),
+            l("(689) 325-6699 sent an image    5:25 PM .", 500, 13), l("You sent an image    5:26 PM .", 950, 179)), emptyList())
+        assertEquals(listOf("received_message", "sent_message"), out.filterIsInstance<WatchJudge.Out.Label>().map { it.action })
+    }
+
     @Test fun aTypingNotificationIsNotAMessage() {
         for (t in listOf("is typing...", "Ana is typing…", "are typing", " is typing... ")) assertTrue(t, NotificationMap.isTypingOnly(t))
         for (t in listOf("sent you a chat", "I am typing a letter", "typing", "Is typing hard?")) assertTrue(t, !NotificationMap.isTypingOnly(t))
@@ -210,7 +221,7 @@ class CaptureLogicTest {
 
     @Test fun shippedRulesParseAndTheInstagramSendMatchesItsField() {
         val shipped = parseRules(java.io.File("src/main/assets/rules/default.json").readText())
-        assertEquals(listOf("google_messages_send", "aosp_camera_shutter", "instagram_send", "telegram_receive", "telegram_send", "discord_author", "zangi_send", "zangi_notification", "snapchat_author", "snapchat_notification"), shipped.map { it.id })
+        assertEquals(listOf("google_messages_send", "aosp_camera_shutter", "instagram_send", "telegram_receive", "telegram_send", "discord_author", "zangi_send", "zangi_notification", "snapchat_author", "snapchat_notification", "google_messages_image_sent", "google_messages_image_received"), shipped.map { it.id })
         val field = "com.instagram.android:id/row_thread_composer_edittext"
         val hit = Rules.match(shipped, "com.instagram.android", RuleEvent.FIELD_CLEARED, field, null)
         assertEquals("sent_message", hit?.action); assertEquals("last_typed", hit?.content)

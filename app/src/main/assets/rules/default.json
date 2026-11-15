@@ -100,6 +100,26 @@
       "action": "received_message",
       "content": "line",
       "verified_with": "Snapchat 14.32.0.54 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-15: a received chat posts \"sent you a chat\" with category msg and no message text; \"is typing...\" and a promotion came with the same category and are not received messages."
+    },
+    {
+      "id": "google_messages_image_sent",
+      "package": "com.google.android.apps.messaging",
+      "event": "description_appeared",
+      "view_id": null,
+      "label_regex": "^You sent an? (image|picture|photo|video|GIF)\\b.*",
+      "action": "sent_message",
+      "content": "line",
+      "verified_with": "Messages messages.android_20250422_03_RC00 and 20250907_01_RC00 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-15: an MMS picture is a view with no id or text, described \"You sent an image <time> .\" or \"<sender> sent an image <time> .\"."
+    },
+    {
+      "id": "google_messages_image_received",
+      "package": "com.google.android.apps.messaging",
+      "event": "description_appeared",
+      "view_id": null,
+      "label_regex": "^.+ sent an? (image|picture|photo|video|GIF)\\b.*",
+      "action": "received_message",
+      "content": "line",
+      "verified_with": "As google_messages_image_sent; listed after it, so a picture this phone sent is not taken for a received one."
     }
   ]
 }

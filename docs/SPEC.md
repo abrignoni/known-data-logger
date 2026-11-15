@@ -248,6 +248,15 @@ value as text so content cannot run as a formula.
   With any author rule, a line with no author above it is labelled sent when it holds this phone's recent
   text, and is otherwise not labelled.
 
+## Picture descriptions
+
+- Rules with event `description_appeared`: during a look, a view with no text whose content description
+  matches one of the package's description rules is read as a line holding the description (leaf, in or
+  out of the list as any line). In the side path such a line is labelled by the matching rule, like a
+  text_appeared rule (one label per message key in 10 minutes). Shipped: `google_messages_image_sent`
+  ("^You sent an? (image|picture|photo|video|GIF)\b.*", sent_message) before
+  `google_messages_image_received` ("^.+ sent an? (image|picture|photo|video|GIF)\b.*", received_message).
+
 ## Recorded looks (testing only)
 
 - Setting `record_screen_looks`, default off, cleared by `stopSession`. The start row's detail ends
