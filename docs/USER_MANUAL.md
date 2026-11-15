@@ -498,7 +498,9 @@ kept as raw events and show up on the Captured events sheet, but no action is in
   labelled `sent_message`. That line changes once the message is read ("Not seen" to "Seen"), so a
   rule labels a message once, keyed on the line up to the time. On a Galaxy A16 5G and a moto g play,
   5 of 5 sent and 5 of 5 received Telegram messages were labelled on each phone, none twice and none
-  false. A message that arrives while the chat is scrolled up, away
+  false. Google Messages, rerun with the same build: 5 of 5 sent on each phone, and 5 of 5 received
+  on the moto but 4 of 5 on the Galaxy in each of three rounds. The one missed was always the round's
+  last message, and the previous build missed it the same way. Why is not known yet. A message that arrives while the chat is scrolled up, away
   from its newest message, is not on the screen, so it cannot be logged this way; that case was not
   tried. Each session also logs `screen_watch_active` when
   the watch first looks at a screen, and `screen_watch_summary` at the end (looks, new screens,
