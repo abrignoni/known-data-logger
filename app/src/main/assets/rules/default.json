@@ -60,6 +60,26 @@
       "action": "received_message",
       "content": "line",
       "verified_with": "Discord 353.11 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-15: every message sits on the left of the screen under its author's name (view com.discord:id/author_name), so the side of the screen cannot tell sent from received."
+    },
+    {
+      "id": "zangi_send",
+      "package": "com.beint.zangi",
+      "event": "field_cleared",
+      "view_id": "com.beint.zangi:id/bottom_sheet_message_input_id",
+      "label_regex": null,
+      "action": "sent_message",
+      "content": "last_typed",
+      "verified_with": "Zangi 6.6.4 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-15: each send clears the message box in one change (5 of 5 per phone). Zangi exposes no message text in the chat to accessibility, so the clear is the only sign of a send."
+    },
+    {
+      "id": "zangi_notification",
+      "package": "com.beint.zangi",
+      "event": "notification",
+      "view_id": null,
+      "label_regex": ".",
+      "action": "received_message",
+      "content": "line",
+      "verified_with": "Zangi 6.6.4 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-15: with the chat closed, a received message posts a notification with no category, the sender as title and the message as text. Zangi keeps one notification per chat and updates it; the Galaxy reported 5 of 5 updates, the moto 3 of 5. Only message notifications were seen; Zangi call notifications were not tried."
     }
   ]
 }

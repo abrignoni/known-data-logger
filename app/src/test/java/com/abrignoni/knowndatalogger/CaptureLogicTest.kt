@@ -169,9 +169,21 @@ class CaptureLogicTest {
         assertNull(b.clearedWithoutChange("k2", true))
     }
 
+    @Test fun aZangiNotificationWithNoCategoryIsAReceive() {
+        val shipped = parseRules(java.io.File("src/main/assets/rules/default.json").readText())
+        val r = Rules.match(shipped, "com.beint.zangi", RuleEvent.NOTIFICATION, null, "Test 11 lima mike november")
+        assertEquals("received_message", r?.action)
+        assertNull(Rules.match(shipped, "com.example.other", RuleEvent.NOTIFICATION, null, "Test 11"))
+        assertNull(Rules.match(shipped, "com.beint.zangi", RuleEvent.NOTIFICATION, null, ""))
+        val send = Rules.match(shipped, "com.beint.zangi", RuleEvent.FIELD_CLEARED, "com.beint.zangi:id/bottom_sheet_message_input_id", null)
+        assertEquals("sent_message", send?.action)
+        val read = readRulesForImport("""{"rules":[{"id":"n","package":"p","event":"notification","label_regex":".","action":"received_message"}]}""")
+        assertEquals(RuleEvent.NOTIFICATION, read.rules.single().event)
+    }
+
     @Test fun shippedRulesParseAndTheInstagramSendMatchesItsField() {
         val shipped = parseRules(java.io.File("src/main/assets/rules/default.json").readText())
-        assertEquals(listOf("google_messages_send", "aosp_camera_shutter", "instagram_send", "telegram_receive", "telegram_send", "discord_author"), shipped.map { it.id })
+        assertEquals(listOf("google_messages_send", "aosp_camera_shutter", "instagram_send", "telegram_receive", "telegram_send", "discord_author", "zangi_send", "zangi_notification"), shipped.map { it.id })
         val field = "com.instagram.android:id/row_thread_composer_edittext"
         val hit = Rules.match(shipped, "com.instagram.android", RuleEvent.FIELD_CLEARED, field, null)
         assertEquals("sent_message", hit?.action); assertEquals("last_typed", hit?.content)

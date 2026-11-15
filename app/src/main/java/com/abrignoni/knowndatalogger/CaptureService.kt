@@ -420,16 +420,25 @@ class CaptureService : AccessibilityService() {
         seenNotifications.remove(key); seenNotifications[key] = now
         if (seenNotifications.size > 100) seenNotifications.remove(seenNotifications.keys.first())
         judge.rememberNotified(body, el())
+        val unmasked = body
         val (shown, masked) = if (maskCodes) NotificationMap.maskCodes(body) else body to false
         body = shown
         val detail = "category ${category ?: "none"}" + (callType?.let { ", call type $it" } ?: "") +
             (if (masked) ", 4 to 8 digit code withheld" else "")
         val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.NOTIFICATION, content = body, counterpart = title,
             direction = "in", detail = detail, source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
-        val action = NotificationMap.actionFor(category, callType) ?: return
-        repo.log(Draft(appPackage = pkg, action = action, content = body, counterpart = title, direction = "in",
-            refersTo = raw.entryId, detail = "auto: notification category $category", source = Source.AUTO_RULE,
-            reviewed = false), stamp = raw.stamp, detect = false)
+        val action = NotificationMap.actionFor(category, callType)
+        if (action != null) {
+            repo.log(Draft(appPackage = pkg, action = action, content = body, counterpart = title, direction = "in",
+                refersTo = raw.entryId, detail = "auto: notification category $category", source = Source.AUTO_RULE,
+                reviewed = false), stamp = raw.stamp, detect = false)
+            return
+        }
+        // No category to go on: a rule for the package can still say what it is (Zangi 6.6.4 posts messages with none).
+        val rule = Rules.match(rules, pkg, RuleEvent.NOTIFICATION, null, unmasked) ?: return
+        repo.log(Draft(appPackage = pkg, action = rule.action, content = body, counterpart = title,
+            direction = directionFor(rule.action), refersTo = raw.entryId, detail = "auto rule ${rule.id}",
+            source = Source.AUTO_RULE, reviewed = false), stamp = raw.stamp, detect = false)
     }
 
 

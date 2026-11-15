@@ -353,5 +353,6 @@ private fun eventLabel(event: String): String = when (event) {
     RuleEvent.FIELD_CLEARED -> "Field cleared"
     RuleEvent.TEXT_APPEARED -> "Text on screen"
     RuleEvent.MESSAGE_AUTHOR -> "Message author"
+    RuleEvent.NOTIFICATION -> "Notification"
     else -> event
 }

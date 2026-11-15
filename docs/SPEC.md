@@ -225,6 +225,14 @@ app with Date, Time, Action, Content, Counterpart and a link to the screenshot, 
 Captured events. It uses current revisions only, keeps each device's own order, and writes every
 value as text so content cannot run as a formula.
 
+## Notification rules
+
+- A notification whose category maps to no action (`NotificationMap.actionFor` returns nothing) is matched
+  against rules with event `notification` for its package, by `label_regex` on its unmasked text. A match logs
+  the rule's action with the notification's (masked) text, the title as counterpart, detail `auto rule <id>`,
+  referring to the raw notification row. Shipped: `zangi_notification` (label_regex ".", received_message).
+  A category that maps to an action always wins over a rule.
+
 ## Recorded looks (testing only)
 
 - Setting `record_screen_looks`, default off, cleared by `stopSession`. The start row's detail ends
