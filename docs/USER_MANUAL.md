@@ -517,8 +517,22 @@ kept as raw events and show up on the Captured events sheet, but no action is in
   newer messages you are reading history, so nothing that comes into view then counts; a message
   that arrived meanwhile is logged once the list is back at its newest message. Google Messages,
   Telegram, Signal and WhatsApp report this; Messenger reports no list, so its screens are read
-  as before, and its title bar is not left out: in a later round the moto labelled Messenger's
-  "Active now" as a received message. With these changes all five apps logged 5 of 5 received messages on each phone in
+  as before. Its title bar is not inside a list, so in one round the moto labelled Messenger's
+  "Active now" as a received message: Messenger had added the new message below the others without
+  moving them, so KDL had no moved content to compare against. Now, when nothing on the screen moved,
+  a new line with more than two lines already seen below it is not taken for an arrival (a chat adds
+  messages at the bottom). Lines that are only a relative time ("Now", "5 min", "2h") are treated like
+  clock times: logged, never labelled (Signal shows "Now" under a new message). So a message whose
+  whole text is "Now" or "5 min" is logged but not labelled received. With the first change, one
+  round per app on both phones (Google Messages, Telegram, Signal, WhatsApp, Messenger twice): 5 of 5
+  received on each phone, and the only false one was Signal's "Now" (one Messenger receive came from
+  its notification, whose text is cut short). With both, a Signal round: 5 of 5 on each phone, none
+  false, with "Now" logged 6 times on each phone and never labelled.
+  KDL counts the copies of each text on the screen, so a message identical to one already on the
+  screen is new only when the screen holds more copies than before. If the older copy scrolls off as
+  the new one comes in, the count does not rise and the new one is missed: in a WhatsApp round sent
+  by mistake with the same texts as the round before, 2 of 5 received messages were missed on each
+  phone that way. With these changes all five apps logged 5 of 5 received messages on each phone in
   one round each, none twice and none false.
   If the chat opened away from its newest message, the first look is taken again once the list
   reaches its end, so older messages the jump brings in are not taken for arrivals.
