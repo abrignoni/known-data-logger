@@ -536,6 +536,19 @@ kept as raw events and show up on the Captured events sheet, but no action is in
   one round each, none twice and none false.
   If the chat opened away from its newest message, the first look is taken again once the list
   reaches its end, so older messages the jump brings in are not taken for arrivals.
+- **Snapchat** (14.32.0.54) shows each run of messages under a header with no view id: "ME" above this
+  phone's own messages and the contact's name in capitals (the chat's title) above theirs. The
+  `snapchat_author` rule reads those words (English only). A message whose header has scrolled off above
+  it is still labelled sent when it holds text this phone just typed. In an open chat on a Galaxy A16 5G
+  and a moto g play (15 November 2026): 5 of 5 sent and 5 of 5 received on each phone, none false. In a
+  group chat the senders' headers do not match the chat's title; that was not tried. Snapchat's
+  notifications carry no message text, only "sent you a chat", and Snapchat files typing ("is typing...")
+  and promotions under the same message category. `snapchat_notification` labels only "sent you a chat" or
+  "sent you a Snap" as received; a package's notification rules decide instead of the category. With the
+  chats closed, the Galaxy labelled 5 received for 5 messages, the moto 4 of 5 (Snapchat updates one
+  notification per chat in place, and the moto's Android did not report every update; the update for the
+  last message was posted, by its time, and never reported). A notification that only says someone is
+  typing is never labelled, for any app.
 - **Apps that show no message text to Android.** Zangi 6.6.4 draws its messages itself: in an open
   chat, Android's accessibility reports each bubble as an empty frame with a time view and no text, so
   KDL cannot see a message there, sent or received (Galaxy A16 5G and moto g play, 15 November 2026:

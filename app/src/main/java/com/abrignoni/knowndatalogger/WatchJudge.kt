@@ -77,8 +77,9 @@ class WatchJudge(private val mask: (String?) -> String? = { NotificationMap.mask
         val appeared = chatWatch.look(key, lines, width, atNewest)
         found += appeared.size
         val authorRule = rules.firstOrNull { it.pkg == pkg && it.event == RuleEvent.MESSAGE_AUTHOR }
+        val authorLines = if (authorRule != null && authorRule.viewId == null) authorsByText(pkg, authorRule, lines, now, out) else authors
         for (a in appeared) {
-            if (authorRule != null) { authoredLine(now, pkg, authorRule, a, authors, out); continue }
+            if (authorRule != null) { authoredLine(now, pkg, authorRule, a, authorLines, out); continue }
             // An app can say in the line itself which way it went: Telegram's message cells span the whole width
             // (side "across") and end with "Received at <time>" or "Sent at <time>". A text_appeared rule names that.
             val rule = Rules.match(rules, pkg, RuleEvent.TEXT_APPEARED, null, a.text)
@@ -106,6 +107,28 @@ class WatchJudge(private val mask: (String?) -> String? = { NotificationMap.mask
         return out
     }
 
+    /**
+     * Author lines of an app that names them by their words, not by a view (Snapchat 14.32: "ME" above this phone's
+     * messages, the contact's name in capitals above theirs). A message_author rule with no view id: a line in the
+     * list, all in capitals, that matches the rule's pattern is this phone's author; one that equals the chat's
+     * title (a line outside the list) in capitals is the other side's. Seeing this phone's author line sets this
+     * phone's author, and messages waiting for it are labelled.
+     */
+    private fun authorsByText(pkg: String, rule: Rule, lines: List<ShownText>, now: Long, out: MutableList<Out>): List<Pair<String, Int>> {
+        val titles = lines.filter { !it.inList }.map { it.text.uppercase() }.toSet()
+        val found = lines.filter { l ->
+            l.inList && l.text == l.text.uppercase() && (rule.regex?.matches(l.text) == true || l.text in titles)
+        }.map { it.text to it.top }
+        val mine = found.firstOrNull { rule.regex?.matches(it.first) == true }?.first
+        if (mine != null && ownAuthor[pkg] != mine) {
+            ownAuthor[pkg] = mine
+            val waiting = awaitingAuthor.filter { it.pkg == pkg }
+            awaitingAuthor.removeAll(waiting)
+            for (w in waiting) byAuthor(now, w.pkg, w.author, mine, w.raw, w.shown, w.ruleId, w.action, null, out)
+        }
+        return found
+    }
+
     private fun raw(pkg: String, shown: String?, detail: String, out: MutableList<Out>): Long {
         val t = ++tokens
         out += Out.Raw(t, pkg, shown, detail)
@@ -127,7 +150,14 @@ class WatchJudge(private val mask: (String?) -> String? = { NotificationMap.mask
         val shown = masked(a.text.take(2000))
         val raw = raw(pkg, shown, "side ${a.side}", out)
         val isAuthorLine = authors.any { it.first == a.text && it.second == a.top }
-        if (!a.inList || !a.leaf || isAuthorLine || ChatWatch.isTimeOrDate(a.text) || author == null) return
+        if (!a.inList || !a.leaf || isAuthorLine || ChatWatch.isTimeOrDate(a.text)) return
+        // Text this phone just typed is a send even when its author line has scrolled off above it (Snapchat, Galaxy
+        // A16 5G, 15 November 2026: the fifth of five sends in a row sat under a "ME" no longer on the screen).
+        if (author == null) {
+            if (recentlyIn(recentOwn, a.text, now)) out += Out.Label(raw, pkg, "sent_message", directionFor("sent_message"), shown,
+                "auto rule ${rule.id}: holds text this phone just typed", shotAuto)
+            return
+        }
         if (recentlyIn(recentOwn, a.text, now)) {
             ownAuthor[pkg] = author
             out += Out.Label(raw, pkg, "sent_message", directionFor("sent_message"), shown,

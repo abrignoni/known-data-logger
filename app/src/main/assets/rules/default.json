@@ -80,6 +80,26 @@
       "action": "received_message",
       "content": "line",
       "verified_with": "Zangi 6.6.4 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-15: with the chat closed, a received message posts a notification with no category, the sender as title and the message as text. Zangi keeps one notification per chat and updates it; the Galaxy reported 5 of 5 updates, the moto 3 of 5. Only message notifications were seen; Zangi call notifications were not tried."
+    },
+    {
+      "id": "snapchat_author",
+      "package": "com.snapchat.android",
+      "event": "message_author",
+      "view_id": null,
+      "label_regex": "ME",
+      "action": "received_message",
+      "content": "line",
+      "verified_with": "Snapchat 14.32.0.54 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-15: each run of messages sits under a header with no view id, \"ME\" for this phone's own and the contact's name in capitals (the chat title) for theirs; the side of the screen cannot tell."
+    },
+    {
+      "id": "snapchat_notification",
+      "package": "com.snapchat.android",
+      "event": "notification",
+      "view_id": null,
+      "label_regex": "^sent you an? (chat|Snap)",
+      "action": "received_message",
+      "content": "line",
+      "verified_with": "Snapchat 14.32.0.54 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-15: a received chat posts \"sent you a chat\" with category msg and no message text; \"is typing...\" and a promotion came with the same category and are not received messages."
     }
   ]
 }

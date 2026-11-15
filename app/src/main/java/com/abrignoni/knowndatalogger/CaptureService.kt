@@ -427,18 +427,23 @@ class CaptureService : AccessibilityService() {
             (if (masked) ", 4 to 8 digit code withheld" else "")
         val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.NOTIFICATION, content = body, counterpart = title,
             direction = "in", detail = detail, source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
+        // Rules for the package decide first: Snapchat files chats, typing and promotions alike as messages.
+        if (rules.any { it.pkg == pkg && it.event == RuleEvent.NOTIFICATION }) {
+            val rule = Rules.match(rules, pkg, RuleEvent.NOTIFICATION, null, unmasked) ?: return
+            repo.log(Draft(appPackage = pkg, action = rule.action, content = body, counterpart = title,
+                direction = directionFor(rule.action), refersTo = raw.entryId, detail = "auto rule ${rule.id}",
+                source = Source.AUTO_RULE, reviewed = false), stamp = raw.stamp, detect = false)
+            return
+        }
         val action = NotificationMap.actionFor(category, callType)
+        if (action == "received_message" && NotificationMap.isTypingOnly(body)) return
         if (action != null) {
             repo.log(Draft(appPackage = pkg, action = action, content = body, counterpart = title, direction = "in",
                 refersTo = raw.entryId, detail = "auto: notification category $category", source = Source.AUTO_RULE,
                 reviewed = false), stamp = raw.stamp, detect = false)
             return
         }
-        // No category to go on: a rule for the package can still say what it is (Zangi 6.6.4 posts messages with none).
-        val rule = Rules.match(rules, pkg, RuleEvent.NOTIFICATION, null, unmasked) ?: return
-        repo.log(Draft(appPackage = pkg, action = rule.action, content = body, counterpart = title,
-            direction = directionFor(rule.action), refersTo = raw.entryId, detail = "auto rule ${rule.id}",
-            source = Source.AUTO_RULE, reviewed = false), stamp = raw.stamp, detect = false)
+
     }
 
 

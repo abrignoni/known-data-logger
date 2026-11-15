@@ -60,6 +60,15 @@ object NotificationMap {
         else -> null
     }
 
+    private val TYPING = Regex("""^(.*\s)?(is|are) typing\s*(\.\.\.|…)?$""", RegexOption.IGNORE_CASE)
+
+    /**
+     * A notification that only says someone is typing ("is typing..."), filed by the app as a message. It is
+     * logged, never labelled a received message (Snapchat 14.32, Galaxy A16 5G and moto g play, 15 November 2026:
+     * "is typing..." came with category msg before each received chat).
+     */
+    fun isTypingOnly(text: String?): Boolean = text != null && TYPING.matches(text.trim())
+
     private val CODE_WORDS = Regex("""\b(code|otp|passcode|pin|verification|verify|2fa|one[- ]time)\b""", RegexOption.IGNORE_CASE)
     private val DIGITS = Regex("""(?<!\d)\d{4,8}(?!\d)""")
 
@@ -119,15 +128,17 @@ object RuleEvent {
     /** A line that came onto an open screen (AutoAction.TEXT_APPEARED); the label pattern is matched against the line. */
     const val TEXT_APPEARED = "text_appeared"
     /**
-     * Apps that draw every message in one column under its author's name (Discord). The rule's view id names
-     * the author view. A new message line takes the author shown nearest above it. The phone's own author is
+     * Apps that draw every message in one column under its author's name (Discord, Snapchat). The rule's view id
+     * names the author view; with no view id, the label pattern matches this phone's own author line (Snapchat's
+     * "ME") and a line equal to the chat title in capitals is the other side's (WatchJudge.authorsByText). A new message line takes the author shown nearest above it. The phone's own author is
      * learned from a line holding text it just typed (labelled sent); a line under any other author is
      * labelled with the rule's action.
      */
     const val MESSAGE_AUTHOR = "message_author"
     /**
-     * A notification from the package whose category gives no action (Zangi files its messages under no
-     * category). The label pattern is matched against the notification's text; the label carries that text.
+     * A notification from the package. When a package has notification rules they decide instead of the category
+     * (Zangi files its messages under no category; Snapchat files chats, typing and promotions all as messages).
+     * The label pattern is matched against the notification's text; the label carries that text.
      */
     const val NOTIFICATION = "notification"
 }
