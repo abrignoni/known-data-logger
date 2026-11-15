@@ -547,7 +547,8 @@ kept as raw events and show up on the Captured events sheet, but no action is in
   "sent you a Snap" as received; a package's notification rules decide instead of the category. With the
   chats closed, the Galaxy labelled 5 received for 5 messages, the moto 4 of 5 (Snapchat updates one
   notification per chat in place, and the moto's Android did not report every update; the update for the
-  last message was posted, by its time, and never reported). A notification that only says someone is
+  last message was posted, by its time, and never reported). With notification access on, both phones
+  labelled 5 of 5, none twice. A notification that only says someone is
   typing is never labelled, for any app.
 - **Apps that show no message text to Android.** Zangi 6.6.4 draws its messages itself: in an open
   chat, Android's accessibility reports each bubble as an empty frame with a time view and no text, so
@@ -559,7 +560,9 @@ kept as raw events and show up on the Captured events sheet, but no action is in
   category) labels Zangi's notifications as received messages; Zangi files them under no category. With
   the chat closed, the Galaxy labelled 5 of 5. The moto labelled 3 of 5: Zangi keeps one notification
   per chat and updates it in place, and on the moto Android reported only 3 of those 5 updates to KDL.
-  Zangi call notifications were not tried.
+  With notification access on (below), the Galaxy labelled 5 of 5 again and the moto 2 of 5: the
+  listener, which Android tells of every post, saw only 2, so Zangi on the moto did not post a
+  notification for each message while it was in the background. Zangi call notifications were not tried.
 - **Apps that show every message under its author's name.** Discord 353.11 puts every message on
   the left under the author's name, so the side of the screen cannot tell. The `discord_author` rule
   (event `message_author`) names Discord's author view: a new message takes the author shown
@@ -602,6 +605,19 @@ or when: that still needs a live session.
 
 When **Screenshot inferred actions** is on, a rule match also takes a screenshot, and so does a
 `received_message` from an open chat. Actions inferred from notifications have no screenshot.
+
+### Notification access (optional)
+
+Accessibility does not always report an update to a notification that is already showing. Some apps keep
+one notification per chat and update it for each new message (Zangi, Snapchat), and on a moto g play
+(Android 16, 15 November 2026) 2 of 5 such updates came with no accessibility event. With **Notification
+access** on, KDL also runs a notification listener, which Android tells of every post and update. While
+it is connected, KDL takes notifications from it and ignores the accessibility events for them, so none
+is logged twice. Turn it on in Setup > **Notification access** (Android's page opens; turn on KDL and
+confirm). Android warns that the app can read all notifications: KDL logs only the apps under test.
+Each session's start row says `notifications=listener` or `notifications=accessibility`. With it on,
+Snapchat's 5 of 5 per-chat updates were logged on both phones (the moto had logged 3 and 4 of 5
+without it). It cannot log a notification the app never posts.
 
 ### Locked notifications
 

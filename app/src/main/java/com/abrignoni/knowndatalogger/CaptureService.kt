@@ -390,6 +390,8 @@ class CaptureService : AccessibilityService() {
     private fun onNotification(event: AccessibilityEvent, pkg: String) {
         // Toasts arrive as the same event type; they are not incoming events.
         if (event.className?.toString()?.contains("Toast") == true) return
+        // With notification access on, the listener reports every post and update; these events would repeat it.
+        if (NotificationWatch.connected) return
         val n = event.parcelableData as? android.app.Notification
         if (n == null) {
             // Seen on Android 17 (Pixel 7a): while locked, the event comes without the Notification, only a
@@ -404,12 +406,25 @@ class CaptureService : AccessibilityService() {
                 detail = NotificationMap.WITHHELD, source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT)
             return
         }
+        posted(pkg, n, event.text?.joinToString(" ")?.takeIf { it.isNotBlank() })
+    }
+
+    /**
+     * A notification from Android's notification listener (NotificationWatch), when notification access is on:
+     * every post and update, including updates that came with no accessibility event.
+     */
+    fun onPostedNotification(pkg: String, n: android.app.Notification) {
+        if (!::repo.isInitialized || !active || !wanted(pkg)) return
+        posted(pkg, n, null)
+    }
+
+    private fun posted(pkg: String, n: android.app.Notification, fallbackText: String?) {
         if (n.flags and android.app.Notification.FLAG_GROUP_SUMMARY != 0) return
         val extras = n.extras
         val title = extras.getCharSequence(android.app.Notification.EXTRA_TITLE)?.toString()
         var body = (extras.getCharSequence(android.app.Notification.EXTRA_BIG_TEXT)
             ?: extras.getCharSequence(android.app.Notification.EXTRA_TEXT))?.toString()
-            ?: event.text?.joinToString(" ")?.takeIf { it.isNotBlank() }
+            ?: fallbackText
         val category = n.category
         val callType = if (Build.VERSION.SDK_INT >= 31 && extras.containsKey(android.app.Notification.EXTRA_CALL_TYPE))
             extras.getInt(android.app.Notification.EXTRA_CALL_TYPE) else null
