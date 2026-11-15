@@ -229,6 +229,9 @@ value as text so content cannot run as a formula.
 
 - `typeWindowContentChanged` from apps on the Setup list (not System UI, not while locked, not
   while KDL is in front) schedules one look at the active window 600 ms after the last change.
+  While a session runs, KDL also looks every 3 s when no look ran in the last 3 s, clearing the
+  node cache first (Android 14 and later), because some app builds send no content change for an
+  arriving message.
   The look collects visible view text (not content descriptions, not Button classes, not editable
   or password fields, nothing under a HorizontalScrollView, ViewPager or ViewPager2) with screen
   bounds. `ChatWatch` takes the first look at each screen (the

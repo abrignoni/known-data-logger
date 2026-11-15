@@ -500,7 +500,13 @@ kept as raw events and show up on the Captured events sheet, but no action is in
   5 of 5 sent and 5 of 5 received Telegram messages were labelled on each phone, none twice and none
   false. Google Messages, rerun with the same build: 5 of 5 sent on each phone, and 5 of 5 received
   on the moto but 4 of 5 on the Galaxy in each of three rounds. The one missed was always the round's
-  last message, and the previous build missed it the same way. Why is not known yet. A message that arrives while the chat is scrolled up, away
+  last message. The Galaxy's Google Messages (messages.android_20250422_03_RC00) sent none of the
+  events KDL listens for when a message arrived or the chat was scrolled, until the screen was touched, and KDL only
+  looked after such a change, so a message that came in while the phone sat idle was never seen.
+  KDL now also looks at the open screen every 3 seconds during a session. With that, a message sent
+  to the idle Galaxy was logged 3.6 seconds after it was sent, and a rerun logged 5 of 5 sent and
+  5 of 5 received on each phone in Google Messages and in Telegram, none twice and none false.
+  A message that arrives while the chat is scrolled up, away
   from its newest message, is not on the screen, so it cannot be logged this way; that case was not
   tried. Each session also logs `screen_watch_active` when
   the watch first looks at a screen, and `screen_watch_summary` at the end (looks, new screens,

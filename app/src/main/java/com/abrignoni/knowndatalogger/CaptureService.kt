@@ -61,6 +61,7 @@ class CaptureService : AccessibilityService() {
         repo.log(Draft(action = "capture_service_disconnected", source = Source.SYSTEM), kind = Kind.SYSTEM_EVENT)
         removeMark()
         stopPackageWatch()
+        main.removeCallbacks(poll); main.removeCallbacks(scan)
         instance = null
         return super.onUnbind(intent)
     }
@@ -95,6 +96,24 @@ class CaptureService : AccessibilityService() {
     private val recentNotified = LinkedHashMap<String, Long>()
     private val ruleLabelled = LinkedHashMap<String, Long>()
     private val scan = Runnable { scanOpenScreen() }
+    private var lastScanAt = 0L
+    /**
+     * A look every few seconds while a session runs, besides the look after each burst of content changes.
+     * Some app builds send no content-change event when a message arrives: Google Messages
+     * (messages.android_20250422_03_RC00, Galaxy A16 5G, 15 November 2026) sent none from the window
+     * opening until the screen was touched, so a message received while the phone sat idle was never seen.
+     * Without events Android's node cache is never told the screen changed, so it is cleared first.
+     */
+    private val poll = object : Runnable {
+        override fun run() {
+            if (!active) return
+            if (android.os.SystemClock.uptimeMillis() - lastScanAt >= POLL_MS) {
+                if (android.os.Build.VERSION.SDK_INT >= 34) clearCache()
+                scanOpenScreen()
+            }
+            main.postDelayed(this, POLL_MS)
+        }
+    }
     /** For the session's summary row: how often the open screen was looked at, started again, and gave new lines. */
     private var watchLooks = 0
     private var watchBaselines = 0
@@ -127,6 +146,8 @@ class CaptureService : AccessibilityService() {
         chatWatch.reset(); recentOwn.clear(); recentNotified.clear(); ruleLabelled.clear()
         watchLooks = 0; watchBaselines = 0; watchFound = 0; watchLastKey = null
         maskCodes = repo.flag(Repo.KEY_MASK_CODES, true)
+        main.removeCallbacks(poll)
+        if (active) main.postDelayed(poll, POLL_MS)
         if (active) { showMark(); startPackageWatch() } else { flushText(); removeMark(); stopPackageWatch() }
     }
 
@@ -420,6 +441,7 @@ class CaptureService : AccessibilityService() {
      * never System UI, never an editable field or a password field.
      */
     private fun scanOpenScreen() {
+        lastScanAt = android.os.SystemClock.uptimeMillis()
         if (!active || kdlInFront) return
         if (getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true) return
         val root = try { rootInActiveWindow } catch (e: Exception) { null } ?: return
@@ -647,6 +669,8 @@ class CaptureService : AccessibilityService() {
 
     companion object {
         const val SYSTEM_UI = "com.android.systemui"
+        /** Milliseconds between periodic looks (see poll). */
+        const val POLL_MS = 3000L
 
         /** The running service, if enabled, so the app can start or stop a session. */
         @Volatile var instance: CaptureService? = null
