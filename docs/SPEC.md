@@ -230,7 +230,8 @@ value as text so content cannot run as a formula.
 - `typeWindowContentChanged` from apps on the Setup list (not System UI, not while locked, not
   while KDL is in front) schedules one look at the active window 600 ms after the last change.
   The look collects visible view text (not content descriptions, not Button classes, not editable
-  or password fields) with screen bounds. `ChatWatch` takes the first look at each screen (the
+  or password fields, nothing under a HorizontalScrollView, ViewPager or ViewPager2) with screen
+  bounds. `ChatWatch` takes the first look at each screen (the
   last `screen` key) as a baseline. A line is new when its text shows more often than ever before
   on that screen and it is not above every line of old content; old content is text seen before,
   less the frame (text at the same top as at the baseline). Each new line not matching this phone's

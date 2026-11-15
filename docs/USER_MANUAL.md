@@ -486,7 +486,8 @@ kept as raw events and show up on the Captured events sheet, but no action is in
   you to check, unless it is a text this phone just sent or a notification just gave. Lines that
   come in above everything already on the screen are left out: that is a scroll revealing older
   messages, not a message arriving. Only view text counts, not buttons or descriptions, so the
-  message box's buttons and "is typing" do not. In the same chat with both phones in it, all 5
+  message box's buttons and "is typing" do not, and nothing in a row that scrolls sideways, so
+  Google Messages' suggested replies ("Okay", "Nice") do not. In the same chat with both phones in it, all 5
   received messages were logged on each phone, none twice and none that was not a received
   message, also after scrolling up and back (one of the 5 on the moto came from a notification, and
   the screen did not log it again). A message that arrives while the chat is scrolled up, away

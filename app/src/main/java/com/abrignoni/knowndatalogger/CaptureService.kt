@@ -426,6 +426,11 @@ class CaptureService : AccessibilityService() {
         fun walk(n: AccessibilityNodeInfo, depth: Int) {
             if (depth > 60 || lines.size > 400) return
             if (n.isEditable || isSecret(null, n)) return
+            // A row that scrolls sideways holds suggestions, not messages: Google Messages' smart replies
+            // ("Okay", "Nice") sit in a HorizontalScrollView under each received message, and were taken for
+            // received messages (Galaxy A16 5G and moto g play, 15 November 2026: 6 false of 36 labels).
+            val cls0 = n.className?.toString() ?: ""
+            if (cls0.endsWith("HorizontalScrollView") || cls0.endsWith("ViewPager") || cls0.endsWith("ViewPager2")) return
             // View text only: buttons, avatars and "is typing" carry a description and no text, and they come
             // and go as the examiner types (Messenger, 15 November 2026: 7 of 7 false labels were those).
             val cls = n.className?.toString() ?: ""
