@@ -30,6 +30,16 @@
       "action": "sent_message",
       "content": "last_typed",
       "verified_with": "Instagram 455.0.0.51.72 on a Pixel 7a with Android 17, 2026-11-14, through a rule taught there with this package, event and view id. The Send button reports no tap and the field no text change; the field found empty at a selection change is the signal, so this needs 0.5.1 or later."
+    },
+    {
+      "id": "telegram_receive",
+      "package": "org.telegram.messenger",
+      "event": "text_appeared",
+      "view_id": null,
+      "label_regex": "\\nReceived at \\d",
+      "action": "received_message",
+      "content": "line",
+      "verified_with": "Telegram 13.2.2 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-15: each message cell spans the screen and its text ends with \"Received at <time>\" for a received message, so the side of the screen cannot tell."
     }
   ]
 }

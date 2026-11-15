@@ -116,6 +116,8 @@ fun sourceEventFor(mark: Entry, rows: List<Entry>): Entry? =
 object RuleEvent {
     const val TAP = "tap"
     const val FIELD_CLEARED = "field_cleared"
+    /** A line that came onto an open screen (AutoAction.TEXT_APPEARED); the label pattern is matched against the line. */
+    const val TEXT_APPEARED = "text_appeared"
 }
 
 /** Allowed values for Entry.timeQuality. */

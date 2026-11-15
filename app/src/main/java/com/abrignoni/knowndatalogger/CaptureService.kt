@@ -272,6 +272,9 @@ class CaptureService : AccessibilityService() {
 
     /** Typed text is stamped at its last keystroke, not when the field was left. */
     private fun writeTyped(t: Typed) {
+        // Typed text is also this phone's own message when an app sends without a field-clear event
+        // (Telegram 13.2.2, 15 November 2026: 15 of 15 sends typed, 0 cleared).
+        remember(recentOwn, t.text)
         val d = Draft(appPackage = t.pkg, action = AutoAction.TYPED_TEXT, content = t.text,
             detail = t.viewId?.let { "view $it" }, source = Source.AUTO_EVENT)
         if (t.stamp != null) repo.log(d, stamp = t.stamp, kind = Kind.AUTO_EVENT, detect = false)
@@ -454,6 +457,17 @@ class CaptureService : AccessibilityService() {
             val shown = masked(a.text.take(2000))
             val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.TEXT_APPEARED, content = shown,
                 detail = "side ${a.side}", source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
+            // An app can say in the line itself which way it went: Telegram's message cells span the whole width
+            // (side "across") and end with "Received at <time>" or "Sent at <time>". A text_appeared rule names that.
+            val rule = Rules.match(rules, pkg, RuleEvent.TEXT_APPEARED, null, a.text)
+            if (rule != null) {
+                if (directionFor(rule.action) == "in" && recentlyIn(recentNotified, a.text)) continue
+                val labelled = repo.log(Draft(appPackage = pkg, action = rule.action, direction = directionFor(rule.action),
+                    content = if (rule.content == "line") shown else null, refersTo = raw.entryId,
+                    detail = "auto rule ${rule.id}", source = Source.AUTO_RULE, reviewed = false), stamp = raw.stamp, detect = false).last()
+                if (shotAuto) screenshot(labelled.entryId)
+                continue
+            }
             if (a.side != "left" || recentlyIn(recentNotified, a.text)) continue
             val labelled = repo.log(Draft(appPackage = pkg, action = "received_message", content = shown, direction = "in",
                 refersTo = raw.entryId, detail = "auto: text appeared on the left of an open screen", source = Source.AUTO_RULE,

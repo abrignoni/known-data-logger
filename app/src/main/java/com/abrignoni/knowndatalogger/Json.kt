@@ -70,7 +70,7 @@ data class RulesRead(val rules: List<Rule>, val skipped: Int)
  * Reads a rules file for import. Unlike parseRules, one bad rule does not fail the file: it is
  * counted and left out. A rule is used only when it could ever match and write something: it needs
  * an id, a package, an action, a known event, a view id or a label pattern that compiles, and
- * content that is absent or "last_typed". Throws IllegalArgumentException when the text is not a
+ * content that is absent, "last_typed" or "line" (the line a text_appeared rule matched). Throws IllegalArgumentException when the text is not a
  * rules file at all.
  */
 fun readRulesForImport(text: String): RulesRead {
@@ -90,10 +90,10 @@ fun readRulesForImport(text: String): RulesRead {
             )
         } catch (e: Exception) { null }
         val usable = r != null && r.id.isNotEmpty() && r.pkg.isNotEmpty() && r.action.isNotEmpty() &&
-            r.event in setOf(RuleEvent.TAP, RuleEvent.FIELD_CLEARED) &&
+            r.event in setOf(RuleEvent.TAP, RuleEvent.FIELD_CLEARED, RuleEvent.TEXT_APPEARED) &&
             (r.viewId != null || r.labelRegex != null) &&
             (r.labelRegex == null || runCatching { Regex(r.labelRegex) }.isSuccess) &&
-            (r.content == null || r.content == "last_typed")
+            (r.content == null || r.content == "last_typed" || r.content == "line")
         if (usable) out += r!! else skipped++
     }
     return RulesRead(out, skipped)
