@@ -125,6 +125,11 @@ object RuleEvent {
      * labelled with the rule's action.
      */
     const val MESSAGE_AUTHOR = "message_author"
+    /**
+     * A notification from the package whose category gives no action (Zangi files its messages under no
+     * category). The label pattern is matched against the notification's text; the label carries that text.
+     */
+    const val NOTIFICATION = "notification"
 }
 
 /** Allowed values for Entry.timeQuality. */

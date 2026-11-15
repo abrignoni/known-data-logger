@@ -536,6 +536,17 @@ kept as raw events and show up on the Captured events sheet, but no action is in
   one round each, none twice and none false.
   If the chat opened away from its newest message, the first look is taken again once the list
   reaches its end, so older messages the jump brings in are not taken for arrivals.
+- **Apps that show no message text to Android.** Zangi 6.6.4 draws its messages itself: in an open
+  chat, Android's accessibility reports each bubble as an empty frame with a time view and no text, so
+  KDL cannot see a message there, sent or received (Galaxy A16 5G and moto g play, 15 November 2026:
+  0 of 5 received in an open chat on each phone). Two rules cover what Zangi does show. `zangi_send`
+  labels a send from the message box clearing, with the text typed (5 of 5 on the Galaxy; on the moto
+  the scorer counted 4 of 5, because adb typed only part of one long test message, and KDL's label
+  matched what was sent). `zangi_notification` (event `notification`, used when a notification has no
+  category) labels Zangi's notifications as received messages; Zangi files them under no category. With
+  the chat closed, the Galaxy labelled 5 of 5. The moto labelled 3 of 5: Zangi keeps one notification
+  per chat and updates it in place, and on the moto Android reported only 3 of those 5 updates to KDL.
+  Zangi call notifications were not tried.
 - **Apps that show every message under its author's name.** Discord 353.11 puts every message on
   the left under the author's name, so the side of the screen cannot tell. The `discord_author` rule
   (event `message_author`) names Discord's author view: a new message takes the author shown
