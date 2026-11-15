@@ -225,6 +225,21 @@ app with Date, Time, Action, Content, Counterpart and a link to the screenshot, 
 Captured events. It uses current revisions only, keeps each device's own order, and writes every
 value as text so content cannot run as a formula.
 
+## Recorded looks (testing only)
+
+- Setting `record_screen_looks`, default off, cleared by `stopSession`. The start row's detail ends
+  `looks=on|off`. When on, `LookLog` appends JSON lines to `looks-<UTC session start>.jsonl` in the app's
+  external files dir (beside `actions-live.jsonl`), written in order on one thread. Never exported, never in
+  the manifest or the hash chain; Start over deletes it.
+- Every record has `n` (counter, restarts if the service reconnects), `el` (elapsedRealtime, the clock the
+  watch's windows use) and `kind`: `reset` (active, mask_codes, shot_auto, all_apps, listed, capture) at
+  every `syncSession`; `rules` (every field) after each reset and reload; `remember` (`list` own, notified or
+  rule_labelled, `text` as remembered); `look` (package, key, width, at_newest, capped, lines as
+  [text, left, top, right, bottom, inList, leaf], authors as [text, top]) just before `ChatWatch.look`;
+  `skip` (reason: kdl_in_front, locked, no_window, no_package, not_watched, read_failed) for looks that
+  ended before it.
+- Lines are unmasked (the watch matches unmasked text).
+
 ## In-app receives (after 0.5.1)
 
 - `typeWindowContentChanged` from apps on the Setup list (not System UI, not while locked, not

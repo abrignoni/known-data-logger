@@ -80,6 +80,8 @@ private fun SetupHome(repo: Repo, bump: () -> Unit, open: (String) -> Unit) {
     var shotAuto by remember { mutableStateOf(repo.flag(Repo.KEY_SHOT_AUTO, true)) }
     var shotTap by remember { mutableStateOf(repo.flag(Repo.KEY_SHOT_TAP, false)) }
     var saveTree by remember { mutableStateOf(repo.flag(Repo.KEY_TREE, true)) }
+    // Re-read when a session starts or stops: stopping a session turns this setting off behind the screen.
+    var recordLooks by remember(repo.sessionActive) { mutableStateOf(repo.flag(Repo.KEY_RECORD_LOOKS, false)) }
     val apps = remember { repo.db.apps() }
     val profile = remember { repo.db.profiles().lastOrNull() }
     val hash = remember { repo.lastRowHash() }
@@ -97,6 +99,7 @@ private fun SetupHome(repo: Repo, bump: () -> Unit, open: (String) -> Unit) {
             SwitchRow("Screenshot inferred actions", null, shotAuto) { shotAuto = it; repo.setFlag(Repo.KEY_SHOT_AUTO, it) }
             SwitchRow("Screenshot every tap", null, shotTap) { shotTap = it; repo.setFlag(Repo.KEY_SHOT_TAP, it) }
             SwitchRow("Save the view tree with screenshots", "The screen's text as the app reports it. Password fields are left empty; other text is kept as shown", saveTree) { saveTree = it; repo.setFlag(Repo.KEY_TREE, it) }
+            SwitchRow("Record screen looks (testing)", "For test phones only. Keeps every line of text the apps under test show, unmasked, in a file on the phone outside exports. Turns off when the session stops", recordLooks) { recordLooks = it; repo.setFlag(Repo.KEY_RECORD_LOOKS, it) }
             if (repo.sessionActive) Text("Changes apply when the next session starts.", color = Kdl.Muted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
             NavRow("Rules", "${repo.loadRules().size}") { open("rules") }
             NavRow("Device", profile?.let { "${it.manufacturer?.replaceFirstChar { c -> c.uppercase() }} ${it.model} · Android ${it.release}" } ?: "No snapshot yet") { open("device") }
