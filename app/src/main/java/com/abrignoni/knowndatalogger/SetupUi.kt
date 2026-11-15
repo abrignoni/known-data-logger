@@ -264,7 +264,7 @@ private fun RulesPage(repo: Repo, bump: () -> Unit, back: () -> Unit) {
                     Column(Modifier.weight(1f)) {
                         Text("${templateLabel(r.action).replaceFirstChar { it.uppercase() }} · ${BUILTIN_LABELS[r.pkg] ?: r.pkg.substringAfterLast('.')}",
                             style = MaterialTheme.typography.bodyLarge)
-                        Text("${if (r.event == RuleEvent.TAP) "Tap" else "Field cleared"} · ${if (r.id in local) "taught or imported" else "built in"}",
+                        Text("${eventLabel(r.event)} · ${if (r.id in local) "taught or imported" else "built in"}",
                             color = Kdl.Muted, style = MaterialTheme.typography.bodyMedium)
                     }
                     if (r.id in local) TextButton(onClick = {
@@ -293,7 +293,7 @@ private fun RulesPage(repo: Repo, bump: () -> Unit, back: () -> Unit) {
                             Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
                                 Text("${templateLabel(r.action).replaceFirstChar { it.uppercase() }} · ${BUILTIN_LABELS[r.pkg] ?: r.pkg.substringAfterLast('.')}",
                                     style = MaterialTheme.typography.bodyLarge)
-                                Text("${if (r.event == RuleEvent.TAP) "Tap" else "Field cleared"} · ${r.pkg} · ${if (item.replaces) "replaces a rule in effect" else "new"}",
+                                Text("${eventLabel(r.event)} · ${r.pkg} · ${if (item.replaces) "replaces a rule in effect" else "new"}",
                                     color = if (item.replaces) Kdl.Amber else Kdl.Muted, style = MaterialTheme.typography.bodySmall)
                             }
                         }
@@ -342,4 +342,13 @@ private fun DevicePage(repo: Repo, bump: () -> Unit, back: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
         }
     }
+}
+
+/** How a rule's event reads in Setup. */
+private fun eventLabel(event: String): String = when (event) {
+    RuleEvent.TAP -> "Tap"
+    RuleEvent.FIELD_CLEARED -> "Field cleared"
+    RuleEvent.TEXT_APPEARED -> "Text on screen"
+    RuleEvent.MESSAGE_AUTHOR -> "Message author"
+    else -> event
 }

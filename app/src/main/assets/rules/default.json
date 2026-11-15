@@ -50,6 +50,16 @@
       "action": "sent_message",
       "content": "line",
       "verified_with": "Telegram 13.2.2 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-15: a send reports no field clear, and its message cell ends with \"Sent at <time>\", then \", Not seen\" or \", Seen\", which changes in place once it is read; the label is keyed on the text up to the time, so one send is labelled once."
+    },
+    {
+      "id": "discord_author",
+      "package": "com.discord",
+      "event": "message_author",
+      "view_id": "com.discord:id/author_name",
+      "label_regex": null,
+      "action": "received_message",
+      "content": "line",
+      "verified_with": "Discord 353.11 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-15: every message sits on the left of the screen under its author's name (view com.discord:id/author_name), so the side of the screen cannot tell sent from received."
     }
   ]
 }

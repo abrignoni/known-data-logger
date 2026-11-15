@@ -6,10 +6,14 @@ package com.abrignoni.knowndatalogger
  * the same flag, so it can be logged but is never labelled a received message.
  */
 data class ShownText(val text: String, val left: Int, val top: Int, val right: Int, val bottom: Int,
-                     val inList: Boolean = true)
+                     val inList: Boolean = true, val leaf: Boolean = true)
 
 /** A line that came onto an open screen, which side of the screen it sits on, and whether it is in the message list. */
-data class Appeared(val text: String, val side: String, val inList: Boolean = true)
+data class Appeared(val text: String, val side: String, val inList: Boolean = true) {
+    /** Where the line sat and whether its node had no children (for author rules); not part of equality. */
+    var top: Int = 0
+    var leaf: Boolean = true
+}
 
 /**
  * Finds text that arrives on a screen that is already open: an incoming message in a chat the
@@ -33,9 +37,11 @@ class ChatWatch {
     private val frame = HashSet<Pair<String, Int>>()
     /** How many times each text showed on the last look. */
     private var last: Map<String, Int> = emptyMap()
+    /** Whether the baseline was taken with the list at its newest end (or with no list to ask). */
+    private var baselineAtNewest = true
 
     /** Forget the screen: the next look is a baseline. */
-    fun reset() { screen = null; most.clear(); frame.clear(); last = emptyMap() }
+    fun reset() { screen = null; most.clear(); frame.clear(); last = emptyMap(); baselineAtNewest = true }
 
     /**
      * [atNewest] false means the screen's message list can still scroll toward newer messages: the examiner
@@ -47,7 +53,11 @@ class ChatWatch {
     fun look(screenKey: Any, lines: List<ShownText>, width: Int, atNewest: Boolean? = null): List<Appeared> {
         val counts = lines.groupingBy { it.text }.eachCount()
         if (screenKey == screen && atNewest == false) return emptyList()
-        if (screenKey != screen) {
+        // A baseline taken away from the newest end (a chat reopened where it was left, scrolled up) holds old
+        // messages that the jump to the end then brings in below it: take the baseline again there. (Discord,
+        // moto g play, 15 November 2026: 4 older messages were logged as new when the list jumped to its end.)
+        if (screenKey != screen || (atNewest == true && !baselineAtNewest)) {
+            baselineAtNewest = atNewest != false
             reset()
             screen = screenKey
             counts.forEach { (t, n) -> most[t] = n }
@@ -81,13 +91,17 @@ class ChatWatch {
                 continue
             }
             extra[line.text] = left - 1
-            out += Appeared(line.text, sideOf(line, width), line.inList)
+            out += Appeared(line.text, sideOf(line, width), line.inList).also { it.top = line.top; it.leaf = line.leaf }
         }
         counts.forEach { (t, n) -> if (n > (most[t] ?: 0)) most[t] = n }
         return out.asReversed()
     }
 
     companion object {
+        /** The author shown nearest above [top]: the last author line whose top is at or above it. */
+        fun authorAbove(top: Int, authors: List<Pair<String, Int>>): String? =
+            authors.filter { it.second <= top }.maxByOrNull { it.second }?.first
+
         private val timeOrDate = Regex(
             "(?i)(\\d{1,2}:\\d{2}(\\s*[ap]\\.?\\s*m\\.?)?|today|yesterday|" +
             "(monday|tuesday|wednesday|thursday|friday|saturday|sunday)|" +
