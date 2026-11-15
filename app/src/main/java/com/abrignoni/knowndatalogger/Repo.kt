@@ -101,7 +101,8 @@ class Repo private constructor(private val context: Context) {
             detail = "apps: " + (if (allApps) "all" else capturePackages().sorted().joinToString(" ")) +
                 "; screenshots: auto=${flag(KEY_SHOT_AUTO, true)} every_tap=${flag(KEY_SHOT_TAP, false)} view_tree=${flag(KEY_TREE, true)}" +
                 "; capture=${if (capture) "on" else "off"}" +
-                "; looks=${if (capture && flag(KEY_RECORD_LOOKS, false)) "on" else "off"}"),
+                "; looks=${if (capture && flag(KEY_RECORD_LOOKS, false)) "on" else "off"}" +
+                "; notifications=${if (notificationAccess()) "listener" else "accessibility"}"),
             s, kind = Kind.SYSTEM_EVENT)
     }
 
@@ -329,6 +330,12 @@ class Repo private constructor(private val context: Context) {
 
     /** The newest row's hash, shown on the Setup tab ("Latest row hash") so the tester can note it. */
     fun lastRowHash(): String? { ensureChain(); return lastHash?.ifEmpty { null } }
+
+    /** Whether notification access is granted to NotificationWatch (Android 8.1 and later can tell). */
+    fun notificationAccess(): Boolean = if (android.os.Build.VERSION.SDK_INT >= 27)
+        context.getSystemService(android.app.NotificationManager::class.java)
+            .isNotificationListenerAccessGranted(android.content.ComponentName(context, NotificationWatch::class.java))
+    else false
 
     fun liveFile(): File = File(context.getExternalFilesDir(null) ?: context.filesDir, "actions-live.jsonl")
 

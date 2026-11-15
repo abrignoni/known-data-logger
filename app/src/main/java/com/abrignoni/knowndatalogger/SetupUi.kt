@@ -93,6 +93,10 @@ private fun SetupHome(repo: Repo, bump: () -> Unit, open: (String) -> Unit) {
             NavRow("Capture", if (enabled) "On" else "Off · open Accessibility settings") {
                 ctx.startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
             }
+            NavRow("Notification access", if (repo.notificationAccess()) "On · every notification update is seen"
+                else "Off · optional, open Android's setting") {
+                ctx.startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+            }
             NavRow("Scenario", "${repo.scenarioId} · ${repo.deviceLabel}") { open("scenario") }
             NavRow("Apps", (if (repo.flag(Repo.KEY_ALL_APPS, false)) "All apps" else apps.joinToString(", ") { it.label }).ifBlank { "None picked" }) { open("apps") }
             SwitchRow("Hide verification codes", "In notifications, screens and taps", maskCodes) { maskCodes = it; repo.setFlag(Repo.KEY_MASK_CODES, it) }

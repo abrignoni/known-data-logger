@@ -225,6 +225,15 @@ app with Date, Time, Action, Content, Counterpart and a link to the screenshot, 
 Captured events. It uses current revisions only, keeps each device's own order, and writes every
 value as text so content cannot run as a formula.
 
+## Notification listener (optional)
+
+- `NotificationWatch` (NotificationListenerService, bound with BIND_NOTIFICATION_LISTENER_SERVICE) forwards
+  every `onNotificationPosted` to `CaptureService.onPostedNotification`, which applies the session and app
+  filters and the same handling as an accessibility notification event (repeat key, masking, package
+  rules, category). While `NotificationWatch.connected`, accessibility TYPE_NOTIFICATION_STATE_CHANGED
+  events are ignored. The start row's detail ends `notifications=listener|accessibility`
+  (`Repo.notificationAccess()`, Android 8.1 and later).
+
 ## Notification rules
 
 - When a package has rules with event `notification`, they decide and the category is not used: the first

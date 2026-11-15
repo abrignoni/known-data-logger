@@ -35,6 +35,16 @@
             </intent-filter>
         </activity>
 
+        <!-- Optional: notification access, bound only by the system (BIND_NOTIFICATION_LISTENER_SERVICE). -->
+        <service
+            android:name=".NotificationWatch"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
         <!-- Capture: an accessibility service, bound only by the system (BIND_ACCESSIBILITY_SERVICE). -->
         <service
             android:name=".CaptureService"
