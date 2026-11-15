@@ -232,6 +232,13 @@ value as text so content cannot run as a formula.
   While a session runs, KDL also looks every 3 s when no look ran in the last 3 s, clearing the
   node cache first (Android 14 and later), because some app builds send no content change for an
   arriving message.
+  The look finds the screen's message list: the largest scrollable node that is not a
+  HorizontalScrollView, ViewPager or ViewPager2. With a list, a line outside its subtree is reported
+  with `inList` false and logged as `text_appeared` but never labelled. While the list offers
+  `ACTION_SCROLL_FORWARD` (it can scroll toward newer items), the look is skipped by `ChatWatch`:
+  no lines reported, nothing learned. A left line that is only a clock time, "Today", "Yesterday",
+  a weekday or a month and day (`ChatWatch.isTimeOrDate`) is not labelled `received_message`.
+  With no list (Messenger), every line counts as in the list and the look is never skipped.
   The look collects visible view text (not content descriptions, not Button classes, not editable
   or password fields, nothing under a HorizontalScrollView, ViewPager or ViewPager2) with screen
   bounds. `ChatWatch` takes the first look at each screen (the

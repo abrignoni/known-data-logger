@@ -38,6 +38,40 @@ class ChatWatchTest {
         assertTrue(c.look("chat", listOf(l("m5", 100), l("m6", 300)), w).isEmpty())
     }
 
+    @Test fun aLookAwayFromTheNewestEndReportsAndLearnsNothing() {
+        val c = ChatWatch()
+        c.look("chat", listOf(l("a", 100), l("b", 300, false)), w, atNewest = true)
+        val shown = listOf(l("a", 20), l("b", 220, false), l("c", 420))
+        // Reading history: what comes into view is not arriving.
+        assertTrue(c.look("chat", shown, w, atNewest = false).isEmpty())
+        // Back at the newest end, a message that arrived meanwhile is still new.
+        assertEquals(listOf(Appeared("c", "left")), c.look("chat", shown, w, atNewest = true))
+    }
+
+    @Test fun anOldMessageScrolledBackIntoViewIsNotNew() {
+        val c = ChatWatch()
+        c.look("chat", listOf(l("m30", 100), l("m31", 300)), w, atNewest = true)
+        // Scrolled up past the baseline, then partway back down: older lines show below one already seen.
+        assertTrue(c.look("chat", listOf(l("m28", 100), l("m29", 300)), w, atNewest = false).isEmpty())
+        assertTrue(c.look("chat", listOf(l("m30", 100), l("m29", 300)), w, atNewest = false).isEmpty())
+        assertTrue(c.look("chat", listOf(l("m30", 100), l("m31", 300)), w, atNewest = true).isEmpty())
+    }
+
+    @Test fun textOutsideTheListIsReportedAsSuch() {
+        val c = ChatWatch()
+        c.look("chat", listOf(ShownText("Alex", 200, 40, 500, 90, inList = false), l("a", 300)), w)
+        val got = c.look("chat", listOf(ShownText("Alex", 200, 40, 500, 90, inList = false),
+            ShownText("online", 200, 95, 400, 130, inList = false), l("a", 300)), w)
+        assertEquals(listOf(Appeared("online", "left", inList = false)), got)
+    }
+
+    @Test fun aTimeOrDateLineIsKnown() {
+        for (t in listOf("8:21 AM", "8:21\u202fAM", "8:21 a.m.", "18:05", "Today", "Yesterday", "Saturday",
+                "November 15", "November 15, 2026")) assertTrue(t, ChatWatch.isTimeOrDate(t))
+        for (t in listOf("online", "Okay", "Test 29 delta", "Meet at 8:21 AM", "8:21 AM tomorrow", "May I?"))
+            assertTrue(t, !ChatWatch.isTimeOrDate(t))
+    }
+
     @Test fun aSecondCopyOfTheSameTextCounts() {
         val c = ChatWatch()
         c.look("chat", listOf(l("ok", 100), l("x", 300, false)), w)
