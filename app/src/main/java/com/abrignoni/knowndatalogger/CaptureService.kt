@@ -99,10 +99,10 @@ class CaptureService : AccessibilityService() {
     private var lastScanAt = 0L
     /**
      * A look every few seconds while a session runs, besides the look after each burst of content changes.
-     * Some app builds send no content-change event when a message arrives: Google Messages
-     * (messages.android_20250422_03_RC00, Galaxy A16 5G, 15 November 2026) sent none from the window
+     * With some app builds KDL gets no content-change event when a message arrives: with Google Messages
+     * (messages.android_20250422_03_RC00, Galaxy A16 5G, 15 November 2026) it got none from the window
      * opening until the screen was touched, so a message received while the phone sat idle was never seen.
-     * Without events Android's node cache is never told the screen changed, so it is cleared first.
+     * With no events the node cache may hold the old screen, so it is cleared first.
      */
     private val poll = object : Runnable {
         override fun run() {
