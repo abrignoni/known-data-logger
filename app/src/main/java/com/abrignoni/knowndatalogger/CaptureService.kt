@@ -93,6 +93,7 @@ class CaptureService : AccessibilityService() {
     /** What this phone sent or was notified of lately (text to elapsed ms), so a line on screen is not taken for a new receive. */
     private val recentOwn = LinkedHashMap<String, Long>()
     private val recentNotified = LinkedHashMap<String, Long>()
+    private val ruleLabelled = LinkedHashMap<String, Long>()
     private val scan = Runnable { scanOpenScreen() }
     /** For the session's summary row: how often the open screen was looked at, started again, and gave new lines. */
     private var watchLooks = 0
@@ -123,7 +124,7 @@ class CaptureService : AccessibilityService() {
         seenNotifications.clear()
         if (!active && watchLooks > 0) repo.log(Draft(action = "screen_watch_summary", source = Source.SYSTEM,
             detail = "looks $watchLooks, baselines $watchBaselines, new lines $watchFound"), kind = Kind.SYSTEM_EVENT)
-        chatWatch.reset(); recentOwn.clear(); recentNotified.clear()
+        chatWatch.reset(); recentOwn.clear(); recentNotified.clear(); ruleLabelled.clear()
         watchLooks = 0; watchBaselines = 0; watchFound = 0; watchLastKey = null
         maskCodes = repo.flag(Repo.KEY_MASK_CODES, true)
         if (active) { showMark(); startPackageWatch() } else { flushText(); removeMark(); stopPackageWatch() }
@@ -407,9 +408,9 @@ class CaptureService : AccessibilityService() {
     }
 
     /** True when the line holds a text this phone sent or was notified of in the last 2 minutes. */
-    private fun recentlyIn(map: Map<String, Long>, line: String): Boolean {
+    private fun recentlyIn(map: Map<String, Long>, line: String, within: Long = 120_000, exact: Boolean = false): Boolean {
         val now = android.os.SystemClock.elapsedRealtime()
-        return map.any { (t, at) -> now - at < 120_000 && line.contains(t) }
+        return map.any { (t, at) -> now - at < within && (if (exact) line == t else line.contains(t)) }
     }
 
     /**
@@ -453,15 +454,22 @@ class CaptureService : AccessibilityService() {
         val found = chatWatch.look(key, lines, win.width())
         watchFound += found.size
         for (a in found) {
-            if (recentlyIn(recentOwn, a.text)) continue
-            val shown = masked(a.text.take(2000))
-            val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.TEXT_APPEARED, content = shown,
-                detail = "side ${a.side}", source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
             // An app can say in the line itself which way it went: Telegram's message cells span the whole width
             // (side "across") and end with "Received at <time>" or "Sent at <time>". A text_appeared rule names that.
             val rule = Rules.match(rules, pkg, RuleEvent.TEXT_APPEARED, null, a.text)
+            // A line holding what this phone just typed is its own message: dropped, unless a rule says it was
+            // sent. Telegram reports no field clear, so its "Sent at" line is the only sign of a send (Galaxy
+            // A16 5G and moto g play, 15 November 2026: 0 of 15 sends labelled per phone before this).
+            if (recentlyIn(recentOwn, a.text) && (rule == null || directionFor(rule.action) != "out")) continue
+            val shown = masked(a.text.take(2000))
+            val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.TEXT_APPEARED, content = shown,
+                detail = "side ${a.side}", source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
             if (rule != null) {
                 if (directionFor(rule.action) == "in" && recentlyIn(recentNotified, a.text)) continue
+                // One label per message, though its line changes in place (Rules.lineKey).
+                val k = Rules.lineKey(rule, a.text)
+                if (k != null && recentlyIn(ruleLabelled, k, 600_000, exact = true)) continue
+                remember(ruleLabelled, k)
                 val labelled = repo.log(Draft(appPackage = pkg, action = rule.action, direction = directionFor(rule.action),
                     content = if (rule.content == "line") shown else null, refersTo = raw.entryId,
                     detail = "auto rule ${rule.id}", source = Source.AUTO_RULE, reviewed = false), stamp = raw.stamp, detect = false).last()

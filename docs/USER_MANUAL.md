@@ -493,11 +493,12 @@ kept as raw events and show up on the Captured events sheet, but no action is in
   the screen did not log it again). A fast scroll that replaces the whole screen is not taken for
   arrivals either. Some apps draw every message across the whole width, so the side cannot tell
   sent from received; a rule with event `text_appeared` can then label a line by the app's own
-  words. KDL ships one for Telegram 13.2.2, whose lines end "Received at <time>" (English). With it,
-  on a Galaxy A16 5G and a moto g play, 5 of 5 received Telegram messages were labelled on each
-  phone, none twice and none false. Google Messages, rerun with the same build: 5 of 5 received
-  and 5 of 5 sent on each phone. Telegram reports no clearing of its message box, so a Telegram send
-  is logged as typed text but not labelled `sent_message`. A message that arrives while the chat is scrolled up, away
+  words. KDL ships two for Telegram 13.2.2, whose lines end "Received at <time>" or "Sent at <time>"
+  (English). Telegram reports no clearing of its message box, so its "Sent at" line is how a send is
+  labelled `sent_message`. That line changes once the message is read ("Not seen" to "Seen"), so a
+  rule labels a message once, keyed on the line up to the time. On a Galaxy A16 5G and a moto g play,
+  5 of 5 sent and 5 of 5 received Telegram messages were labelled on each phone, none twice and none
+  false. A message that arrives while the chat is scrolled up, away
   from its newest message, is not on the screen, so it cannot be logged this way; that case was not
   tried. Each session also logs `screen_watch_active` when
   the watch first looks at a screen, and `screen_watch_summary` at the end (looks, new screens,

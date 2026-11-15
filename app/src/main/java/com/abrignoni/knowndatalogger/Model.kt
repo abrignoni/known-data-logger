@@ -373,7 +373,7 @@ data class Rule(
     val event: String = RuleEvent.TAP,
 ) {
     /** Compiled once; an invalid pattern is rejected when the rules file is parsed. */
-    private val regex: Regex? by lazy { labelRegex?.let { Regex(it, RegexOption.IGNORE_CASE) } }
+    internal val regex: Regex? by lazy { labelRegex?.let { Regex(it, RegexOption.IGNORE_CASE) } }
 
     fun matches(pkg: String, event: String, viewId: String?, label: String?): Boolean {
         if (pkg != this.pkg || event != this.event) return false
@@ -388,6 +388,17 @@ data class Rule(
 object Rules {
     fun match(rules: List<Rule>, pkg: String, event: String, viewId: String?, label: String?): Rule? =
         rules.firstOrNull { it.matches(pkg, event, viewId, label) }
+
+    /**
+     * Which message a text_appeared line is, for labelling it once: the line up to the end of the rule's
+     * match. A line can change in place after it came in: Telegram 13.2.2 rewrites "Sent at 5:34 AM, Not
+     * seen" as "Sent at 5:34 AM, Seen" once it is read (Galaxy A16 5G, 15 November 2026: 30 lines for 15
+     * sends), and the part after the match is what changes. Null when the rule has no label_regex.
+     */
+    fun lineKey(rule: Rule, line: String): String? {
+        val m = rule.regex?.find(line) ?: return null
+        return "${rule.id}|${line.substring(0, m.range.last + 1)}"
+    }
 
     /** True when one text change removed all of the previous text (at least 2 characters). */
     fun isBulkClear(before: String?, added: Int, removed: Int): Boolean =

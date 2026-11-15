@@ -245,7 +245,11 @@ value as text so content cannot run as a formula.
   event `text_appeared` are matched by `label_regex` against the line; content `line` puts the line
   in the labelled action. A matching rule replaces the side test; an incoming action is skipped
   when a notification of the last 2 minutes held the text. Typed text also counts as this phone's
-  own text for 2 minutes. Shipped: `telegram_receive` (`\nReceived at \d` -> received_message).
+  own text for 2 minutes; a line holding it is dropped unless a rule labels it outgoing. A rule labels
+  a message once in 10 minutes, keyed on the line up to the end of its match, since a line can
+  change in place after it came in ("Not seen" to "Seen"). Shipped: `telegram_receive`
+  (`\nReceived at \d{1,2}:\d{2}` -> received_message) and `telegram_send`
+  (`\nSent at \d{1,2}:\d{2}` -> sent_message).
 
 ## Version 0.3
 

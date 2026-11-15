@@ -1,6 +1,8 @@
 package com.abrignoni.knowndatalogger
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -101,14 +103,31 @@ class ChatWatchTest {
 class TextAppearedRuleTest {
     private val shipped = parseRules(java.io.File("src/main/assets/rules/default.json").readText())
 
-    @Test fun telegramsReceivedLineIsLabelledAndItsSentLineIsNot() {
+    @Test fun telegramsCellsAreLabelledByTheirOwnWords() {
         // Telegram 13.2.2 (Galaxy A16 5G and moto g play, 15 November 2026): full-width cells that say which way they went.
         val received = "Test 102 golf hotel\nReceived at 12:29 AM"
         val sent = "Test 101 foxtrot golf\nSent at 12:29 AM, Seen"
         assertEquals("received_message", Rules.match(shipped, "org.telegram.messenger", RuleEvent.TEXT_APPEARED, null, received)?.action)
-        assertEquals(null, Rules.match(shipped, "org.telegram.messenger", RuleEvent.TEXT_APPEARED, null, sent))
+        assertEquals("sent_message", Rules.match(shipped, "org.telegram.messenger", RuleEvent.TEXT_APPEARED, null, sent)?.action)
+        assertEquals("line", Rules.match(shipped, "org.telegram.messenger", RuleEvent.TEXT_APPEARED, null, sent)?.content)
+        assertEquals(null, Rules.match(shipped, "org.telegram.messenger", RuleEvent.TEXT_APPEARED, null, "Sent at the shop"))
+        assertEquals(null, Rules.match(shipped, "org.telegram.messenger", RuleEvent.TEXT_APPEARED, null, "Test 103\nEdited"))
         assertEquals(null, Rules.match(shipped, "org.telegram.messenger", RuleEvent.TAP, null, received))
         assertEquals(null, Rules.match(shipped, "com.example", RuleEvent.TEXT_APPEARED, null, received))
+    }
+
+    @Test fun aSentLineThatChangesInPlaceKeepsOneKey() {
+        // The line is rewritten once the other side reads it; the message is the same one.
+        val rule = Rules.match(shipped, "org.telegram.messenger", RuleEvent.TEXT_APPEARED, null, "a\nSent at 5:34 AM, Not seen")!!
+        val notSeen = Rules.lineKey(rule, "Test 101 foxtrot golf\nSent at 5:34 AM, Not seen")
+        assertEquals(notSeen, Rules.lineKey(rule, "Test 101 foxtrot golf\nSent at 5:34 AM, Seen"))
+        assertEquals("telegram_send|Test 101 foxtrot golf\nSent at 5:34", notSeen)
+        // Another message, or the same words sent at another time, is another key. A 24-hour clock works too.
+        assertNotEquals(notSeen, Rules.lineKey(rule, "Test 102 golf hotel\nSent at 5:34 AM, Seen"))
+        assertNotEquals(notSeen, Rules.lineKey(rule, "Test 101 foxtrot golf\nSent at 5:35 AM, Seen"))
+        assertEquals("telegram_send|ok\nSent at 17:34", Rules.lineKey(rule, "ok\nSent at 17:34, Seen"))
+        val noRegex = Rule("r", "p", "p:id/x", null, "took_photo", null, null)
+        assertNull(Rules.lineKey(noRegex, "anything"))
     }
 
     @Test fun aTextAppearedRuleWithLineContentCanBeImported() {
