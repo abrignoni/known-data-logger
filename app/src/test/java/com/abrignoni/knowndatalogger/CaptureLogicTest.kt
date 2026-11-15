@@ -171,7 +171,7 @@ class CaptureLogicTest {
 
     @Test fun shippedRulesParseAndTheInstagramSendMatchesItsField() {
         val shipped = parseRules(java.io.File("src/main/assets/rules/default.json").readText())
-        assertEquals(listOf("google_messages_send", "aosp_camera_shutter", "instagram_send"), shipped.map { it.id })
+        assertEquals(listOf("google_messages_send", "aosp_camera_shutter", "instagram_send", "telegram_receive"), shipped.map { it.id })
         val field = "com.instagram.android:id/row_thread_composer_edittext"
         val hit = Rules.match(shipped, "com.instagram.android", RuleEvent.FIELD_CLEARED, field, null)
         assertEquals("sent_message", hit?.action); assertEquals("last_typed", hit?.content)

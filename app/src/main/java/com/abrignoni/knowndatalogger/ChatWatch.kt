@@ -26,9 +26,11 @@ class ChatWatch {
     private val most = HashMap<String, Int>()
     /** Text and top of every line at the baseline. */
     private val frame = HashSet<Pair<String, Int>>()
+    /** How many times each text showed on the last look. */
+    private var last: Map<String, Int> = emptyMap()
 
     /** Forget the screen: the next look is a baseline. */
-    fun reset() { screen = null; most.clear(); frame.clear() }
+    fun reset() { screen = null; most.clear(); frame.clear(); last = emptyMap() }
 
     fun look(screenKey: Any, lines: List<ShownText>, width: Int): List<Appeared> {
         val counts = lines.groupingBy { it.text }.eachCount()
@@ -37,11 +39,20 @@ class ChatWatch {
             screen = screenKey
             counts.forEach { (t, n) -> most[t] = n }
             lines.forEach { frame += it.text to it.top }
+            last = counts
             return emptyList()
         }
         // Lines whose text was already seen as often as it shows now, outside the frame: the old content.
         val oldTopmost = lines.filter { (most[it.text] ?: 0) >= (counts[it.text] ?: 0) && (it.text to it.top) !in frame }
             .minOfOrNull { it.top }
+        // Lines of the last look are gone and nothing that stayed has moved (only the frame is left): the screen
+        // jumped (a fast scroll), and what came in is not arriving. An arrival either moves what was there or
+        // leaves it all in place; the first message in an empty chat removes nothing. (Telegram, Galaxy A16 5G,
+        // 15 November 2026: one old message was labelled after a scroll.)
+        val gone = last.any { (t, n) -> (counts[t] ?: 0) < n }
+        val stayedAndMoved = lines.any { (last[it.text] ?: 0) > 0 && (it.text to it.top) !in frame }
+        val jumped = gone && !stayedAndMoved
+        last = counts
         val out = ArrayList<Appeared>()
         val extra = HashMap<String, Int>()
         for ((t, n) in counts) {
@@ -52,7 +63,7 @@ class ChatWatch {
         for (line in lines.sortedBy { it.top }.asReversed()) {
             val left = extra[line.text] ?: 0
             if (left <= 0) continue
-            if (oldTopmost != null && line.top < oldTopmost) {
+            if (jumped || (oldTopmost != null && line.top < oldTopmost)) {
                 extra[line.text] = 0      // above all old content: revealed by a scroll, not arrived
                 continue
             }

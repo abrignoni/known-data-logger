@@ -79,9 +79,42 @@ class ChatWatchTest {
             c.look("chat", chrome + listOf(l("a", 1100), l("b", 1300, false), l("c", 1500), ShownText("seen", 950, 1600, 1000, 1640)), w))
     }
 
+    @Test fun aJumpThatReplacesTheWholeScreenIsNotArrivals() {
+        val c = ChatWatch()
+        c.look("chat", chrome + listOf(l("m8", 300), l("m9", 500)), w)
+        assertTrue(c.look("chat", chrome + listOf(l("m1", 300), l("m2", 500)), w).isEmpty())
+    }
+
+    @Test fun theFirstMessageInAnEmptyChatStillCounts() {
+        val c = ChatWatch()
+        c.look("chat", chrome, w)
+        assertEquals(listOf(Appeared("hi", "left")), c.look("chat", chrome + listOf(l("hi", 1700)), w))
+    }
+
     @Test fun sideFollowsAppWalksRule() {
         assertEquals("left", ChatWatch.sideOf(ShownText("t", 60, 0, 600, 1), w))
         assertEquals("right", ChatWatch.sideOf(ShownText("t", 480, 0, 1020, 1), w))
         assertEquals("across", ChatWatch.sideOf(ShownText("t", 20, 0, 1060, 1), w))
+    }
+}
+
+class TextAppearedRuleTest {
+    private val shipped = parseRules(java.io.File("src/main/assets/rules/default.json").readText())
+
+    @Test fun telegramsReceivedLineIsLabelledAndItsSentLineIsNot() {
+        // Telegram 13.2.2 (Galaxy A16 5G and moto g play, 15 November 2026): full-width cells that say which way they went.
+        val received = "Test 102 golf hotel\nReceived at 12:29 AM"
+        val sent = "Test 101 foxtrot golf\nSent at 12:29 AM, Seen"
+        assertEquals("received_message", Rules.match(shipped, "org.telegram.messenger", RuleEvent.TEXT_APPEARED, null, received)?.action)
+        assertEquals(null, Rules.match(shipped, "org.telegram.messenger", RuleEvent.TEXT_APPEARED, null, sent))
+        assertEquals(null, Rules.match(shipped, "org.telegram.messenger", RuleEvent.TAP, null, received))
+        assertEquals(null, Rules.match(shipped, "com.example", RuleEvent.TEXT_APPEARED, null, received))
+    }
+
+    @Test fun aTextAppearedRuleWithLineContentCanBeImported() {
+        val f = """{"version":1,"rules":[{"id":"r","package":"p","event":"text_appeared","label_regex":"Received at","action":"received_message","content":"line"}]}"""
+        val read = readRulesForImport(f)
+        assertEquals(0, read.skipped)
+        assertEquals(RuleEvent.TEXT_APPEARED, read.rules.single().event)
     }
 }

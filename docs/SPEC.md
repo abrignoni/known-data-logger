@@ -240,7 +240,12 @@ value as text so content cannot run as a formula.
   minutes adds an unreviewed `received_message` (detail "auto: text appeared on the left of an open
   screen"), with a screenshot when inferred-action screenshots are on. System events
   `screen_watch_active` (first look of a session) and `screen_watch_summary` (looks, baselines,
-  new lines; at session stop).
+  new lines; at session stop). A look where lines of the previous look are gone and every line that
+  stayed is still at its baseline place is a jump (a fast scroll): nothing on it is new. Rules with
+  event `text_appeared` are matched by `label_regex` against the line; content `line` puts the line
+  in the labelled action. A matching rule replaces the side test; an incoming action is skipped
+  when a notification of the last 2 minutes held the text. Typed text also counts as this phone's
+  own text for 2 minutes. Shipped: `telegram_receive` (`\nReceived at \d` -> received_message).
 
 ## Version 0.3
 
