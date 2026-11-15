@@ -44,6 +44,8 @@ class Repo private constructor(private val context: Context) {
         const val KEY_TREE = "view_tree_with_screenshot"
         const val KEY_ALL_APPS = "capture_all_apps"
         const val KEY_MASK_CODES = "mask_notification_codes"
+        /** Testing only: write every look of the screen watch to a looks file (LookLog). Off by default. */
+        const val KEY_RECORD_LOOKS = "record_screen_looks"
         /** Set while a session that was started without the capture service is running. */
         const val KEY_HAND_ONLY = "session_hand_only"
         val DEFAULT_CAPTURE_PACKAGES = setOf("com.android.systemui", "com.android.settings")
@@ -98,12 +100,15 @@ class Repo private constructor(private val context: Context) {
         log(Draft(action = "capture_session_start", source = Source.SYSTEM,
             detail = "apps: " + (if (allApps) "all" else capturePackages().sorted().joinToString(" ")) +
                 "; screenshots: auto=${flag(KEY_SHOT_AUTO, true)} every_tap=${flag(KEY_SHOT_TAP, false)} view_tree=${flag(KEY_TREE, true)}" +
-                "; capture=${if (capture) "on" else "off"}"),
+                "; capture=${if (capture) "on" else "off"}" +
+                "; looks=${if (capture && flag(KEY_RECORD_LOOKS, false)) "on" else "off"}"),
             s, kind = Kind.SYSTEM_EVENT)
     }
 
     fun stopSession() {
         setFlag(KEY_SESSION, false)
+        // Recording looks keeps every line the watched apps show: it ends with the session it was turned on for.
+        setFlag(KEY_RECORD_LOOKS, false)
         setFlag(KEY_HAND_ONLY, false)
         log(Draft(action = "capture_session_stop", source = Source.SYSTEM), kind = Kind.SYSTEM_EVENT)
     }
@@ -243,6 +248,7 @@ class Repo private constructor(private val context: Context) {
         screensDir().listFiles()?.forEach { it.delete() }
         treesDir().listFiles()?.forEach { it.delete() }
         liveFile().delete()
+        looksFiles().forEach { it.delete() }
         lastHash = null
         lastStamp = null
         lastStampLoaded = false
@@ -325,6 +331,17 @@ class Repo private constructor(private val context: Context) {
     fun lastRowHash(): String? { ensureChain(); return lastHash?.ifEmpty { null } }
 
     fun liveFile(): File = File(context.getExternalFilesDir(null) ?: context.filesDir, "actions-live.jsonl")
+
+    /** The looks file of the running session (LookLog), beside the live file: never exported, never hashed. */
+    fun looksFile(): File {
+        val start = sessionStart()?.utcMs ?: System.currentTimeMillis()
+        val name = java.text.SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'", java.util.Locale.US)
+            .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }.format(java.util.Date(start))
+        return File(context.getExternalFilesDir(null) ?: context.filesDir, "looks-$name.jsonl")
+    }
+
+    fun looksFiles(): List<File> = (context.getExternalFilesDir(null) ?: context.filesDir)
+        .listFiles { f -> f.name.startsWith("looks-") && f.name.endsWith(".jsonl") }?.toList() ?: emptyList()
 
     /** Logs system rows for detected reboots and clock or zone changes, then returns them. */
     private fun systemRowsFor(stamp: Stamp): List<Entry> {

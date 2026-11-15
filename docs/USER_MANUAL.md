@@ -557,6 +557,15 @@ kept as raw events and show up on the Captured events sheet, but no action is in
   the watch first looks at a screen, and `screen_watch_summary` at the end (looks, new screens,
   new lines), so an export shows whether it ran.
 
+**Record screen looks (testing)** keeps what the screen watch saw, so a session can be replayed off the
+phone when KDL's own logic changes. It is for test phones only: the file holds every line of text the
+apps under test show, unmasked, every few seconds. It is off by default, it turns itself off when the
+session stops, and the session's start row says `looks=on` when it was on. The file
+(`looks-<session start>.jsonl`) stays on the phone beside the live log, in KDL's folder under
+Android/data. It is not part of any export and not in the hash chain. To copy it, use adb:
+`adb pull /sdcard/Android/data/com.abrignoni.knowndatalogger/files/` (read on a Galaxy A16 5G and a moto
+g play, Android 16). Start over deletes it.
+
 When **Screenshot inferred actions** is on, a rule match also takes a screenshot, and so does a
 `received_message` from an open chat. Actions inferred from notifications have no screenshot.
 

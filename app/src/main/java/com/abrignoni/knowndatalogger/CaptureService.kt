@@ -96,6 +96,12 @@ class CaptureService : AccessibilityService() {
     private val recentNotified = LinkedHashMap<String, Long>()
     private val ruleLabelled = LinkedHashMap<String, Long>()
     private val scan = Runnable { scanOpenScreen() }
+    /** Testing only: the session's looks file when Record screen looks is on (LookLog). */
+    private var looks: LookLog? = null
+    private fun el() = android.os.SystemClock.elapsedRealtime()
+    private fun skip(reason: String, pkg: String? = null) {
+        looks?.write("skip", el(), org.json.JSONObject().put("reason", reason).put("package", pkg ?: org.json.JSONObject.NULL))
+    }
     private var lastScanAt = 0L
     /**
      * A look every few seconds while a session runs, besides the look after each burst of content changes.
@@ -149,9 +155,19 @@ class CaptureService : AccessibilityService() {
         main.removeCallbacks(poll)
         if (active) main.postDelayed(poll, POLL_MS)
         if (active) { showMark(); startPackageWatch() } else { flushText(); removeMark(); stopPackageWatch() }
+        // The looks file records this reset, then the settings and rules every decision after it depends on.
+        if (looks == null && active && repo.flag(Repo.KEY_RECORD_LOOKS, false)) looks = LookLog(repo.looksFile())
+        looks?.write("reset", el(), org.json.JSONObject().put("active", active).put("mask_codes", maskCodes)
+            .put("shot_auto", shotAuto).put("all_apps", allApps)
+            .put("listed", org.json.JSONArray(listed.sorted())).put("capture", org.json.JSONArray(pkgs.sorted())))
+        looks?.write("rules", el(), LookLog.rules(rules))
+        if (!active) { looks?.close(); looks = null }
     }
 
-    fun reloadRules() { rules = repo.loadRules() }
+    fun reloadRules() {
+        rules = repo.loadRules()
+        looks?.write("rules", el(), LookLog.rules(rules))
+    }
 
     // ---- App changes during a session ----
 
@@ -424,7 +440,12 @@ class CaptureService : AccessibilityService() {
 
     private fun remember(map: LinkedHashMap<String, Long>, t: String?) {
         val s = t?.trim()?.takeIf { it.isNotEmpty() } ?: return
-        map.remove(s); map[s] = android.os.SystemClock.elapsedRealtime()
+        val now = android.os.SystemClock.elapsedRealtime()
+        looks?.let { lg ->
+            val which = when { map === recentOwn -> "own"; map === recentNotified -> "notified"; map === ruleLabelled -> "rule_labelled"; else -> "other" }
+            lg.write("remember", now, org.json.JSONObject().put("list", which).put("text", s))
+        }
+        map.remove(s); map[s] = now
         while (map.size > 50) map.remove(map.keys.first())
     }
 
@@ -501,11 +522,12 @@ class CaptureService : AccessibilityService() {
      */
     private fun scanOpenScreen() {
         lastScanAt = android.os.SystemClock.uptimeMillis()
-        if (!active || kdlInFront) return
-        if (getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true) return
-        val root = try { rootInActiveWindow } catch (e: Exception) { null } ?: return
-        val pkg = root.packageName?.toString() ?: return
-        if (pkg == SYSTEM_UI || pkg !in listed || !wanted(pkg)) return
+        if (!active) return
+        if (kdlInFront) { skip("kdl_in_front"); return }
+        if (getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true) { skip("locked"); return }
+        val root = try { rootInActiveWindow } catch (e: Exception) { null } ?: run { skip("no_window"); return }
+        val pkg = root.packageName?.toString() ?: run { skip("no_package"); return }
+        if (pkg == SYSTEM_UI || pkg !in listed || !wanted(pkg)) { skip("not_watched", pkg); return }
         val win = android.graphics.Rect().also { root.getBoundsInScreen(it) }
         val lines = ArrayList<ShownText>()
         // An app that names each message's author (Discord): where the author lines are.
@@ -554,12 +576,13 @@ class CaptureService : AccessibilityService() {
             }
             for (i in 0 until n.childCount) n.getChild(i)?.let { walk(it, depth + 1, inList) }
         }
-        try { walk(root, 0, false) } catch (e: Exception) { return }
+        try { walk(root, 0, false) } catch (e: Exception) { skip("read_failed", pkg); return }
         val key = lastScreen ?: (pkg to "")
         if (watchLooks == 0) repo.log(Draft(appPackage = pkg, action = "screen_watch_active", source = Source.SYSTEM,
             detail = "${lines.size} lines on the first look"), kind = Kind.SYSTEM_EVENT)
         watchLooks++
         if (key != watchLastKey) { watchBaselines++; watchLastKey = key }
+        looks?.write("look", el(), LookLog.look(pkg, key, win.width(), atNewest, lines, authors, lines.size > 400))
         val found = chatWatch.look(key, lines, win.width(), atNewest)
         watchFound += found.size
         for (a in found) {
