@@ -1,0 +1,7 @@
+{"seq":1,"entry_id":"s","action":"capture_session_start","source":"system","content":null,"detail":"made up","refers_to":null,"direction":null,"revision_n":0}
+{"seq":2,"entry_id":"a","action":"screen_watch_active","source":"system","app_package":"com.example.chat","content":null,"detail":"1 lines on the first look","refers_to":null,"direction":null,"revision_n":0}
+{"seq":3,"entry_id":"r1","action":"text_appeared","source":"auto_event","app_package":"com.example.chat","content":"How are you","detail":"side left","refers_to":null,"direction":null,"revision_n":0}
+{"seq":4,"entry_id":"l1","action":"received_message","source":"auto_rule","app_package":"com.example.chat","content":"How are you","detail":"auto: text appeared on the left of an open screen","refers_to":"r1","direction":"in","revision_n":0}
+{"seq":5,"entry_id":"t","action":"typed_text","source":"auto_event","app_package":"com.example.chat","content":"On my way","detail":null,"refers_to":null,"direction":null,"revision_n":0}
+{"seq":6,"entry_id":"e","action":"capture_session_stop","source":"system","content":null,"detail":null,"refers_to":null,"direction":null,"revision_n":0}
+{"seq":7,"entry_id":"z","action":"screen_watch_summary","source":"system","content":null,"detail":"looks 3, baselines 1, new lines 2","refers_to":null,"direction":null,"revision_n":0}

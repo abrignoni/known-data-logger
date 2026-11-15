@@ -89,12 +89,12 @@ class CaptureService : AccessibilityService() {
      * are still two notifications.
      */
     private val seenNotifications = LinkedHashMap<String, Long>()
-    /** Text arriving on a screen that is already open (an incoming message in an open chat). */
-    private val chatWatch = ChatWatch()
-    /** What this phone sent or was notified of lately (text to elapsed ms), so a line on screen is not taken for a new receive. */
-    private val recentOwn = LinkedHashMap<String, Long>()
-    private val recentNotified = LinkedHashMap<String, Long>()
-    private val ruleLabelled = LinkedHashMap<String, Long>()
+    /** Every decision the screen watch makes (pure, so a recorded session can be replayed off the phone). */
+    private val judge = WatchJudge().also { j ->
+        j.onRemember = { list, text, now -> looks?.write("remember", now, org.json.JSONObject().put("list", list).put("text", text)) }
+    }
+    /** text_appeared rows the judge named, so a later label (an author learned afterwards) can refer to them. */
+    private val rawRows = LinkedHashMap<Long, Entry>()
     private val scan = Runnable { scanOpenScreen() }
     /** Testing only: the session's looks file when Record screen looks is on (LookLog). */
     private var looks: LookLog? = null
@@ -120,11 +120,6 @@ class CaptureService : AccessibilityService() {
             main.postDelayed(this, POLL_MS)
         }
     }
-    /** For the session's summary row: how often the open screen was looked at, started again, and gave new lines. */
-    private var watchLooks = 0
-    private var watchBaselines = 0
-    private var watchFound = 0
-    private var watchLastKey: Any? = null
     private var maskCodes = true
     /** Version of each captured app when the session started or last changed. */
     private val versions = HashMap<String, String?>()
@@ -147,11 +142,9 @@ class CaptureService : AccessibilityService() {
         rules = repo.loadRules()
         secretKeys.clear()
         seenNotifications.clear()
-        if (!active && watchLooks > 0) repo.log(Draft(action = "screen_watch_summary", source = Source.SYSTEM,
-            detail = "looks $watchLooks, baselines $watchBaselines, new lines $watchFound"), kind = Kind.SYSTEM_EVENT)
-        chatWatch.reset(); recentOwn.clear(); recentNotified.clear(); ruleLabelled.clear(); ownAuthor.clear(); awaitingAuthor.clear()
-        watchLooks = 0; watchBaselines = 0; watchFound = 0; watchLastKey = null
+        write(judge.reset(active)); rawRows.clear()
         maskCodes = repo.flag(Repo.KEY_MASK_CODES, true)
+        judge.rules = rules; judge.maskCodes = maskCodes; judge.shotAuto = shotAuto
         main.removeCallbacks(poll)
         if (active) main.postDelayed(poll, POLL_MS)
         if (active) { showMark(); startPackageWatch() } else { flushText(); removeMark(); stopPackageWatch() }
@@ -166,6 +159,7 @@ class CaptureService : AccessibilityService() {
 
     fun reloadRules() {
         rules = repo.loadRules()
+        judge.rules = rules
         looks?.write("rules", el(), LookLog.rules(rules))
     }
 
@@ -275,7 +269,7 @@ class CaptureService : AccessibilityService() {
         if (Rules.isBulkClear(before, event.addedCount, event.removedCount)) {
             // The field went from text to empty in one change: record what was there, then the clear.
             flushText()
-            remember(recentOwn, before)
+            judge.rememberOwn(before, el())
             val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.FIELD_CLEARED, content = before,
                 detail = viewId?.let { "view $it" }, source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
             applyRule(pkg, RuleEvent.FIELD_CLEARED, viewId, null, raw, before)
@@ -299,7 +293,7 @@ class CaptureService : AccessibilityService() {
         val empty = src.isShowingHintText || src.text.isNullOrEmpty()
         val typed = text.clearedWithoutChange("$stableKey|${src.hashCode()}", empty) ?: return
         writeTyped(typed)
-        remember(recentOwn, typed.text)
+        judge.rememberOwn(typed.text, el())
         val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.FIELD_CLEARED, content = typed.text,
             detail = listOfNotNull(viewId?.let { "view $it" }, "no text change reported").joinToString(", "),
             source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
@@ -312,7 +306,7 @@ class CaptureService : AccessibilityService() {
     private fun writeTyped(t: Typed) {
         // Typed text is also this phone's own message when an app sends without a field-clear event
         // (Telegram 13.2.2, 15 November 2026: 15 of 15 sends typed, 0 cleared).
-        remember(recentOwn, t.text)
+        judge.rememberOwn(t.text, el())
         val d = Draft(appPackage = t.pkg, action = AutoAction.TYPED_TEXT, content = t.text,
             detail = t.viewId?.let { "view $it" }, source = Source.AUTO_EVENT)
         if (t.stamp != null) repo.log(d, stamp = t.stamp, kind = Kind.AUTO_EVENT, detect = false)
@@ -425,7 +419,7 @@ class CaptureService : AccessibilityService() {
         if (last != null && now - last < 60_000) return
         seenNotifications.remove(key); seenNotifications[key] = now
         if (seenNotifications.size > 100) seenNotifications.remove(seenNotifications.keys.first())
-        remember(recentNotified, body)
+        judge.rememberNotified(body, el())
         val (shown, masked) = if (maskCodes) NotificationMap.maskCodes(body) else body to false
         body = shown
         val detail = "category ${category ?: "none"}" + (callType?.let { ", call type $it" } ?: "") +
@@ -438,81 +432,8 @@ class CaptureService : AccessibilityService() {
             reviewed = false), stamp = raw.stamp, detect = false)
     }
 
-    private fun remember(map: LinkedHashMap<String, Long>, t: String?) {
-        val s = t?.trim()?.takeIf { it.isNotEmpty() } ?: return
-        val now = android.os.SystemClock.elapsedRealtime()
-        looks?.let { lg ->
-            val which = when { map === recentOwn -> "own"; map === recentNotified -> "notified"; map === ruleLabelled -> "rule_labelled"; else -> "other" }
-            lg.write("remember", now, org.json.JSONObject().put("list", which).put("text", s))
-        }
-        map.remove(s); map[s] = now
-        while (map.size > 50) map.remove(map.keys.first())
-    }
 
-    /** True when the line holds a text this phone sent or was notified of in the last 2 minutes. */
-    private fun recentlyIn(map: Map<String, Long>, line: String, within: Long = 120_000, exact: Boolean = false): Boolean {
-        val now = android.os.SystemClock.elapsedRealtime()
-        return map.any { (t, at) -> now - at < within && (if (exact) line == t else line.contains(t)) }
-    }
 
-    /** This phone's author name per app, learned from its own lines in an app with a message_author rule. */
-    private val ownAuthor = HashMap<String, String>()
-    /** Messages logged before this phone's author was known: (app, author, raw row, text), labelled once it is. */
-    private val awaitingAuthor = ArrayList<AwaitingAuthor>()
-    private data class AwaitingAuthor(val pkg: String, val author: String, val raw: Entry, val shown: String?, val ruleId: String, val action: String)
-
-    /**
-     * One new line in an app whose messages sit under their author's name (a message_author rule). Every line
-     * is logged; a line is a message only when it is in the message list, has no child views (the row around
-     * a message also carries the author and time as text), is not an author line and is not only a time or a
-     * date. A message holding text this phone just typed is its own: its author becomes this phone's author and
-     * it is labelled sent. A message under another author, once this phone's author is known, gets the rule's
-     * action. Until then it is logged only. (Discord 353.11, Galaxy A16 5G and moto g play, 15 November 2026:
-     * every message sits on the left under its author, so the side of the screen could not tell, and author
-     * names were labelled received.)
-     */
-    private fun onAuthoredLine(pkg: String, rule: Rule, a: Appeared, authors: List<Pair<String, Int>>) {
-        val author = ChatWatch.authorAbove(a.top, authors)
-        val shown = masked(a.text.take(2000))
-        val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.TEXT_APPEARED, content = shown,
-            detail = "side ${a.side}", source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
-        val isAuthorLine = authors.any { it.first == a.text && it.second == a.top }
-        if (!a.inList || !a.leaf || isAuthorLine || ChatWatch.isTimeOrDate(a.text) || author == null) return
-        if (recentlyIn(recentOwn, a.text)) {
-            ownAuthor[pkg] = author
-            labelAuthored(pkg, raw, shown, "sent_message", "auto rule ${rule.id}: holds text this phone just typed")
-            // Messages that came before this phone's author was known are labelled now, at their own time.
-            val waiting = awaitingAuthor.filter { it.pkg == pkg }
-            awaitingAuthor.removeAll(waiting)
-            for (w in waiting) labelByAuthor(w.pkg, w.author, author, w.raw, w.shown, w.ruleId, w.action, null)
-            return
-        }
-        val mine = ownAuthor[pkg]
-        if (mine == null) {
-            awaitingAuthor += AwaitingAuthor(pkg, author, raw, shown, rule.id, rule.action)
-            if (awaitingAuthor.size > 200) awaitingAuthor.removeAt(0)
-            return
-        }
-        labelByAuthor(pkg, author, mine, raw, shown, rule.id, rule.action, a.text)
-    }
-
-    /**
-     * A message under this phone's own author was sent from this account, though its typed text was not seen
-     * yet (Discord, moto g play: the line was on screen before the field cleared). Any other author: the rule's action.
-     */
-    private fun labelByAuthor(pkg: String, author: String, mine: String, raw: Entry, shown: String?, ruleId: String,
-                              action: String, text: String?) {
-        if (author == mine) labelAuthored(pkg, raw, shown, "sent_message", "auto rule $ruleId: under this phone's own author")
-        else if (text == null || !recentlyIn(recentNotified, text))
-            labelAuthored(pkg, raw, shown, action, "auto rule $ruleId: under another author than this phone's")
-    }
-
-    private fun labelAuthored(pkg: String, raw: Entry, shown: String?, action: String, why: String) {
-        val labelled = repo.log(Draft(appPackage = pkg, action = action, direction = directionFor(action),
-            content = shown, refersTo = raw.entryId, detail = why, source = Source.AUTO_RULE, reviewed = false),
-            stamp = raw.stamp, detect = false).last()
-        if (shotAuto) screenshot(labelled.entryId)
-    }
 
     /**
      * Looks at the open screen of an app under test and logs text that came onto it (ChatWatch). Each new
@@ -578,44 +499,27 @@ class CaptureService : AccessibilityService() {
         }
         try { walk(root, 0, false) } catch (e: Exception) { skip("read_failed", pkg); return }
         val key = lastScreen ?: (pkg to "")
-        if (watchLooks == 0) repo.log(Draft(appPackage = pkg, action = "screen_watch_active", source = Source.SYSTEM,
-            detail = "${lines.size} lines on the first look"), kind = Kind.SYSTEM_EVENT)
-        watchLooks++
-        if (key != watchLastKey) { watchBaselines++; watchLastKey = key }
         looks?.write("look", el(), LookLog.look(pkg, key, win.width(), atNewest, lines, authors, lines.size > 400))
-        val found = chatWatch.look(key, lines, win.width(), atNewest)
-        watchFound += found.size
-        for (a in found) {
-            if (authorRule != null) { onAuthoredLine(pkg, authorRule, a, authors); continue }
-            // An app can say in the line itself which way it went: Telegram's message cells span the whole width
-            // (side "across") and end with "Received at <time>" or "Sent at <time>". A text_appeared rule names that.
-            val rule = Rules.match(rules, pkg, RuleEvent.TEXT_APPEARED, null, a.text)
-            // A line holding what this phone just typed is its own message: dropped, unless a rule says it was
-            // sent. Telegram reports no field clear, so its "Sent at" line is the only sign of a send (Galaxy
-            // A16 5G and moto g play, 15 November 2026: 0 of 15 sends labelled per phone before this).
-            if (recentlyIn(recentOwn, a.text) && (rule == null || directionFor(rule.action) != "out")) continue
-            val shown = masked(a.text.take(2000))
-            val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.TEXT_APPEARED, content = shown,
-                detail = "side ${a.side}", source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
-            // Outside the message list (title bar, message box) nothing is a message: logged, never labelled.
-            if (!a.inList) continue
-            if (rule != null) {
-                if (directionFor(rule.action) == "in" && recentlyIn(recentNotified, a.text)) continue
-                // One label per message, though its line changes in place (Rules.lineKey).
-                val k = Rules.lineKey(rule, a.text)
-                if (k != null && recentlyIn(ruleLabelled, k, 600_000, exact = true)) continue
-                remember(ruleLabelled, k)
-                val labelled = repo.log(Draft(appPackage = pkg, action = rule.action, direction = directionFor(rule.action),
-                    content = if (rule.content == "line") shown else null, refersTo = raw.entryId,
-                    detail = "auto rule ${rule.id}", source = Source.AUTO_RULE, reviewed = false), stamp = raw.stamp, detect = false).last()
-                if (shotAuto) screenshot(labelled.entryId)
-                continue
+        write(judge.look(el(), pkg, key, win.width(), atNewest, lines, authors))
+    }
+
+    /** Writes what the judge decided, in its order; a label carries its text_appeared row's time. */
+    private fun write(outs: List<WatchJudge.Out>) {
+        for (o in outs) when (o) {
+            is WatchJudge.Out.Raw -> {
+                rawRows[o.token] = repo.log(Draft(appPackage = o.pkg, action = AutoAction.TEXT_APPEARED, content = o.content,
+                    detail = o.detail, source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
+                while (rawRows.size > 1000) rawRows.remove(rawRows.keys.first())
             }
-            if (a.side != "left" || recentlyIn(recentNotified, a.text) || ChatWatch.isTimeOrDate(a.text)) continue
-            val labelled = repo.log(Draft(appPackage = pkg, action = "received_message", content = shown, direction = "in",
-                refersTo = raw.entryId, detail = "auto: text appeared on the left of an open screen", source = Source.AUTO_RULE,
-                reviewed = false), stamp = raw.stamp, detect = false).last()
-            if (shotAuto) screenshot(labelled.entryId)
+            is WatchJudge.Out.Label -> {
+                val raw = rawRows[o.refersTo] ?: continue
+                val labelled = repo.log(Draft(appPackage = o.pkg, action = o.action, direction = o.direction, content = o.content,
+                    refersTo = raw.entryId, detail = o.detail, source = Source.AUTO_RULE, reviewed = false),
+                    stamp = raw.stamp, detect = false).last()
+                if (o.screenshot) screenshot(labelled.entryId)
+            }
+            is WatchJudge.Out.System -> repo.log(Draft(appPackage = o.pkg, action = o.action, source = Source.SYSTEM, detail = o.detail),
+                kind = Kind.SYSTEM_EVENT)
         }
     }
 
