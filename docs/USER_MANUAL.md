@@ -566,6 +566,16 @@ Android/data. It is not part of any export and not in the hash chain. To copy it
 `adb pull /sdcard/Android/data/com.abrignoni.knowndatalogger/files/` (read on a Galaxy A16 5G and a moto
 g play, Android 16). Start over deletes it.
 
+To replay recorded sessions against a change to KDL (from a copy of the source): pull the looks file,
+export the session, and make a replay folder for each with
+`python3 tools/replay_folder.py <looks file> <export>/actions.jsonl <folder>/<name>`. Then run
+`KDL_REPLAY_DIR=<folder> ./gradlew testDebugUnitTest --tests '*ReplayTest*'`. It passes when KDL's
+logic, given what the phone saw, writes the same rows the phone wrote. On 15 November 2026, 14 recorded
+sessions (Google Messages, Telegram, Signal, WhatsApp, Messenger and Discord, on a Galaxy A16 5G and a
+moto g play) replayed to exactly the rows the phones wrote, 12 of them recorded before the logic was
+moved out of the capture service. Replay cannot show whether a phone reports a change on its screen,
+or when: that still needs a live session.
+
 When **Screenshot inferred actions** is on, a rule match also takes a screenshot, and so does a
 `received_message` from an open chat. Actions inferred from notifications have no screenshot.
 

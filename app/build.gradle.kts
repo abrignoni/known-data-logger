@@ -67,3 +67,9 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20260814")
 }
+
+// Replay recorded sessions in unit tests: KDL_REPLAY_DIR=<dir of replay folders> ./gradlew testDebugUnitTest
+tasks.withType<Test>().configureEach {
+    systemProperty("kdl.replay", System.getenv("KDL_REPLAY_DIR") ?: "")
+    inputs.property("kdl.replay", System.getenv("KDL_REPLAY_DIR") ?: "")
+}

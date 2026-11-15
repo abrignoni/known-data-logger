@@ -1,0 +1,7 @@
+{"n":1,"el":1000,"kind":"reset","active":true,"mask_codes":true,"shot_auto":true,"all_apps":false,"listed":["com.example.chat"],"capture":["com.example.chat"]}
+{"n":2,"el":1000,"kind":"rules","rules":[]}
+{"n":3,"el":5000,"kind":"look","package":"com.example.chat","key":"(com.example.chat, Chat)","width":1080,"at_newest":true,"capped":false,"lines":[["Hi there",60,300,600,380,true,true]],"authors":[]}
+{"n":4,"el":9000,"kind":"look","package":"com.example.chat","key":"(com.example.chat, Chat)","width":1080,"at_newest":true,"capped":false,"lines":[["Hi there",60,200,600,280,true,true],["How are you",60,300,600,380,true,true]],"authors":[]}
+{"n":5,"el":12000,"kind":"remember","list":"own","text":"On my way"}
+{"n":6,"el":13000,"kind":"look","package":"com.example.chat","key":"(com.example.chat, Chat)","width":1080,"at_newest":true,"capped":false,"lines":[["Hi there",60,100,600,180,true,true],["How are you",60,200,600,280,true,true],["On my way",480,300,1020,380,true,true]],"authors":[]}
+{"n":7,"el":20000,"kind":"reset","active":false,"mask_codes":true,"shot_auto":true,"all_apps":false,"listed":["com.example.chat"],"capture":["com.example.chat"]}

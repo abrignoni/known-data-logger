@@ -239,6 +239,15 @@ value as text so content cannot run as a formula.
   `skip` (reason: kdl_in_front, locked, no_window, no_package, not_watched, read_failed) for looks that
   ended before it.
 - Lines are unmasked (the watch matches unmasked text).
+- `WatchJudge` (pure Kotlin) makes every screen-watch decision; CaptureService reads the screen, feeds it
+  each look, each remembered text and each reset, and writes the rows it returns in order (labels refer to
+  their text_appeared row by a token). The time windows use the elapsed time given with each call, read
+  once per look; before `WatchJudge` it was read again for each line, so a window could close in the
+  middle of a look.
+- `ReplayTest` replays folders of `looks.jsonl` plus that session's export rows (`tools/replay_folder.py`)
+  through `WatchJudge` and requires, in order, every text_appeared row, every label that refers to one,
+  and the screen_watch_active and screen_watch_summary rows. A made-up folder in the test resources always
+  runs; recorded ones run with `KDL_REPLAY_DIR` set.
 
 ## In-app receives (after 0.5.1)
 
