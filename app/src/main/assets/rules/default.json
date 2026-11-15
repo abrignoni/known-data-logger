@@ -36,10 +36,20 @@
       "package": "org.telegram.messenger",
       "event": "text_appeared",
       "view_id": null,
-      "label_regex": "\\nReceived at \\d",
+      "label_regex": "\\nReceived at \\d{1,2}:\\d{2}",
       "action": "received_message",
       "content": "line",
       "verified_with": "Telegram 13.2.2 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-15: each message cell spans the screen and its text ends with \"Received at <time>\" for a received message, so the side of the screen cannot tell."
+    },
+    {
+      "id": "telegram_send",
+      "package": "org.telegram.messenger",
+      "event": "text_appeared",
+      "view_id": null,
+      "label_regex": "\\nSent at \\d{1,2}:\\d{2}",
+      "action": "sent_message",
+      "content": "line",
+      "verified_with": "Telegram 13.2.2 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-15: a send reports no field clear, and its message cell ends with \"Sent at <time>\", then \", Not seen\" or \", Seen\", which changes in place once it is read; the label is keyed on the text up to the time, so one send is labelled once."
     }
   ]
 }
