@@ -143,7 +143,7 @@ class CaptureService : AccessibilityService() {
         seenNotifications.clear()
         if (!active && watchLooks > 0) repo.log(Draft(action = "screen_watch_summary", source = Source.SYSTEM,
             detail = "looks $watchLooks, baselines $watchBaselines, new lines $watchFound"), kind = Kind.SYSTEM_EVENT)
-        chatWatch.reset(); recentOwn.clear(); recentNotified.clear(); ruleLabelled.clear()
+        chatWatch.reset(); recentOwn.clear(); recentNotified.clear(); ruleLabelled.clear(); ownAuthor.clear(); awaitingAuthor.clear()
         watchLooks = 0; watchBaselines = 0; watchFound = 0; watchLastKey = null
         maskCodes = repo.flag(Repo.KEY_MASK_CODES, true)
         main.removeCallbacks(poll)
@@ -434,6 +434,65 @@ class CaptureService : AccessibilityService() {
         return map.any { (t, at) -> now - at < within && (if (exact) line == t else line.contains(t)) }
     }
 
+    /** This phone's author name per app, learned from its own lines in an app with a message_author rule. */
+    private val ownAuthor = HashMap<String, String>()
+    /** Messages logged before this phone's author was known: (app, author, raw row, text), labelled once it is. */
+    private val awaitingAuthor = ArrayList<AwaitingAuthor>()
+    private data class AwaitingAuthor(val pkg: String, val author: String, val raw: Entry, val shown: String?, val ruleId: String, val action: String)
+
+    /**
+     * One new line in an app whose messages sit under their author's name (a message_author rule). Every line
+     * is logged; a line is a message only when it is in the message list, has no child views (the row around
+     * a message also carries the author and time as text), is not an author line and is not only a time or a
+     * date. A message holding text this phone just typed is its own: its author becomes this phone's author and
+     * it is labelled sent. A message under another author, once this phone's author is known, gets the rule's
+     * action. Until then it is logged only. (Discord 353.11, Galaxy A16 5G and moto g play, 15 November 2026:
+     * every message sits on the left under its author, so the side of the screen could not tell, and author
+     * names were labelled received.)
+     */
+    private fun onAuthoredLine(pkg: String, rule: Rule, a: Appeared, authors: List<Pair<String, Int>>) {
+        val author = ChatWatch.authorAbove(a.top, authors)
+        val shown = masked(a.text.take(2000))
+        val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.TEXT_APPEARED, content = shown,
+            detail = "side ${a.side}", source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
+        val isAuthorLine = authors.any { it.first == a.text && it.second == a.top }
+        if (!a.inList || !a.leaf || isAuthorLine || ChatWatch.isTimeOrDate(a.text) || author == null) return
+        if (recentlyIn(recentOwn, a.text)) {
+            ownAuthor[pkg] = author
+            labelAuthored(pkg, raw, shown, "sent_message", "auto rule ${rule.id}: holds text this phone just typed")
+            // Messages that came before this phone's author was known are labelled now, at their own time.
+            val waiting = awaitingAuthor.filter { it.pkg == pkg }
+            awaitingAuthor.removeAll(waiting)
+            for (w in waiting) labelByAuthor(w.pkg, w.author, author, w.raw, w.shown, w.ruleId, w.action, null)
+            return
+        }
+        val mine = ownAuthor[pkg]
+        if (mine == null) {
+            awaitingAuthor += AwaitingAuthor(pkg, author, raw, shown, rule.id, rule.action)
+            if (awaitingAuthor.size > 200) awaitingAuthor.removeAt(0)
+            return
+        }
+        labelByAuthor(pkg, author, mine, raw, shown, rule.id, rule.action, a.text)
+    }
+
+    /**
+     * A message under this phone's own author was sent from this account, though its typed text was not seen
+     * yet (Discord, moto g play: the line was on screen before the field cleared). Any other author: the rule's action.
+     */
+    private fun labelByAuthor(pkg: String, author: String, mine: String, raw: Entry, shown: String?, ruleId: String,
+                              action: String, text: String?) {
+        if (author == mine) labelAuthored(pkg, raw, shown, "sent_message", "auto rule $ruleId: under this phone's own author")
+        else if (text == null || !recentlyIn(recentNotified, text))
+            labelAuthored(pkg, raw, shown, action, "auto rule $ruleId: under another author than this phone's")
+    }
+
+    private fun labelAuthored(pkg: String, raw: Entry, shown: String?, action: String, why: String) {
+        val labelled = repo.log(Draft(appPackage = pkg, action = action, direction = directionFor(action),
+            content = shown, refersTo = raw.entryId, detail = why, source = Source.AUTO_RULE, reviewed = false),
+            stamp = raw.stamp, detect = false).last()
+        if (shotAuto) screenshot(labelled.entryId)
+    }
+
     /**
      * Looks at the open screen of an app under test and logs text that came onto it (ChatWatch). Each new
      * line is a raw text_appeared event with its side of the screen; a line on the left, not one this phone
@@ -449,6 +508,9 @@ class CaptureService : AccessibilityService() {
         if (pkg == SYSTEM_UI || pkg !in listed || !wanted(pkg)) return
         val win = android.graphics.Rect().also { root.getBoundsInScreen(it) }
         val lines = ArrayList<ShownText>()
+        // An app that names each message's author (Discord): where the author lines are.
+        val authorRule = rules.firstOrNull { it.pkg == pkg && it.event == RuleEvent.MESSAGE_AUTHOR }
+        val authors = ArrayList<Pair<String, Int>>()
         fun sideways(n: AccessibilityNodeInfo): Boolean {
             val c = n.className?.toString() ?: ""
             return c.endsWith("HorizontalScrollView") || c.endsWith("ViewPager") || c.endsWith("ViewPager2")
@@ -485,7 +547,10 @@ class CaptureService : AccessibilityService() {
             val t = if (cls.endsWith("Button")) null else n.text?.toString()?.trim()
             if (!t.isNullOrEmpty() && n.isVisibleToUser) {
                 val r = android.graphics.Rect().also { n.getBoundsInScreen(it) }
-                if (r.width() > 0 && r.height() > 0) lines += ShownText(t, r.left, r.top, r.right, r.bottom, list == null || inList)
+                if (r.width() > 0 && r.height() > 0) {
+                    lines += ShownText(t, r.left, r.top, r.right, r.bottom, list == null || inList, n.childCount == 0)
+                    if (authorRule != null && n.viewIdResourceName == authorRule.viewId) authors += t to r.top
+                }
             }
             for (i in 0 until n.childCount) n.getChild(i)?.let { walk(it, depth + 1, inList) }
         }
@@ -498,6 +563,7 @@ class CaptureService : AccessibilityService() {
         val found = chatWatch.look(key, lines, win.width(), atNewest)
         watchFound += found.size
         for (a in found) {
+            if (authorRule != null) { onAuthoredLine(pkg, authorRule, a, authors); continue }
             // An app can say in the line itself which way it went: Telegram's message cells span the whole width
             // (side "across") and end with "Received at <time>" or "Sent at <time>". A text_appeared rule names that.
             val rule = Rules.match(rules, pkg, RuleEvent.TEXT_APPEARED, null, a.text)

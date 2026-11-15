@@ -239,6 +239,18 @@ value as text so content cannot run as a formula.
   no lines reported, nothing learned. A left line that is only a clock time, "Today", "Yesterday",
   a weekday or a month and day (`ChatWatch.isTimeOrDate`) is not labelled `received_message`.
   With no list (Messenger), every line counts as in the list and the look is never skipped.
+  A baseline taken while the list could scroll forward is taken again at the first look with
+  the list at its end.
+- Rules with event `message_author` (shipped: `discord_author`, view `com.discord:id/author_name`)
+  replace the side test for their package. Each new line takes the text of the nearest author view
+  whose top is at or above its own (`ChatWatch.authorAbove`). Every line is logged as
+  `text_appeared`; only a line in the list, from a node with no children, not an author view and
+  not `isTimeOrDate` can be labelled. A line holding this phone's text of the last 2 minutes sets
+  this phone's author for the package and is labelled `sent_message` ("holds text this phone just
+  typed"). Once that author is known, a line under it is `sent_message` ("under this phone's own
+  author") and a line under another author gets the rule's action unless a notification of the last
+  2 minutes held it. Lines seen before the author is known wait (at most 200) and are labelled, with
+  their own time, when it is learned. All of this is forgotten when a session starts or stops.
   The look collects visible view text (not content descriptions, not Button classes, not editable
   or password fields, nothing under a HorizontalScrollView, ViewPager or ViewPager2) with screen
   bounds. `ChatWatch` takes the first look at each screen (the

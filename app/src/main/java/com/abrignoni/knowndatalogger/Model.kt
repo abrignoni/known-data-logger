@@ -118,6 +118,13 @@ object RuleEvent {
     const val FIELD_CLEARED = "field_cleared"
     /** A line that came onto an open screen (AutoAction.TEXT_APPEARED); the label pattern is matched against the line. */
     const val TEXT_APPEARED = "text_appeared"
+    /**
+     * Apps that draw every message in one column under its author's name (Discord). The rule's view id names
+     * the author view. A new message line takes the author shown nearest above it. The phone's own author is
+     * learned from a line holding text it just typed (labelled sent); a line under any other author is
+     * labelled with the rule's action.
+     */
+    const val MESSAGE_AUTHOR = "message_author"
 }
 
 /** Allowed values for Entry.timeQuality. */

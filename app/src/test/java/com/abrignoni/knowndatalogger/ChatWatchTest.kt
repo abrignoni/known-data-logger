@@ -48,6 +48,17 @@ class ChatWatchTest {
         assertEquals(listOf(Appeared("c", "left")), c.look("chat", shown, w, atNewest = true))
     }
 
+    @Test fun aBaselineTakenAwayFromTheEndIsTakenAgainAtTheEnd() {
+        val c = ChatWatch()
+        // The chat reopened scrolled up, where it was left.
+        c.look("chat", listOf(l("m10", 100), l("m11", 300)), w, atNewest = false)
+        // The list jumps to its end: older messages below the first baseline are not arrivals.
+        assertTrue(c.look("chat", listOf(l("m48", 100), l("m49", 300), l("m50", 500)), w, atNewest = true).isEmpty())
+        // From there on, an arrival is new.
+        assertEquals(listOf(Appeared("m51", "left")),
+            c.look("chat", listOf(l("m49", 100), l("m50", 300), l("m51", 500)), w, atNewest = true))
+    }
+
     @Test fun anOldMessageScrolledBackIntoViewIsNotNew() {
         val c = ChatWatch()
         c.look("chat", listOf(l("m30", 100), l("m31", 300)), w, atNewest = true)
@@ -63,6 +74,23 @@ class ChatWatchTest {
         val got = c.look("chat", listOf(ShownText("Alex", 200, 40, 500, 90, inList = false),
             ShownText("online", 200, 95, 400, 130, inList = false), l("a", 300)), w)
         assertEquals(listOf(Appeared("online", "left", inList = false)), got)
+    }
+
+    @Test fun aMessageTakesTheAuthorShownNearestAbove() {
+        val authors = listOf("Motto" to 266, "Samsung" to 443, "Motto" to 683)
+        assertEquals("Samsung", ChatWatch.authorAbove(503, authors))
+        assertEquals("Motto", ChatWatch.authorAbove(743, authors))
+        // A follow-up in a group has no author line of its own: the one above it still names it.
+        assertEquals("Motto", ChatWatch.authorAbove(1200, authors))
+        assertNull(ChatWatch.authorAbove(100, authors))
+    }
+
+    @Test fun anArrivedLineKeepsWhereItSatAndWhetherItIsALeaf() {
+        val c = ChatWatch()
+        c.look("chat", listOf(l("a", 100)), w)
+        val got = c.look("chat", listOf(l("a", 20), ShownText("Motto, 10:12 AM", 0, 260, 1080, 392, leaf = false)), w)
+        assertEquals(260, got.single().top)
+        assertTrue(!got.single().leaf)
     }
 
     @Test fun aTimeOrDateLineIsKnown() {
@@ -169,5 +197,12 @@ class TextAppearedRuleTest {
         val read = readRulesForImport(f)
         assertEquals(0, read.skipped)
         assertEquals(RuleEvent.TEXT_APPEARED, read.rules.single().event)
+    }
+
+    @Test fun aMessageAuthorRuleNeedsTheAuthorView() {
+        val ok = """{"rules":[{"id":"d","package":"com.discord","event":"message_author","view_id":"com.discord:id/author_name","action":"received_message","content":"line"}]}"""
+        val noView = """{"rules":[{"id":"d","package":"com.discord","event":"message_author","label_regex":"x","action":"received_message"}]}"""
+        assertEquals(RuleEvent.MESSAGE_AUTHOR, readRulesForImport(ok).rules.single().event)
+        assertEquals(1, readRulesForImport(noView).skipped)
     }
 }

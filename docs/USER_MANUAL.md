@@ -517,8 +517,26 @@ kept as raw events and show up on the Captured events sheet, but no action is in
   newer messages you are reading history, so nothing that comes into view then counts; a message
   that arrived meanwhile is logged once the list is back at its newest message. Google Messages,
   Telegram, Signal and WhatsApp report this; Messenger reports no list, so its screens are read
-  as before. With these changes all five apps logged 5 of 5 received messages on each phone in
+  as before, and its title bar is not left out: in a later round the moto labelled Messenger's
+  "Active now" as a received message. With these changes all five apps logged 5 of 5 received messages on each phone in
   one round each, none twice and none false.
+  If the chat opened away from its newest message, the first look is taken again once the list
+  reaches its end, so older messages the jump brings in are not taken for arrivals.
+- **Apps that show every message under its author's name.** Discord 353.11 puts every message on
+  the left under the author's name, so the side of the screen cannot tell. The `discord_author` rule
+  (event `message_author`) names Discord's author view: a new message takes the author shown
+  nearest above it. This phone's own author is learned from the first message holding text it just
+  typed, which is labelled `sent_message`; after that a message under the same author is labelled
+  sent too, and one under any other author `received_message`. Messages that came before this
+  phone's first send in a session are labelled once it sends; in a session where this phone sends
+  nothing, Discord messages are logged but not labelled. Author lines, the line above each message
+  that repeats the author and time, and time lines are logged but not labelled. On a Galaxy A16 5G
+  and a moto g play, 15 November 2026: one round of 10 messages taking turns, started with one
+  chat scrolled up, labelled 5 of 5 sent and 5 of 5 received on each phone, none false. A round in
+  runs of 3, 4 and 3 from one phone labelled all 4 and all 6 received and 5 of 6 and 4 of 4 sent: the
+  Galaxy's first message of the session was never logged as appearing, and why is not known. An
+  earlier round, in which the moto had been sent away from the chat before it started, labelled 3
+  older messages as received; why is not known either.
   A message that arrives while the chat is scrolled up, away
   from its newest message, is not on the screen, so it cannot be logged this way; that case was not
   tried. Each session also logs `screen_watch_active` when
