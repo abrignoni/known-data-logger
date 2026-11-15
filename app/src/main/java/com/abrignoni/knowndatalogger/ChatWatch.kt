@@ -1,10 +1,15 @@
 package com.abrignoni.knowndatalogger
 
-/** One line of text on the screen, with its box in screen pixels. */
-data class ShownText(val text: String, val left: Int, val top: Int, val right: Int, val bottom: Int)
+/**
+ * One line of text on the screen, with its box in screen pixels. [inList] is false for text outside the
+ * screen's message list (the title bar's "online" or "typing", the message box): it is reported with
+ * the same flag, so it can be logged but is never labelled a received message.
+ */
+data class ShownText(val text: String, val left: Int, val top: Int, val right: Int, val bottom: Int,
+                     val inList: Boolean = true)
 
-/** A line that came onto an open screen, and which side of the screen it sits on. */
-data class Appeared(val text: String, val side: String)
+/** A line that came onto an open screen, which side of the screen it sits on, and whether it is in the message list. */
+data class Appeared(val text: String, val side: String, val inList: Boolean = true)
 
 /**
  * Finds text that arrives on a screen that is already open: an incoming message in a chat the
@@ -32,8 +37,16 @@ class ChatWatch {
     /** Forget the screen: the next look is a baseline. */
     fun reset() { screen = null; most.clear(); frame.clear(); last = emptyMap() }
 
-    fun look(screenKey: Any, lines: List<ShownText>, width: Int): List<Appeared> {
+    /**
+     * [atNewest] false means the screen's message list can still scroll toward newer messages: the examiner
+     * is reading history, so nothing coming into view is arriving. Such a look reports nothing and learns
+     * nothing, so a message that arrived meanwhile is still new when the list is back at its end. (WhatsApp,
+     * Galaxy A16 5G and moto g play, 15 November 2026: older messages scrolled back into view were labelled
+     * received, with and without the 3-second look.) Null when the screen has no list to ask.
+     */
+    fun look(screenKey: Any, lines: List<ShownText>, width: Int, atNewest: Boolean? = null): List<Appeared> {
         val counts = lines.groupingBy { it.text }.eachCount()
+        if (screenKey == screen && atNewest == false) return emptyList()
         if (screenKey != screen) {
             reset()
             screen = screenKey
@@ -68,13 +81,26 @@ class ChatWatch {
                 continue
             }
             extra[line.text] = left - 1
-            out += Appeared(line.text, sideOf(line, width))
+            out += Appeared(line.text, sideOf(line, width), line.inList)
         }
         counts.forEach { (t, n) -> if (n > (most[t] ?: 0)) most[t] = n }
         return out.asReversed()
     }
 
     companion object {
+        private val timeOrDate = Regex(
+            "(?i)(\\d{1,2}:\\d{2}(\\s*[ap]\\.?\\s*m\\.?)?|today|yesterday|" +
+            "(monday|tuesday|wednesday|thursday|friday|saturday|sunday)|" +
+            "(january|february|march|april|may|june|july|august|september|october|november|december) \\d{1,2}(, \\d{4})?)")
+
+        /**
+         * A line that is only a clock time or a date ("8:21 AM", "Today", "November 15"): a message's time or a
+         * day divider, never a message itself. It is still logged as text that appeared, but not labelled as a
+         * received message. (WhatsApp, moto g play, 15 November 2026: a received bubble's time was labelled.)
+         */
+        fun isTimeOrDate(text: String): Boolean =
+            timeOrDate.matches(text.replace('\u202f', ' ').replace('\u00a0', ' ').trim())
+
         /** left, right or across, from where the box sits across the screen (the same rule as AppWalk). */
         fun sideOf(l: ShownText, width: Int): String {
             if (width <= 0) return ""

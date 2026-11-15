@@ -449,31 +449,53 @@ class CaptureService : AccessibilityService() {
         if (pkg == SYSTEM_UI || pkg !in listed || !wanted(pkg)) return
         val win = android.graphics.Rect().also { root.getBoundsInScreen(it) }
         val lines = ArrayList<ShownText>()
-        fun walk(n: AccessibilityNodeInfo, depth: Int) {
+        fun sideways(n: AccessibilityNodeInfo): Boolean {
+            val c = n.className?.toString() ?: ""
+            return c.endsWith("HorizontalScrollView") || c.endsWith("ViewPager") || c.endsWith("ViewPager2")
+        }
+        // The screen's message list: the largest node that scrolls, not sideways. Text outside it (the title
+        // bar's "online", the message box) is never an arrival, and while the list can still scroll toward newer
+        // messages the examiner is reading history. Google Messages, Telegram, Signal and WhatsApp offered
+        // "scroll forward" exactly while scrolled away from the newest message (Galaxy A16 5G and moto g play,
+        // 15 November 2026). Messenger reported no scrolling node, so its screens have no list and are read as before.
+        var list: AccessibilityNodeInfo? = null
+        var listArea = 0
+        fun findList(n: AccessibilityNodeInfo, depth: Int) {
+            if (depth > 60 || sideways(n)) return
+            if (n.isScrollable) {
+                val r = android.graphics.Rect().also { n.getBoundsInScreen(it) }
+                val area = r.width() * r.height()
+                if (area > listArea) { list = n; listArea = area }
+            }
+            for (i in 0 until n.childCount) n.getChild(i)?.let { findList(it, depth + 1) }
+        }
+        try { findList(root, 0) } catch (e: Exception) { list = null }
+        val atNewest = list?.let { l -> l.actionList.none { it.id == AccessibilityNodeInfo.ACTION_SCROLL_FORWARD } }
+        fun walk(n: AccessibilityNodeInfo, depth: Int, inListAbove: Boolean) {
             if (depth > 60 || lines.size > 400) return
             if (n.isEditable || isSecret(null, n)) return
+            val inList = inListAbove || (list != null && n == list)
             // A row that scrolls sideways holds suggestions, not messages: Google Messages' smart replies
             // ("Okay", "Nice") sit in a HorizontalScrollView under each received message, and were taken for
             // received messages (Galaxy A16 5G and moto g play, 15 November 2026: 6 false of 36 labels).
-            val cls0 = n.className?.toString() ?: ""
-            if (cls0.endsWith("HorizontalScrollView") || cls0.endsWith("ViewPager") || cls0.endsWith("ViewPager2")) return
+            if (sideways(n)) return
             // View text only: buttons, avatars and "is typing" carry a description and no text, and they come
             // and go as the examiner types (Messenger, 15 November 2026: 7 of 7 false labels were those).
             val cls = n.className?.toString() ?: ""
             val t = if (cls.endsWith("Button")) null else n.text?.toString()?.trim()
             if (!t.isNullOrEmpty() && n.isVisibleToUser) {
                 val r = android.graphics.Rect().also { n.getBoundsInScreen(it) }
-                if (r.width() > 0 && r.height() > 0) lines += ShownText(t, r.left, r.top, r.right, r.bottom)
+                if (r.width() > 0 && r.height() > 0) lines += ShownText(t, r.left, r.top, r.right, r.bottom, list == null || inList)
             }
-            for (i in 0 until n.childCount) n.getChild(i)?.let { walk(it, depth + 1) }
+            for (i in 0 until n.childCount) n.getChild(i)?.let { walk(it, depth + 1, inList) }
         }
-        try { walk(root, 0) } catch (e: Exception) { return }
+        try { walk(root, 0, false) } catch (e: Exception) { return }
         val key = lastScreen ?: (pkg to "")
         if (watchLooks == 0) repo.log(Draft(appPackage = pkg, action = "screen_watch_active", source = Source.SYSTEM,
             detail = "${lines.size} lines on the first look"), kind = Kind.SYSTEM_EVENT)
         watchLooks++
         if (key != watchLastKey) { watchBaselines++; watchLastKey = key }
-        val found = chatWatch.look(key, lines, win.width())
+        val found = chatWatch.look(key, lines, win.width(), atNewest)
         watchFound += found.size
         for (a in found) {
             // An app can say in the line itself which way it went: Telegram's message cells span the whole width
@@ -486,6 +508,8 @@ class CaptureService : AccessibilityService() {
             val shown = masked(a.text.take(2000))
             val raw = repo.log(Draft(appPackage = pkg, action = AutoAction.TEXT_APPEARED, content = shown,
                 detail = "side ${a.side}", source = Source.AUTO_EVENT), kind = Kind.AUTO_EVENT).last()
+            // Outside the message list (title bar, message box) nothing is a message: logged, never labelled.
+            if (!a.inList) continue
             if (rule != null) {
                 if (directionFor(rule.action) == "in" && recentlyIn(recentNotified, a.text)) continue
                 // One label per message, though its line changes in place (Rules.lineKey).
@@ -498,7 +522,7 @@ class CaptureService : AccessibilityService() {
                 if (shotAuto) screenshot(labelled.entryId)
                 continue
             }
-            if (a.side != "left" || recentlyIn(recentNotified, a.text)) continue
+            if (a.side != "left" || recentlyIn(recentNotified, a.text) || ChatWatch.isTimeOrDate(a.text)) continue
             val labelled = repo.log(Draft(appPackage = pkg, action = "received_message", content = shown, direction = "in",
                 refersTo = raw.entryId, detail = "auto: text appeared on the left of an open screen", source = Source.AUTO_RULE,
                 reviewed = false), stamp = raw.stamp, detect = false).last()

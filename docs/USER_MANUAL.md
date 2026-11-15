@@ -509,8 +509,16 @@ kept as raw events and show up on the Captured events sheet, but no action is in
   phones run Android 16; on Android 13 and earlier the look runs without clearing Android's node
   cache, and that was not tried. With the 3-second look, Signal, WhatsApp and Messenger also logged 5 of 5
   received messages on each phone in one round each. WhatsApp also gave false received messages
-  ("online" when the chat opens, and older messages after scrolling), and the build without the
-  look gave the same kinds in the same round on the same phones.
+  ("online" when the chat opens, a message's time read as its own line, and older messages after
+  scrolling), and the build without the look gave the same kinds in the same round on the same
+  phones. So KDL now asks the screen for its message list. Text outside the list (the title bar's
+  "online" or "typing") and a line that is only a time or a date are still logged as
+  `text_appeared` but never labelled a received message. While the list can still scroll toward
+  newer messages you are reading history, so nothing that comes into view then counts; a message
+  that arrived meanwhile is logged once the list is back at its newest message. Google Messages,
+  Telegram, Signal and WhatsApp report this; Messenger reports no list, so its screens are read
+  as before. With these changes all five apps logged 5 of 5 received messages on each phone in
+  one round each, none twice and none false.
   A message that arrives while the chat is scrolled up, away
   from its newest message, is not on the screen, so it cannot be logged this way; that case was not
   tried. Each session also logs `screen_watch_active` when
