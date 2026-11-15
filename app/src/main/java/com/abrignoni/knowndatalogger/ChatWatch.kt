@@ -90,6 +90,14 @@ class ChatWatch {
                 extra[line.text] = 0      // above all old content: revealed by a scroll, not arrived
                 continue
             }
+            // Nothing moved, so every line seen before counts as frame and there is no old content to be above.
+            // A chat adds a message at the bottom; a line with more than two lines already seen below it came in
+            // somewhere else, such as the title bar. (Messenger, moto g play, 15 November 2026: "Active now"
+            // came into the title bar above five old messages that had not moved, and was labelled received.)
+            if (oldTopmost == null && lines.count { (most[it.text] ?: 0) > 0 && it.top >= line.bottom } > 2) {
+                extra[line.text] = 0
+                continue
+            }
             extra[line.text] = left - 1
             out += Appeared(line.text, sideOf(line, width), line.inList).also { it.top = line.top; it.leaf = line.leaf }
         }
@@ -103,14 +111,16 @@ class ChatWatch {
             authors.filter { it.second <= top }.maxByOrNull { it.second }?.first
 
         private val timeOrDate = Regex(
-            "(?i)(\\d{1,2}:\\d{2}(\\s*[ap]\\.?\\s*m\\.?)?|today|yesterday|" +
+            "(?i)(\\d{1,2}:\\d{2}(\\s*[ap]\\.?\\s*m\\.?)?|today|yesterday|now|just now|" +
+            "\\d{1,2}\\s*(m|min|mins|h|hr|hrs)( ago)?|" +
             "(monday|tuesday|wednesday|thursday|friday|saturday|sunday)|" +
             "(january|february|march|april|may|june|july|august|september|october|november|december) \\d{1,2}(, \\d{4})?)")
 
         /**
-         * A line that is only a clock time or a date ("8:21 AM", "Today", "November 15"): a message's time or a
-         * day divider, never a message itself. It is still logged as text that appeared, but not labelled as a
-         * received message. (WhatsApp, moto g play, 15 November 2026: a received bubble's time was labelled.)
+         * A line that is only a clock time, a relative time or a date ("8:21 AM", "Now", "5 min", "Today",
+         * "November 15"): a message's time or a day divider, never a message itself. It is still logged as text
+         * that appeared, but not labelled as a received message. (Moto g play, 15 November 2026: a received bubble's
+         * time was labelled in WhatsApp, and Signal's "Now" under a new message.)
          */
         fun isTimeOrDate(text: String): Boolean =
             timeOrDate.matches(text.replace('\u202f', ' ').replace('\u00a0', ' ').trim())

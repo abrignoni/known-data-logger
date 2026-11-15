@@ -237,7 +237,10 @@ value as text so content cannot run as a formula.
   with `inList` false and logged as `text_appeared` but never labelled. While the list offers
   `ACTION_SCROLL_FORWARD` (it can scroll toward newer items), the look is skipped by `ChatWatch`:
   no lines reported, nothing learned. A left line that is only a clock time, "Today", "Yesterday",
-  a weekday or a month and day (`ChatWatch.isTimeOrDate`) is not labelled `received_message`.
+  a weekday, a month and day, "now", "just now" or a short relative time ("5 min", "2h", "12 mins ago")
+  (`ChatWatch.isTimeOrDate`) is not labelled `received_message`. When no line seen before has moved
+  (no old content outside the frame), a new line with more than two lines seen before entirely below
+  it is not reported.
   With no list (Messenger), every line counts as in the list and the look is never skipped.
   A baseline taken while the list could scroll forward is taken again at the first look with
   the list at its end.

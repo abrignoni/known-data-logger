@@ -48,6 +48,16 @@ class ChatWatchTest {
         assertEquals(listOf(Appeared("c", "left")), c.look("chat", shown, w, atNewest = true))
     }
 
+    @Test fun aTitleBarLineAboveMessagesThatDidNotMoveIsNotAnArrival() {
+        val c = ChatWatch()
+        val title = ShownText("Alex M", 171, 85, 360, 120)
+        val old = listOf(l("m336", 161), l("m337", 239), l("m338", 321), l("m339", 434), l("m340", 547))
+        c.look("chat", listOf(title) + old, w)
+        // The message comes in below the old ones, which stay where they were; the title bar gains a status line.
+        val got = c.look("chat", listOf(title, ShownText("Active now", 171, 120, 276, 148)) + old + l("m381", 704), w)
+        assertEquals(listOf(Appeared("m381", "left")), got)
+    }
+
     @Test fun aBaselineTakenAwayFromTheEndIsTakenAgainAtTheEnd() {
         val c = ChatWatch()
         // The chat reopened scrolled up, where it was left.
@@ -95,8 +105,8 @@ class ChatWatchTest {
 
     @Test fun aTimeOrDateLineIsKnown() {
         for (t in listOf("8:21 AM", "8:21\u202fAM", "8:21 a.m.", "18:05", "Today", "Yesterday", "Saturday",
-                "November 15", "November 15, 2026")) assertTrue(t, ChatWatch.isTimeOrDate(t))
-        for (t in listOf("online", "Okay", "Test 29 delta", "Meet at 8:21 AM", "8:21 AM tomorrow", "May I?"))
+                "November 15", "November 15, 2026", "Now", "Just now", "5 min", "2h", "12 mins ago")) assertTrue(t, ChatWatch.isTimeOrDate(t))
+        for (t in listOf("online", "Okay", "Test 29 delta", "Meet at 8:21 AM", "8:21 AM tomorrow", "May I?", "Now what", "5 more minutes"))
             assertTrue(t, !ChatWatch.isTimeOrDate(t))
     }
 
