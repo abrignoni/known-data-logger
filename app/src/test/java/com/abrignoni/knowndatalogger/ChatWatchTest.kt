@@ -25,6 +25,32 @@ class ChatWatchTest {
         assertTrue(c.look("chat", listOf(l("a", 20), l("b", 220, false), l("c", 420)), w).isEmpty())
     }
 
+    @Test fun backOnTheChatSoonAfterAPickerWhatCameInIsNew() {
+        // Telegram, Galaxy A16 5G (15 November 2026): the picture this phone sent was already in the chat on the
+        // first look after the picker closed, and a new baseline swallowed it.
+        val c = ChatWatch()
+        c.look("chat", listOf(l("a", 100), l("b", 300, false)), w, true, 1_000)
+        c.look("picker", listOf(l("photo 1", 200), l("photo 2", 400)), w, null, 20_000)
+        val got = c.look("chat", listOf(l("a", 20), l("b", 220, false), l("Photo", 420, false)), w, true, 36_000)
+        assertEquals(listOf(Appeared("Photo", "right")), got)
+        assertTrue(c.lastLookReturned)
+    }
+
+    @Test fun backOnTheChatLongAfterLeavingItIsABaseline() {
+        val c = ChatWatch()
+        c.look("chat", listOf(l("a", 100), l("b", 300, false)), w, true, 1_000)
+        c.look("picker", listOf(l("photo 1", 200)), w, null, 20_000)
+        assertTrue(c.look("chat", listOf(l("a", 20), l("b", 220, false), l("Photo", 420, false)), w, true, 62_000).isEmpty())
+        assertTrue(!c.lastLookReturned)
+    }
+
+    @Test fun aReturnWithoutTimesIsABaseline() {
+        val c = ChatWatch()
+        c.look("chat", listOf(l("a", 100)), w)
+        c.look("picker", listOf(l("photo 1", 200)), w)
+        assertTrue(c.look("chat", listOf(l("a", 20), l("Photo", 420, false)), w).isEmpty())
+    }
+
     @Test fun linesRevealedByScrollingUpAreNotNew() {
         val c = ChatWatch()
         c.look("chat", listOf(l("m5", 100), l("m6", 300)), w)

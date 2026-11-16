@@ -27,6 +27,7 @@ class WatchJudge(private val mask: (String?) -> String? = { NotificationMap.mask
     private val recentOwn = LinkedHashMap<String, Long>()
     private val recentNotified = LinkedHashMap<String, Long>()
     private val ruleLabelled = LinkedHashMap<String, Long>()
+    private val receivedLabelled = LinkedHashMap<String, Long>()
     /** This phone's author name per app, learned from its own lines in an app with a message_author rule. */
     private val ownAuthor = HashMap<String, String>()
     /** Messages logged before this phone's author was known, labelled once it is. */
@@ -42,7 +43,7 @@ class WatchJudge(private val mask: (String?) -> String? = { NotificationMap.mask
     fun reset(active: Boolean): List<Out> {
         val out = ArrayList<Out>()
         if (!active && looks > 0) out += Out.System(null, "screen_watch_summary", "looks $looks, baselines $baselines, new lines $found")
-        chatWatch.reset(); recentOwn.clear(); recentNotified.clear(); ruleLabelled.clear(); ownAuthor.clear(); awaitingAuthor.clear()
+        chatWatch.reset(); recentOwn.clear(); recentNotified.clear(); ruleLabelled.clear(); receivedLabelled.clear(); ownAuthor.clear(); awaitingAuthor.clear()
         looks = 0; baselines = 0; found = 0; lastKey = null
         return out
     }
@@ -74,7 +75,8 @@ class WatchJudge(private val mask: (String?) -> String? = { NotificationMap.mask
         if (looks == 0) out += Out.System(pkg, "screen_watch_active", "${lines.size} lines on the first look")
         looks++
         if (key != lastKey) { baselines++; lastKey = key }
-        val appeared = chatWatch.look(key, lines, width, atNewest)
+        val appeared = chatWatch.look(key, lines, width, atNewest, now)
+        val returned = chatWatch.lastLookReturned
         found += appeared.size
         val authorRule = rules.firstOrNull { it.pkg == pkg && it.event == RuleEvent.MESSAGE_AUTHOR }
         val authorLines = if (authorRule != null && authorRule.viewId == null) authorsByText(pkg, authorRule, lines, now, out) else authors
@@ -104,6 +106,10 @@ class WatchJudge(private val mask: (String?) -> String? = { NotificationMap.mask
             }
             if (a.side != "left" || recentlyIn(recentNotified, a.text, now) || ChatWatch.isTimeOrDate(a.text) ||
                 ChatWatch.isStatusOnly(a.text)) continue
+            // Back on the screen held just before (ChatWatch): a text labelled received in the last 2 minutes is the
+            // same message seen again (a chat list's preview of what came in while the chat was open), not a new one.
+            if (returned && recentlyIn(receivedLabelled, a.text, now, exact = true)) continue
+            remember(receivedLabelled, "received_labelled", a.text, now)
             out += Out.Label(raw, pkg, "received_message", "in", shown, "auto: text appeared on the left of an open screen", shotAuto)
         }
         return out
