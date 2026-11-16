@@ -147,6 +147,12 @@ object RuleEvent {
      * Without a message_author rule the rule's action labels it; with one, it is a message labelled by its author.
      */
     const val DESCRIPTION = "description_appeared"
+    /**
+     * A line in the message list that holds text this phone just typed: the message it sent. For apps whose message
+     * box has no view id, so no field_cleared rule can name it (Wire 4.x: a Compose text field with no id and no
+     * hint). The label pattern is matched against the line; the label carries the line, once per message.
+     */
+    const val TYPED_TEXT = "typed_text_appeared"
 }
 
 /** Allowed values for Entry.timeQuality. */

@@ -82,6 +82,16 @@
       "verified_with": "Zangi 6.6.4 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-15: with the chat closed, a received message posts a notification with no category, the sender as title and the message as text. Zangi keeps one notification per chat and updates it; the Galaxy reported 5 of 5 updates, the moto 3 of 5. Only message notifications were seen; Zangi call notifications were not tried."
     },
     {
+      "id": "wire_send",
+      "package": "com.wire",
+      "event": "typed_text_appeared",
+      "view_id": null,
+      "label_regex": ".",
+      "action": "sent_message",
+      "content": "line",
+      "verified_with": "Wire on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-16: the message box has no view id and no hint, so no field_cleared rule can name it; each of 5 sends per phone came into the message list as a line holding the typed text right after the box cleared. Received messages were labelled 5 of 5 per phone by the left-side rule."
+    },
+    {
       "id": "snapchat_author",
       "package": "com.snapchat.android",
       "event": "message_author",

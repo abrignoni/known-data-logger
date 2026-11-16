@@ -180,6 +180,25 @@ class CaptureLogicTest {
         assertEquals(listOf("received_message", "sent_message"), out.filterIsInstance<WatchJudge.Out.Label>().map { it.action })
     }
 
+    @Test fun typedTextThatComesIntoTheListIsASendWhereARuleSaysSo() {
+        val shipped = parseRules(java.io.File("src/main/assets/rules/default.json").readText())
+        val j = WatchJudge(); j.rules = shipped
+        fun l(t: String, top: Int, left: Int, inList: Boolean = true) = ShownText(t, left, top, left + 400, top + 60, inList)
+        for (pkg in listOf("com.wire", "com.example.other")) {
+            j.reset(true)
+            j.look(0, pkg, "chat", 720, true, listOf(l("Test 600 hi", 300, 36)), emptyList())
+            j.rememberOwn("Test 601 delta echo", 1000)
+            val out = j.look(2000, pkg, "chat", 720, true, listOf(l("Test 600 hi", 200, 36), l("Test 601 delta echo", 300, 300),
+                l("Test 601 delta echo", 1500, 100, inList = false)), emptyList())
+            val labels = out.filterIsInstance<WatchJudge.Out.Label>().map { it.action to it.content }
+            // Wire has the rule; an app without one still drops its own line, as before.
+            assertEquals(pkg, if (pkg == "com.wire") listOf("sent_message" to "Test 601 delta echo") else emptyList(), labels)
+            // Seen again on the next look, it is not labelled twice.
+            val again = j.look(3000, pkg, "chat", 720, true, listOf(l("Test 600 hi", 100, 36), l("Test 601 delta echo", 200, 300)), emptyList())
+            assertTrue(again.filterIsInstance<WatchJudge.Out.Label>().isEmpty())
+        }
+    }
+
     @Test fun aTypingNotificationIsNotAMessage() {
         for (t in listOf("is typing...", "Ana is typing…", "are typing", " is typing... ")) assertTrue(t, NotificationMap.isTypingOnly(t))
         for (t in listOf("sent you a chat", "I am typing a letter", "typing", "Is typing hard?")) assertTrue(t, !NotificationMap.isTypingOnly(t))
@@ -221,7 +240,7 @@ class CaptureLogicTest {
 
     @Test fun shippedRulesParseAndTheInstagramSendMatchesItsField() {
         val shipped = parseRules(java.io.File("src/main/assets/rules/default.json").readText())
-        assertEquals(listOf("google_messages_send", "aosp_camera_shutter", "instagram_send", "telegram_receive", "telegram_send", "discord_author", "zangi_send", "zangi_notification", "snapchat_author", "snapchat_notification", "google_messages_image_sent", "google_messages_image_received"), shipped.map { it.id })
+        assertEquals(listOf("google_messages_send", "aosp_camera_shutter", "instagram_send", "telegram_receive", "telegram_send", "discord_author", "zangi_send", "zangi_notification", "wire_send", "snapchat_author", "snapchat_notification", "google_messages_image_sent", "google_messages_image_received"), shipped.map { it.id })
         val field = "com.instagram.android:id/row_thread_composer_edittext"
         val hit = Rules.match(shipped, "com.instagram.android", RuleEvent.FIELD_CLEARED, field, null)
         assertEquals("sent_message", hit?.action); assertEquals("last_typed", hit?.content)

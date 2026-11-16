@@ -89,7 +89,20 @@ class WatchJudge(private val mask: (String?) -> String? = { NotificationMap.mask
             // A line holding what this phone just typed is its own message: dropped, unless a rule says it was
             // sent. Telegram reports no field clear, so its "Sent at" line is the only sign of a send (Galaxy
             // A16 5G and moto g play, 15 November 2026: 0 of 15 sends labelled per phone before this).
-            if (recentlyIn(recentOwn, a.text, now) && (rule == null || directionFor(rule.action) != "out")) continue
+            if (recentlyIn(recentOwn, a.text, now) && (rule == null || directionFor(rule.action) != "out")) {
+                // A typed_text_appeared rule says such a line in the list is the message this phone sent.
+                val typedRule = if (a.inList) Rules.match(rules, pkg, RuleEvent.TYPED_TEXT, null, a.text) else null
+                if (typedRule != null) {
+                    val k = "${typedRule.id}|${a.text}"
+                    if (!recentlyIn(ruleLabelled, k, now, 600_000, exact = true)) {
+                        remember(ruleLabelled, "rule_labelled", k, now)
+                        val shown = masked(a.text.take(2000))
+                        out += Out.Label(raw(pkg, shown, "side ${a.side}", out), pkg, typedRule.action, directionFor(typedRule.action),
+                            if (typedRule.content == "line") shown else null, "auto rule ${typedRule.id}", shotAuto)
+                    }
+                }
+                continue
+            }
             val shown = masked(a.text.take(2000))
             val raw = raw(pkg, shown, "side ${a.side}", out)
             // Outside the message list (title bar, message box) nothing is a message: logged, never labelled.

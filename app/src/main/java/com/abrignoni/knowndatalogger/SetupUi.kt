@@ -359,5 +359,6 @@ private fun eventLabel(event: String): String = when (event) {
     RuleEvent.MESSAGE_AUTHOR -> "Message author"
     RuleEvent.NOTIFICATION -> "Notification"
     RuleEvent.DESCRIPTION -> "Picture description"
+    RuleEvent.TYPED_TEXT -> "Typed text on screen"
     else -> event
 }
