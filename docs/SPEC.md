@@ -290,7 +290,7 @@ value as text so content cannot run as a formula.
   and the screen_watch_active and screen_watch_summary rows. A made-up folder in the test resources always
   runs; recorded ones run with `KDL_REPLAY_DIR` set.
 
-## In-app receives (after 0.5.1)
+## In-app receives (from 0.6.0)
 
 - `typeWindowContentChanged` from apps on the Setup list (not System UI, not while locked, not
   while KDL is in front) schedules one look at the active window 600 ms after the last change.

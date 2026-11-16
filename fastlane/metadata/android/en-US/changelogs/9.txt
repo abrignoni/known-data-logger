@@ -1,0 +1,1 @@
+KDL now labels messages that arrive in an open chat, from the text that appears on screen. It ships send and receive rules for Telegram, Discord, Zangi, LINE, Threads, TikTok, Signal, WhatsApp, Messenger, Wire and Snapchat, and for pictures in Google Messages. An optional notification listener can be turned on in Setup.
