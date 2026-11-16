@@ -278,6 +278,7 @@ class CaptureService : AccessibilityService() {
         // An empty field reports its hint as its text; record it as empty.
         val value = if (src?.isShowingHintText == true) "" else event.text?.joinToString("")
         text.update(pkg, viewId, key, value, false, repo.stamp())?.let { writeTyped(it) }
+        judge.setPendingOwn(value, el())
     }
 
     /**
