@@ -43,12 +43,33 @@ class WatchJudge(private val mask: (String?) -> String? = { NotificationMap.mask
     fun reset(active: Boolean): List<Out> {
         val out = ArrayList<Out>()
         if (!active && looks > 0) out += Out.System(null, "screen_watch_summary", "looks $looks, baselines $baselines, new lines $found")
-        chatWatch.reset(); recentOwn.clear(); recentNotified.clear(); ruleLabelled.clear(); receivedLabelled.clear(); ownAuthor.clear(); awaitingAuthor.clear()
+        chatWatch.reset(); recentOwn.clear(); pendingOwn = null; recentNotified.clear(); ruleLabelled.clear(); receivedLabelled.clear(); ownAuthor.clear(); awaitingAuthor.clear()
         looks = 0; baselines = 0; found = 0; lastKey = null
         return out
     }
 
     fun rememberOwn(text: String?, now: Long) = remember(recentOwn, "own", text, now)
+
+    /** What the message box holds now, as it is typed: one text, replaced as it changes. */
+    private var pendingOwn: String? = null
+    private var pendingAt = 0L
+
+    /**
+     * The text being typed. An app can send without reporting the box cleared, and the typed text is then written
+     * only after the sent line is on the screen (TikTok 47.7.3, Galaxy A16 5G and moto g play, 16 November 2026:
+     * 0 clears for 5 sends per phone, each sent line seen before its typed text was written). A line equal to it
+     * is this phone's own. An empty box keeps the last text: that is the send.
+     */
+    fun setPendingOwn(text: String?, now: Long) {
+        val s = text?.trim()?.takeIf { it.isNotEmpty() } ?: return
+        if (s == pendingOwn) return
+        pendingOwn = s; pendingAt = now
+        onRemember?.invoke("pending", s, now)
+    }
+
+    /** A line holding text this phone just typed: remembered as sent or cleared, or equal to the box's text. */
+    private fun isOwn(line: String, now: Long): Boolean =
+        recentlyIn(recentOwn, line, now) || (pendingOwn != null && now - pendingAt < 120_000 && line.trim() == pendingOwn)
     fun rememberNotified(text: String?, now: Long) = remember(recentNotified, "notified", text, now)
 
     private fun remember(map: LinkedHashMap<String, Long>, list: String, t: String?, now: Long) {
@@ -89,7 +110,7 @@ class WatchJudge(private val mask: (String?) -> String? = { NotificationMap.mask
             // A line holding what this phone just typed is its own message: dropped, unless a rule says it was
             // sent. Telegram reports no field clear, so its "Sent at" line is the only sign of a send (Galaxy
             // A16 5G and moto g play, 15 November 2026: 0 of 15 sends labelled per phone before this).
-            if (recentlyIn(recentOwn, a.text, now) && (rule == null || directionFor(rule.action) != "out")) {
+            if (isOwn(a.text, now) && (rule == null || directionFor(rule.action) != "out")) {
                 // A typed_text_appeared rule says such a line in the list is the message this phone sent.
                 val typedRule = if (a.inList) Rules.match(rules, pkg, RuleEvent.TYPED_TEXT, null, a.text) else null
                 if (typedRule != null) {
@@ -175,11 +196,11 @@ class WatchJudge(private val mask: (String?) -> String? = { NotificationMap.mask
         // Text this phone just typed is a send even when its author line has scrolled off above it (Snapchat, Galaxy
         // A16 5G, 15 November 2026: the fifth of five sends in a row sat under a "ME" no longer on the screen).
         if (author == null) {
-            if (recentlyIn(recentOwn, a.text, now)) out += Out.Label(raw, pkg, "sent_message", directionFor("sent_message"), shown,
+            if (isOwn(a.text, now)) out += Out.Label(raw, pkg, "sent_message", directionFor("sent_message"), shown,
                 "auto rule ${rule.id}: holds text this phone just typed", shotAuto)
             return
         }
-        if (recentlyIn(recentOwn, a.text, now)) {
+        if (isOwn(a.text, now)) {
             ownAuthor[pkg] = author
             out += Out.Label(raw, pkg, "sent_message", directionFor("sent_message"), shown,
                 "auto rule ${rule.id}: holds text this phone just typed", shotAuto)

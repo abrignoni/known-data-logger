@@ -12,7 +12,8 @@ import java.util.concurrent.Executors
  *  - "reset": the session state was cleared (session start, stop, or the service reconnecting), with the settings
  *    that change decisions;
  *  - "rules": every rule in effect, at a reset and whenever the rules are reloaded;
- *  - "remember": a text put into one of the watch's recent-text lists ("own", "notified", "rule_labelled",
+ *  - "remember": a text put into one of the watch's recent-text lists ("own", "notified", "pending" (the box's
+ *    text as typed), "rule_labelled",
  *    "received_labelled"; the last two are the judge's own memory, rebuilt on replay);
  *  - "look": a look at an open screen, with the lines as the watch received them;
  *  - "skip": a look that ended before the watch saw it, and why.

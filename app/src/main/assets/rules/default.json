@@ -92,6 +92,46 @@
       "verified_with": "LINE 26.17.1 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-16: each of 5 sends per phone cleared the message box (view chat_ui_message_edit) with no text change reported, then tapped the send button."
     },
     {
+      "id": "tiktok_send",
+      "package": "com.zhiliaoapp.musically",
+      "event": "typed_text_appeared",
+      "view_id": null,
+      "label_regex": ".",
+      "action": "sent_message",
+      "content": "line",
+      "verified_with": "TikTok 47.7.3 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-16: the message box has no view id and reports no clear when a message is sent; each sent message came into the list as a line equal to the box's text, before the typed text was written."
+    },
+    {
+      "id": "signal_send",
+      "package": "org.thoughtcrime.securesms",
+      "event": "field_cleared",
+      "view_id": "org.thoughtcrime.securesms:id/embedded_text_editor",
+      "label_regex": null,
+      "action": "sent_message",
+      "content": "last_typed",
+      "verified_with": "Signal 8.34.2 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-16: each of 5 sends per phone cleared the message box (view embedded_text_editor) with no text change reported, then tapped send_button; no send was labelled before this rule."
+    },
+    {
+      "id": "whatsapp_send",
+      "package": "com.whatsapp",
+      "event": "typed_text_appeared",
+      "view_id": null,
+      "label_regex": ".",
+      "action": "sent_message",
+      "content": "line",
+      "verified_with": "WhatsApp 2.26.44.90 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-15: no clear was reported for 5 sends per phone and none was labelled."
+    },
+    {
+      "id": "messenger_send",
+      "package": "com.facebook.orca",
+      "event": "typed_text_appeared",
+      "view_id": null,
+      "label_regex": ".",
+      "action": "sent_message",
+      "content": "line",
+      "verified_with": "Messenger 587.0.0.54.96 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-15: each send cleared a message box with no view id and none was labelled."
+    },
+    {
       "id": "wire_send",
       "package": "com.wire",
       "event": "typed_text_appeared",

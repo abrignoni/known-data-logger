@@ -35,6 +35,7 @@ class ReplayTest {
             "remember" -> when (r.getString("list")) {
                 "own" -> judge.rememberOwn(r.getString("text"), r.getLong("el"))
                 "notified" -> judge.rememberNotified(r.getString("text"), r.getLong("el"))
+                "pending" -> judge.setPendingOwn(r.getString("text"), r.getLong("el"))
                 // rule_labelled and received_labelled are the judge's own memory: it rebuilds them.
             }
             "look" -> {
