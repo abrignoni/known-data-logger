@@ -101,7 +101,8 @@ class WatchJudge(private val mask: (String?) -> String? = { NotificationMap.mask
                     "auto rule ${rule.id}", shotAuto)
                 continue
             }
-            if (a.side != "left" || recentlyIn(recentNotified, a.text, now) || ChatWatch.isTimeOrDate(a.text)) continue
+            if (a.side != "left" || recentlyIn(recentNotified, a.text, now) || ChatWatch.isTimeOrDate(a.text) ||
+                ChatWatch.isStatusOnly(a.text)) continue
             out += Out.Label(raw, pkg, "received_message", "in", shown, "auto: text appeared on the left of an open screen", shotAuto)
         }
         return out
@@ -150,7 +151,7 @@ class WatchJudge(private val mask: (String?) -> String? = { NotificationMap.mask
         val shown = masked(a.text.take(2000))
         val raw = raw(pkg, shown, "side ${a.side}", out)
         val isAuthorLine = authors.any { it.first == a.text && it.second == a.top }
-        if (!a.inList || !a.leaf || isAuthorLine || ChatWatch.isTimeOrDate(a.text)) return
+        if (!a.inList || !a.leaf || isAuthorLine || ChatWatch.isTimeOrDate(a.text) || ChatWatch.isStatusOnly(a.text)) return
         // Text this phone just typed is a send even when its author line has scrolled off above it (Snapchat, Galaxy
         // A16 5G, 15 November 2026: the fifth of five sends in a row sat under a "ME" no longer on the screen).
         if (author == null) {

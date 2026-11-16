@@ -122,6 +122,16 @@ class ChatWatch {
          * that appeared, but not labelled as a received message. (Moto g play, 15 November 2026: a received bubble's
          * time was labelled in WhatsApp, and Signal's "Now" under a new message.)
          */
+        private val status = Regex("(?i)(downloading|uploading|sending|loading|connecting|waiting for network|" +
+            "tap to (download|load|retry)|failed to send|not delivered)\\s*(\\.\\.\\.|…)?")
+
+        /**
+         * A line that is only a passing status ("Downloading", "Sending…"), shown while a message or picture loads.
+         * It is logged as text that appeared, never labelled. (Messenger, moto g play, 15 November 2026:
+         * "Downloading" showed on the left while a received photo loaded and was labelled received.)
+         */
+        fun isStatusOnly(text: String): Boolean = status.matches(text.trim())
+
         fun isTimeOrDate(text: String): Boolean =
             timeOrDate.matches(text.replace('\u202f', ' ').replace('\u00a0', ' ').trim())
 

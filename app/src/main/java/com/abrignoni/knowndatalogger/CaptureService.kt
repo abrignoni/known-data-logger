@@ -527,7 +527,10 @@ class CaptureService : AccessibilityService() {
             for (i in 0 until n.childCount) n.getChild(i)?.let { walk(it, depth + 1, inList) }
         }
         try { walk(root, 0, false) } catch (e: Exception) { skip("read_failed", pkg); return }
-        val key = lastScreen ?: (pkg to "")
+        // The screen is also known by its list: an app can open another screen without telling Android (Google
+        // Messages' "Select recipients" and Zangi's "Send File" while sharing, 15 November 2026), and its rows were
+        // then compared with the chat's and labelled received. A different list (or none) starts a new baseline.
+        val key = (lastScreen ?: (pkg to "")) to (list?.viewIdResourceName ?: list?.className?.toString() ?: "no list")
         looks?.write("look", el(), LookLog.look(pkg, key, win.width(), atNewest, lines, authors, lines.size > 400))
         write(judge.look(el(), pkg, key, win.width(), atNewest, lines, authors))
     }
