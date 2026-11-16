@@ -535,7 +535,16 @@ kept as raw events and show up on the Captured events sheet, but no action is in
   phone that way. With these changes all five apps logged 5 of 5 received messages on each phone in
   one round each, none twice and none false.
   If the chat opened away from its newest message, the first look is taken again once the list
-  reaches its end, so older messages the jump brings in are not taken for arrivals.
+  reaches its end, so older messages the jump brings in are not taken for arrivals. A message that
+  arrives before the chat first reaches its newest message is then taken into that look and not logged
+  (moto g play, Telegram, 15 November 2026: a session started on a chat left scrolled up, and its first
+  2 messages were missed). Start a session with the chat at its newest message.
+  A screen is also known by the list on it: an app can open another screen without telling Android
+  (Google Messages' "Select recipients" and Zangi's "Send File", while sharing a picture), and the rows
+  there were taken for received messages. A different list, or none, now starts a new first look. Lines
+  that are only a passing status ("Downloading", "Sending…") are logged but never labelled (Messenger
+  showed "Downloading" while a received photo loaded). Afterwards, one round per app on both phones in
+  Google Messages, Telegram, Signal, WhatsApp and Messenger gave no false receives.
 - **Snapchat** (14.32.0.54) shows each run of messages under a header with no view id: "ME" above this
   phone's own messages and the contact's name in capitals (the chat's title) above theirs. The
   `snapchat_author` rule reads those words (English only). A message whose header has scrolled off above

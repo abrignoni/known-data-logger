@@ -290,7 +290,9 @@ value as text so content cannot run as a formula.
   it is not reported.
   With no list (Messenger), every line counts as in the list and the look is never skipped.
   A baseline taken while the list could scroll forward is taken again at the first look with
-  the list at its end.
+  the list at its end. The screen key is the last screen (package and title) together with the list's view id, else its
+  class, else "no list". A left line that `ChatWatch.isStatusOnly` (a passing status such as
+  "Downloading") is not labelled, in either labelling path.
 - Rules with event `message_author` (shipped: `discord_author`, view `com.discord:id/author_name`)
   replace the side test for their package. Each new line takes the text of the nearest author view
   whose top is at or above its own (`ChatWatch.authorAbove`). Every line is logged as
