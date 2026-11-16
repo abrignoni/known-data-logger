@@ -35,7 +35,7 @@ class ReplayTest {
             "remember" -> when (r.getString("list")) {
                 "own" -> judge.rememberOwn(r.getString("text"), r.getLong("el"))
                 "notified" -> judge.rememberNotified(r.getString("text"), r.getLong("el"))
-                // rule_labelled is the judge's own memory: it rebuilds it.
+                // rule_labelled and received_labelled are the judge's own memory: it rebuilds them.
             }
             "look" -> {
                 val ls = r.getJSONArray("lines").let { a -> (0 until a.length()).map { i -> a.getJSONArray(i).let { l ->

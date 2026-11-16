@@ -39,9 +39,22 @@ class ChatWatch {
     private var last: Map<String, Int> = emptyMap()
     /** Whether the baseline was taken with the list at its newest end (or with no list to ask). */
     private var baselineAtNewest = true
+    /** When the screen was last looked at (the [now] of the last look; null when no time was given). */
+    private var lastAt: Long? = null
+
+    /** The screen held just before this one, as it was when it was left, and when that was. */
+    private class Held(val screen: Any, val most: Map<String, Int>, val frame: Set<Pair<String, Int>>,
+                       val last: Map<String, Int>, val atNewest: Boolean, val leftAt: Long)
+    private var before: Held? = null
+
+    /** True when the last look went back to the screen held just before, instead of taking a new baseline. */
+    var lastLookReturned = false
+        private set
 
     /** Forget the screen: the next look is a baseline. */
-    fun reset() { screen = null; most.clear(); frame.clear(); last = emptyMap(); baselineAtNewest = true }
+    fun reset() {
+        screen = null; most.clear(); frame.clear(); last = emptyMap(); baselineAtNewest = true; lastAt = null; before = null
+    }
 
     /**
      * [atNewest] false means the screen's message list can still scroll toward newer messages: the examiner
@@ -50,21 +63,37 @@ class ChatWatch {
      * Galaxy A16 5G and moto g play, 15 November 2026: older messages scrolled back into view were labelled
      * received, with and without the 3-second look.) Null when the screen has no list to ask.
      */
-    fun look(screenKey: Any, lines: List<ShownText>, width: Int, atNewest: Boolean? = null): List<Appeared> {
+    fun look(screenKey: Any, lines: List<ShownText>, width: Int, atNewest: Boolean? = null, now: Long? = null): List<Appeared> {
         val counts = lines.groupingBy { it.text }.eachCount()
-        if (screenKey == screen && atNewest == false) return emptyList()
+        lastLookReturned = false
+        if (screenKey == screen && atNewest == false) { lastAt = now ?: lastAt; return emptyList() }
+        // Back on the screen held just before, within RETURN_MS of leaving it (a chat, after the picker that sends a
+        // picture from it): what came in meanwhile is compared with the screen as it was left, not taken as a new
+        // baseline. (Telegram 13.2.2, Galaxy A16 5G, 15 November 2026: the picture this phone sent was already in
+        // the chat on the first look after the picker closed, became part of a new baseline and was never logged;
+        // on the moto g play it came in a second later and was.) The list must be at its newest end.
+        val held = before
+        if (screenKey != screen && held != null && held.screen == screenKey && now != null && atNewest != false &&
+            held.atNewest && now - held.leftAt in 0..RETURN_MS) {
+            leave(now)
+            screen = held.screen; most.putAll(held.most); frame += held.frame; last = held.last
+            baselineAtNewest = held.atNewest
+            lastLookReturned = true
+        }
         // A baseline taken away from the newest end (a chat reopened where it was left, scrolled up) holds old
         // messages that the jump to the end then brings in below it: take the baseline again there. (Discord,
         // moto g play, 15 November 2026: 4 older messages were logged as new when the list jumped to its end.)
         if (screenKey != screen || (atNewest == true && !baselineAtNewest)) {
+            if (screenKey != screen) leave(now) else { most.clear(); frame.clear(); last = emptyMap() }
             baselineAtNewest = atNewest != false
-            reset()
             screen = screenKey
             counts.forEach { (t, n) -> most[t] = n }
             lines.forEach { frame += it.text to it.top }
             last = counts
+            lastAt = now
             return emptyList()
         }
+        lastAt = now ?: lastAt
         // Lines whose text was already seen as often as it shows now, outside the frame: the old content.
         val oldTopmost = lines.filter { (most[it.text] ?: 0) >= (counts[it.text] ?: 0) && (it.text to it.top) !in frame }
             .minOfOrNull { it.top }
@@ -105,7 +134,18 @@ class ChatWatch {
         return out.asReversed()
     }
 
+    /** Keeps the screen being left as the one held before, and clears the state for the next. */
+    private fun leave(now: Long?) {
+        val cur = screen
+        val at = lastAt ?: now
+        before = if (cur != null && at != null) Held(cur, HashMap(most), HashSet(frame), last, baselineAtNewest, at) else null
+        screen = null; most.clear(); frame.clear(); last = emptyMap(); lastAt = null
+    }
+
     companion object {
+        /** How long after leaving a screen a return to it still compares with it as it was left. */
+        const val RETURN_MS = 60_000L
+
         /** The author shown nearest above [top]: the last author line whose top is at or above it. */
         fun authorAbove(top: Int, authors: List<Pair<String, Int>>): String? =
             authors.filter { it.second <= top }.maxByOrNull { it.second }?.first
