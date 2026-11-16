@@ -251,7 +251,11 @@ value as text so content cannot run as a formula.
 - Rules with event `typed_text_appeared`: during a look, a new line in the message list holding text this phone
   typed in the last 2 minutes (the line that is otherwise dropped as its own) is labelled with the rule's
   action, once per line text in 10 minutes. For apps whose message box has no view id, so no `field_cleared`
-  rule can name it. Shipped: `wire_send` (".", sent_message).
+  rule can name it. Shipped: `wire_send`, `tiktok_send`, `whatsapp_send`, `messenger_send` (".", sent_message).
+- The message box's text as it is typed is kept as this phone's own (`WatchJudge.setPendingOwn`, one text,
+  replaced as it changes, kept when the box empties); a line equal to it counts as typed text. TikTok reports
+  no clear on send, and its sent line shows before the typed text is written. Recorded looks log it as
+  `remember` with list `pending`.
 
 ## Picture descriptions
 
