@@ -559,6 +559,18 @@ kept as raw events and show up on the Captured events sheet, but no action is in
   last message was posted, by its time, and never reported). With notification access on, both phones
   labelled 5 of 5, none twice. A notification that only says someone is
   typing is never labelled, for any app.
+- **Pictures.** A picture has no text, so the screen watch logs it only where a rule names its
+  description (event `description_appeared`). Google Messages describes a picture as "You sent an image
+  <time>." or "<sender> sent an image <time>.": `google_messages_image_sent` and
+  `google_messages_image_received` label them (an MMS picture each way on a Galaxy A16 5G and a moto g play,
+  16 November 2026: 4 of 4 right). Telegram writes "Photo" with "Received at" or "Sent at" in the line,
+  and its rules label that (15 November 2026: both received pictures labelled, and 1 of 2 sent). Messenger
+  posts "Sent a photo to you" as a message notification, labelled received (2 of 2). Discord describes
+  every picture the same way ("image, button, double tap to enlarge"), and a new picture moves the list
+  by exactly one picture, so the screen holds the same lines at the same places before and after:
+  0 of 3 received pictures could be seen, and Discord has no picture rule. Snapchat and Zangi pictures
+  have no text or description to read. A share screen that picks a recipient can still show the
+  picked contact as a new line (Google Messages on the moto, 1 false receive).
 - **Apps that show no message text to Android.** Zangi 6.6.4 draws its messages itself: in an open
   chat, Android's accessibility reports each bubble as an empty frame with a time view and no text, so
   KDL cannot see a message there, sent or received (Galaxy A16 5G and moto g play, 15 November 2026:

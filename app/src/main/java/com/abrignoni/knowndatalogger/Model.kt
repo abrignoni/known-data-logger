@@ -141,6 +141,12 @@ object RuleEvent {
      * The label pattern is matched against the notification's text; the label carries that text.
      */
     const val NOTIFICATION = "notification"
+    /**
+     * A view with no text whose description matches the label pattern is read as a line holding that description
+     * (a picture: Google Messages "You sent an image 5:26 PM.").
+     * Without a message_author rule the rule's action labels it; with one, it is a message labelled by its author.
+     */
+    const val DESCRIPTION = "description_appeared"
 }
 
 /** Allowed values for Entry.timeQuality. */

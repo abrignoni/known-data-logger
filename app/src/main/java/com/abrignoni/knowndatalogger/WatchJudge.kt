@@ -83,6 +83,7 @@ class WatchJudge(private val mask: (String?) -> String? = { NotificationMap.mask
             // An app can say in the line itself which way it went: Telegram's message cells span the whole width
             // (side "across") and end with "Received at <time>" or "Sent at <time>". A text_appeared rule names that.
             val rule = Rules.match(rules, pkg, RuleEvent.TEXT_APPEARED, null, a.text)
+                ?: Rules.match(rules, pkg, RuleEvent.DESCRIPTION, null, a.text)
             // A line holding what this phone just typed is its own message: dropped, unless a rule says it was
             // sent. Telegram reports no field clear, so its "Sent at" line is the only sign of a send (Galaxy
             // A16 5G and moto g play, 15 November 2026: 0 of 15 sends labelled per phone before this).
