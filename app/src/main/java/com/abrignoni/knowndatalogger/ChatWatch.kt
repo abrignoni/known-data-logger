@@ -183,7 +183,9 @@ class ChatWatch {
          */
         private val status = Regex("(?i)(downloading|uploading|sending|loading|connecting|waiting for network|" +
             "tap to (download|load|retry)|failed to send|not delivered|saved|read|" +
-            "tap and hold to [a-z ]+(\\. try it)?)\\s*(\\.\\.\\.|…)?")
+            "tap and hold to [a-z ]+(\\. try it)?|" +
+            "seen([\\s\u202f\u00a0]+(just now|\\d{1,2}:\\d{2}[\\s\u202f\u00a0]*([ap]m)?|\\d+[\\s\u202f\u00a0]*(m|h|d|min|mins|hr|hrs)( ago)?))?)" +
+            "\\s*(\\.\\.\\.|…)?")
 
         /**
          * A line that is only a passing status ("Downloading", "Sending…"), shown while a message or picture loads.
@@ -193,7 +195,9 @@ class ChatWatch {
          * under the other side's author line, and was labelled received. LINE, Galaxy A16 5G and moto g play,
          * 16 November 2026: the read receipt "Read" beside a sent message was labelled received, 4 times in 10 sends.
          * Instagram 455.0.0.51.72, same phones, 16 November 2026: the hints "Tap and hold to react" and "Tap and hold
-         * to imagine with AI. Try it" showed under a message and were labelled received, once on each phone.)
+         * to imagine with AI. Try it" showed under a message and were labelled received, once on each phone. Threads
+         * 455.0.0.55.72, same phones, 16 November 2026: the receipt "Seen 6:40 AM" under a sent message sat on the left
+         * and was labelled received, 3 times in 5 sends on each phone.)
          */
         fun isStatusOnly(text: String): Boolean = status.matches(text.trim())
 
