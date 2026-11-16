@@ -8,7 +8,7 @@ forensic tool can then check each action against what the tool reports.
 
 Author: Alexis Brignoni.
 
-This manual describes KDL 0.5.1, the v0.5.1 release on GitHub. Every screenshot comes from an
+This manual describes KDL 0.6.0, the v0.6.0 release on GitHub. Every screenshot comes from an
 Android 15 emulator (Google APIs image, API 35, 1080 x 2400, no Play Store) running a debug build of
 0.3.0 or of the code that became a later release, or the signed 0.5.0 release (Setup and the label
 form, 12 November 2026), with made-up test data: the
@@ -47,26 +47,26 @@ was America/New_York (UTC-05:00), so the times you see are local to that zone.
 - Python 3 with `openpyxl` to make the spreadsheet (`python3 -m pip install openpyxl`). The script,
   `tools/make_documentation.py`, is in the release's source code download and in the repository.
   The APK alone does not include it.
-- The APK: `KDL-0.5.1.apk` from the v0.5.1 release on GitHub, and the release's `SHA256SUMS` file.
+- The APK: `KDL-0.6.0.apk` from the v0.6.0 release on GitHub, and the release's `SHA256SUMS` file.
 
 ### Check the download
 
-Compare the APK's SHA-256 with the line for `KDL-0.5.1.apk` in `SHA256SUMS`. They must match.
+Compare the APK's SHA-256 with the line for `KDL-0.6.0.apk` in `SHA256SUMS`. They must match.
 
 ```bash
-shasum -a 256 KDL-0.5.1.apk
+shasum -a 256 KDL-0.6.0.apk
 ```
 
-On Linux, `sha256sum KDL-0.5.1.apk` works too. On Windows:
+On Linux, `sha256sum KDL-0.6.0.apk` works too. On Windows:
 
 ```
-certutil -hashfile KDL-0.5.1.apk SHA256
+certutil -hashfile KDL-0.6.0.apk SHA256
 ```
 
 You can also check who signed it. `apksigner` comes with the Android SDK build tools:
 
 ```bash
-apksigner verify --print-certs KDL-0.5.1.apk
+apksigner verify --print-certs KDL-0.6.0.apk
 ```
 
 The line `Signer #1 certificate SHA-256 digest:` must read
@@ -97,14 +97,14 @@ Other phones and versions have not been tried. [Section 15](#15-tested-on) lists
 Connect the phone with USB debugging on and run:
 
 ```bash
-adb install KDL-0.5.1.apk
+adb install KDL-0.6.0.apk
 ```
 
 On a phone with more than one user profile, install into the test profile only. For example, for
 user 10:
 
 ```bash
-adb install --user 10 KDL-0.5.1.apk
+adb install --user 10 KDL-0.6.0.apk
 ```
 
 On the Pixel 7a with Android 17 (8 November 2026), an `adb install` did not trigger Android's
@@ -453,7 +453,7 @@ The code in the second received message reads `[code withheld]`. That is the
 
 ### Where inferred actions come from
 
-- **Rules** (see [Rules](#rules)). The app ships three:
+- **Rules** (see [Rules](#rules)). The app ships these, among others:
   - Google Messages: the message field cleared in one change becomes `sent_message`, with the
     text that was in the field as its content. Checked against Messages
     `messages.android_20240528_00_RC01` on an Android 15 emulator.
@@ -462,7 +462,11 @@ The code in the second received message reads `[code withheld]`. That is the
   - Instagram (from 0.5.1): the message field found empty after a send becomes
     `sent_message`, with the typed text as its content. A rule taught with the same app, event and
     view id inferred a send in Instagram 455.0.0.51.72 on a Pixel 7a with Android 17
-    (14 November 2026).
+    (14 November 2026), and the shipped rule itself on a Galaxy A16 5G and a moto g play with
+    Android 16 (16 November 2026).
+  - From 0.6.0, rules for Telegram, Discord, Zangi, LINE, Threads, TikTok, Signal, WhatsApp,
+    Messenger, Wire and Snapchat, and for pictures in Google Messages. Each rule's `verified_with`
+    names the app version and the phones it was checked on.
 
   The shipped rules are in `app/src/main/assets/rules/` in the repository.
 - **Notifications** from the apps under test, by the category the app gave the notification:
@@ -1230,7 +1234,7 @@ It shows only during a session, and never over KDL itself.
 
 ### A send in my app was not inferred
 
-KDL ships rules for Google Messages and the AOSP Camera, and from 0.5.1 for Instagram. Find the tap or cleared field in the
+KDL ships rules for Google Messages, the AOSP Camera and Instagram, and from 0.6.0 for Telegram, Discord, Zangi, LINE, Threads, TikTok, Signal, WhatsApp, Messenger, Wire and Snapchat. Find the tap or cleared field in the
 Timeline (show captured events) and [teach a rule](#teach-a-rule), or use MARK and label it. If the
 Timeline shows neither for that send, the app reported none (see [It has limits](#it-has-limits)),
 so MARK or a hand-logged entry is the way.
