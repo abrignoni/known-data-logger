@@ -90,7 +90,7 @@ fun readRulesForImport(text: String): RulesRead {
             )
         } catch (e: Exception) { null }
         val usable = r != null && r.id.isNotEmpty() && r.pkg.isNotEmpty() && r.action.isNotEmpty() &&
-            r.event in setOf(RuleEvent.TAP, RuleEvent.FIELD_CLEARED, RuleEvent.TEXT_APPEARED, RuleEvent.MESSAGE_AUTHOR, RuleEvent.NOTIFICATION, RuleEvent.DESCRIPTION) &&
+            r.event in setOf(RuleEvent.TAP, RuleEvent.FIELD_CLEARED, RuleEvent.TEXT_APPEARED, RuleEvent.MESSAGE_AUTHOR, RuleEvent.NOTIFICATION, RuleEvent.DESCRIPTION, RuleEvent.TYPED_TEXT) &&
             (r.viewId != null || r.labelRegex != null) && (r.event != RuleEvent.MESSAGE_AUTHOR || r.viewId != null || r.labelRegex != null) &&
             (r.event != RuleEvent.DESCRIPTION || r.labelRegex != null) &&
             (r.labelRegex == null || runCatching { Regex(r.labelRegex) }.isSuccess) &&

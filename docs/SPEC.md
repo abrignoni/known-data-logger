@@ -248,6 +248,11 @@ value as text so content cannot run as a formula.
   With any author rule, a line with no author above it is labelled sent when it holds this phone's recent
   text, and is otherwise not labelled.
 
+- Rules with event `typed_text_appeared`: during a look, a new line in the message list holding text this phone
+  typed in the last 2 minutes (the line that is otherwise dropped as its own) is labelled with the rule's
+  action, once per line text in 10 minutes. For apps whose message box has no view id, so no `field_cleared`
+  rule can name it. Shipped: `wire_send` (".", sent_message).
+
 ## Picture descriptions
 
 - Rules with event `description_appeared`: during a look, a view with no text whose content description
