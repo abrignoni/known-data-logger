@@ -104,9 +104,9 @@ class ChatWatchTest {
     }
 
     @Test fun aPassingStatusLineIsKnown() {
-        for (t in listOf("Downloading", "Sending…", "sending...", "Uploading", "Waiting for network", "Tap to download"))
+        for (t in listOf("Downloading", "Sending…", "sending...", "Uploading", "Waiting for network", "Tap to download", "SAVED"))
             assertTrue(t, ChatWatch.isStatusOnly(t))
-        for (t in listOf("Downloading the file now", "I am sending it", "Loading dock", "Test 12 sending"))
+        for (t in listOf("Downloading the file now", "I am sending it", "Loading dock", "Test 12 sending", "Saved the file"))
             assertTrue(t, !ChatWatch.isStatusOnly(t))
     }
 

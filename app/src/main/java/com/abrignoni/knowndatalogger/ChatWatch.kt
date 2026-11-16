@@ -123,12 +123,14 @@ class ChatWatch {
          * time was labelled in WhatsApp, and Signal's "Now" under a new message.)
          */
         private val status = Regex("(?i)(downloading|uploading|sending|loading|connecting|waiting for network|" +
-            "tap to (download|load|retry)|failed to send|not delivered)\\s*(\\.\\.\\.|…)?")
+            "tap to (download|load|retry)|failed to send|not delivered|saved)\\s*(\\.\\.\\.|…)?")
 
         /**
          * A line that is only a passing status ("Downloading", "Sending…"), shown while a message or picture loads.
          * It is logged as text that appeared, never labelled. (Messenger, moto g play, 15 November 2026:
-         * "Downloading" showed on the left while a received photo loaded and was labelled received.)
+         * "Downloading" showed on the left while a received photo loaded and was labelled received. Snapchat
+         * 14.32.0.54, moto g play, 15 November 2026: "SAVED" slid in beside a received picture saved in the chat,
+         * under the other side's author line, and was labelled received.)
          */
         fun isStatusOnly(text: String): Boolean = status.matches(text.trim())
 
