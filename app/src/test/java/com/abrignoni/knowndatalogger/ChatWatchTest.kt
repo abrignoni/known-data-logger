@@ -130,9 +130,11 @@ class ChatWatchTest {
     }
 
     @Test fun aPassingStatusLineIsKnown() {
-        for (t in listOf("Downloading", "Sending…", "sending...", "Uploading", "Waiting for network", "Tap to download", "SAVED", "Read"))
+        for (t in listOf("Downloading", "Sending…", "sending...", "Uploading", "Waiting for network", "Tap to download", "SAVED", "Read",
+                "Tap and hold to react", "Tap and hold to imagine with AI. Try it"))
             assertTrue(t, ChatWatch.isStatusOnly(t))
-        for (t in listOf("Downloading the file now", "I am sending it", "Loading dock", "Test 12 sending", "Saved the file", "Read it later"))
+        for (t in listOf("Downloading the file now", "I am sending it", "Loading dock", "Test 12 sending", "Saved the file", "Read it later",
+                "Tap and hold to react, then send it 2 times"))
             assertTrue(t, !ChatWatch.isStatusOnly(t))
     }
 
@@ -202,6 +204,37 @@ class ChatWatchTest {
         assertEquals("left", ChatWatch.sideOf(ShownText("t", 60, 0, 600, 1), w))
         assertEquals("right", ChatWatch.sideOf(ShownText("t", 480, 0, 1020, 1), w))
         assertEquals("across", ChatWatch.sideOf(ShownText("t", 20, 0, 1060, 1), w))
+    }
+
+    @Test fun aBubbleWithEvenGapsTakesTheSideOfTheBubblesItLinesUpWith() {
+        // Instagram, Galaxy A16 5G: received bubbles start at 158 after the avatar; a wide one ended at 911 of 1080.
+        val wide = ShownText("Test 764 kilo lima", 158, 981, 911, 1145)
+        assertEquals("across", ChatWatch.sideOf(wide, w))
+        assertEquals("left", ChatWatch.sideAmong(wide, w, setOf(158), setOf(1057)))
+        // Lined up with nothing that has a side, or with both, it stays across (a day line, a full-width cell).
+        assertEquals("across", ChatWatch.sideAmong(wide, w, emptySet(), setOf(1057)))
+        assertEquals("across", ChatWatch.sideAmong(wide, w, setOf(158), setOf(911)))
+        val day = ShownText("Today", 0, 10, 1080, 40)
+        assertEquals("across", ChatWatch.sideAmong(day, w, setOf(158), setOf(1057)))
+    }
+
+    @Test fun aWideBubbleIsLeftWhenOnlyAnEarlierLookShowedTheLeftEdge() {
+        // Round 5: by the time 780 came in, the only other received bubble on screen (778) was wide too.
+        val c = ChatWatch()
+        c.look("chat", listOf(ShownText("Test 776 short", 158, 100, 600, 200), ShownText("Test 777 x", 294, 220, 1057, 320)), w)
+        val now = listOf(ShownText("Test 777 x", 294, 0, 1057, 100), ShownText("Test 778 wide", 158, 120, 908, 280),
+            ShownText("Test 779 y", 313, 300, 1057, 400))
+        c.look("chat", now, w)
+        val got = c.look("chat", now + ShownText("Test 780 wide too", 158, 420, 924, 580), w)
+        assertEquals(listOf(Appeared("Test 780 wide too", "left")), got)
+    }
+
+    @Test fun anArrivingWideBubbleIsLeft() {
+        val c = ChatWatch()
+        val before = listOf(ShownText("Test 762 india", 158, 207, 823, 371), ShownText("Test 763 juliett", 311, 405, 1057, 947))
+        c.look("chat", before, w)
+        val got = c.look("chat", before + ShownText("Test 764 kilo lima", 158, 981, 911, 1145), w)
+        assertEquals(listOf(Appeared("Test 764 kilo lima", "left")), got)
     }
 }
 
