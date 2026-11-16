@@ -92,6 +92,16 @@
       "verified_with": "LINE 26.17.1 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-16: each of 5 sends per phone cleared the message box (view chat_ui_message_edit) with no text change reported, then tapped the send button."
     },
     {
+      "id": "threads_send",
+      "package": "com.instagram.barcelona",
+      "event": "field_cleared",
+      "view_id": "messaging_message_box",
+      "label_regex": null,
+      "action": "sent_message",
+      "content": "last_typed",
+      "verified_with": "Threads 455.0.0.55.72 on a Galaxy A16 5G and a moto g play (Android 16, English), 2026-11-16: each of 5 sends per phone cleared the message box (view id messaging_message_box, reported without the package) after its text was typed."
+    },
+    {
       "id": "tiktok_send",
       "package": "com.zhiliaoapp.musically",
       "event": "typed_text_appeared",
