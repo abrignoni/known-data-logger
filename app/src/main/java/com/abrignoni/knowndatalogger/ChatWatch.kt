@@ -47,6 +47,12 @@ class ChatWatch {
                        val last: Map<String, Int>, val atNewest: Boolean, val leftAt: Long)
     private var before: Held? = null
 
+    /**
+     * Left edges of lines that sat clearly on the left, and right edges of lines clearly on the right, per screen
+     * key, kept across baselines and screens (bubble layout belongs to the app, not to one look). Read by [sideAmong].
+     */
+    private val edges = LinkedHashMap<Any, Pair<HashSet<Int>, HashSet<Int>>>()
+
     /** True when the last look went back to the screen held just before, instead of taking a new baseline. */
     var lastLookReturned = false
         private set
@@ -54,6 +60,18 @@ class ChatWatch {
     /** Forget the screen: the next look is a baseline. */
     fun reset() {
         screen = null; most.clear(); frame.clear(); last = emptyMap(); baselineAtNewest = true; lastAt = null; before = null
+        edges.clear()
+    }
+
+    /** Remembers the edges of this look's lines that sit clearly on one side; returns the screen's edges. */
+    private fun learnEdges(screenKey: Any, lines: List<ShownText>, width: Int): Pair<HashSet<Int>, HashSet<Int>> {
+        val e = edges.getOrPut(screenKey) { HashSet<Int>() to HashSet<Int>() }
+        if (edges.size > 50) edges.remove(edges.keys.first())
+        for (l in lines) if (l.inList) when (sideOf(l, width)) {
+            "left" -> e.first += l.left
+            "right" -> e.second += l.right
+        }
+        return e
     }
 
     /**
@@ -66,6 +84,7 @@ class ChatWatch {
     fun look(screenKey: Any, lines: List<ShownText>, width: Int, atNewest: Boolean? = null, now: Long? = null): List<Appeared> {
         val counts = lines.groupingBy { it.text }.eachCount()
         lastLookReturned = false
+        val (leftEdges, rightEdges) = learnEdges(screenKey, lines, width)
         if (screenKey == screen && atNewest == false) { lastAt = now ?: lastAt; return emptyList() }
         // Back on the screen held just before, within RETURN_MS of leaving it (a chat, after the picker that sends a
         // picture from it): what came in meanwhile is compared with the screen as it was left, not taken as a new
@@ -128,7 +147,7 @@ class ChatWatch {
                 continue
             }
             extra[line.text] = left - 1
-            out += Appeared(line.text, sideOf(line, width), line.inList).also { it.top = line.top; it.leaf = line.leaf }
+            out += Appeared(line.text, sideAmong(line, width, leftEdges, rightEdges), line.inList).also { it.top = line.top; it.leaf = line.leaf }
         }
         counts.forEach { (t, n) -> if (n > (most[t] ?: 0)) most[t] = n }
         return out.asReversed()
@@ -163,7 +182,8 @@ class ChatWatch {
          * time was labelled in WhatsApp, and Signal's "Now" under a new message.)
          */
         private val status = Regex("(?i)(downloading|uploading|sending|loading|connecting|waiting for network|" +
-            "tap to (download|load|retry)|failed to send|not delivered|saved|read)\\s*(\\.\\.\\.|…)?")
+            "tap to (download|load|retry)|failed to send|not delivered|saved|read|" +
+            "tap and hold to [a-z ]+(\\. try it)?)\\s*(\\.\\.\\.|…)?")
 
         /**
          * A line that is only a passing status ("Downloading", "Sending…"), shown while a message or picture loads.
@@ -171,7 +191,9 @@ class ChatWatch {
          * "Downloading" showed on the left while a received photo loaded and was labelled received. Snapchat
          * 14.32.0.54, moto g play, 15 November 2026: "SAVED" slid in beside a received picture saved in the chat,
          * under the other side's author line, and was labelled received. LINE, Galaxy A16 5G and moto g play,
-         * 16 November 2026: the read receipt "Read" beside a sent message was labelled received, 4 times in 10 sends.)
+         * 16 November 2026: the read receipt "Read" beside a sent message was labelled received, 4 times in 10 sends.
+         * Instagram 455.0.0.51.72, same phones, 16 November 2026: the hints "Tap and hold to react" and "Tap and hold
+         * to imagine with AI. Try it" showed under a message and were labelled received, once on each phone.)
          */
         fun isStatusOnly(text: String): Boolean = status.matches(text.trim())
 
@@ -185,6 +207,27 @@ class ChatWatch {
             val rightGap = (width - l.right).toDouble() / width
             if ((leftGap < 0.04 && rightGap < 0.04) || kotlin.math.abs(leftGap - rightGap) < 0.02) return "across"
             return if (leftGap < rightGap) "left" else "right"
+        }
+
+        /**
+         * The side of a line, read against the other lines of the same look. A line whose gaps to the two edges are
+         * nearly equal reads "across", but a bubble lines up with the other bubbles on its side: when its left edge
+         * matches a line seen clearly on the left (or its right edge one clearly on the right), and not both, it takes
+         * that side. The edges are those seen on the same screen so far, this look included, because every received
+         * bubble on screen can be a wide one. (Instagram 455.0.0.51.72, Galaxy A16 5G, 16 November 2026: received
+         * bubbles start 158 px in, after the avatar, and two-line ones ended at 908 to 924 of 1080, leaving almost
+         * the same gap on the right; they read across and were not labelled, 1 of 5 received in two rounds.)
+         */
+        fun sideAmong(l: ShownText, width: Int, leftEdges: Set<Int>, rightEdges: Set<Int>): String {
+            val s = sideOf(l, width)
+            if (s != "across" || !l.inList) return s
+            val asLeft = leftEdges.any { kotlin.math.abs(it - l.left) <= 2 }
+            val asRight = rightEdges.any { kotlin.math.abs(it - l.right) <= 2 }
+            return when {
+                asLeft && !asRight -> "left"
+                asRight && !asLeft -> "right"
+                else -> s
+            }
         }
     }
 }

@@ -328,7 +328,9 @@ value as text so content cannot run as a formula.
   on that screen and it is not above every line of old content; old content is text seen before,
   less the frame (text at the same top as at the baseline). Each new line not matching this phone's
   text sent in the last 2 minutes (typed or cleared field) is a `text_appeared` event with detail
-  `side left|right|across` (AppWalk's side rule). A left line not in a notification of the last 2
+  `side left|right|across` (AppWalk's side rule). A line that rule calls across takes a side when its
+  left edge matches a line seen clearly on the left of that screen key, or its right edge one seen
+  clearly on the right, and not both (Instagram's wide received bubbles). A left line not in a notification of the last 2
   minutes adds an unreviewed `received_message` (detail "auto: text appeared on the left of an open
   screen"), with a screenshot when inferred-action screenshots are on. System events
   `screen_watch_active` (first look of a session) and `screen_watch_summary` (looks, baselines,
